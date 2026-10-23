@@ -270,7 +270,8 @@ h3 { font-size: 1.5rem; }
 .cta__side { display: grid; gap: 28px; }
 
 /* Footer */
-.footer { background: var(--abyss); color: var(--on-dark-soft); padding: 0 0 32px; font-size: .95rem; }
+/* Bottom padding keeps the legal links clear of the fixed chat button. */
+.footer { background: var(--abyss); color: var(--on-dark-soft); padding: 0 0 104px; font-size: .95rem; }
 .footer__cols { display: grid; grid-template-columns: 1.6fr repeat(4, 1fr); gap: 32px; border-top: 1px solid var(--rule-dark); padding-top: 72px; }
 .footer__cols p { max-width: 22em; margin-top: 18px; }
 .footer h4 { font-family: var(--sans); color: var(--white); margin: 0 0 16px; font-weight: 500; font-size: .97rem; letter-spacing: 0; }
