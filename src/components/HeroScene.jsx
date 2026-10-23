@@ -739,18 +739,21 @@ export default function HeroScene() {
   };
 
   return (
-    <div
-      className={`hero-scene${failed ? ' is-unavailable' : ''}`}
-      ref={ref}
-      role="img"
-      aria-label="3D animations of CallsTalk: a ringing phone traced to its ad, a lead score dial, revenue bars by channel, calls arriving from many markets on a globe, and conversions syncing to ad platforms."
-    >
-      <div className="hero-scene__caption" aria-hidden="true">
-        <span>{STEPS[step]}</span>
-        <ol>{STEPS.map((s, i) => <li key={s} className={i === step ? 'is-active' : undefined} />)}</ol>
+    <>
+      <div
+        className={`hero-scene${failed ? ' is-unavailable' : ''}`}
+        ref={ref}
+        role="img"
+        aria-label="3D animations of CallsTalk: a ringing phone traced to its ad, a lead score dial, revenue bars by channel, calls arriving from many markets on a globe, and conversions syncing to ad platforms."
+      />
+      <div className="hero-scene__bar">
+        <div className="hero-scene__caption" aria-hidden="true">
+          <span>{STEPS[step]}</span>
+          <ol>{STEPS.map((s, i) => <li key={s} className={i === step ? 'is-active' : undefined} />)}</ol>
+        </div>
+        <button className={`intro__toggle${playing ? '' : ' is-paused'}`} onClick={toggle}
+          aria-label={playing ? 'Pause animation' : 'Play animation'} />
       </div>
-      <button className={`intro__toggle${playing ? '' : ' is-paused'}`} onClick={toggle}
-        aria-label={playing ? 'Pause animation' : 'Play animation'} />
-    </div>
+    </>
   );
 }
