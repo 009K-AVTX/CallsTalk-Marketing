@@ -37,7 +37,7 @@ export default function Hero() {
           <span className="eyebrow">Lead attribution for growing teams</span>
           <h1>See exactly which marketing turns into revenue.</h1>
           <p className="lead">
-            Avortyx connects every phone call, form fill and chat to the campaign, keyword and channel behind it,
+            CallsTalk connects every phone call, form fill and chat to the campaign, keyword and channel behind it,
             so you can cut wasted spend and double down on what works.
           </p>
           <div className="hero__ctas">

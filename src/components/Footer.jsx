@@ -18,7 +18,7 @@ export default function Footer() {
           ))}
         </div>
         <div className="footer__legal">
-          <span>© {new Date().getFullYear()} Avortyx. All rights reserved.</span>
+          <span>© {new Date().getFullYear()} CallsTalk. All rights reserved.</span>
           <span><a href="#">Privacy</a> · <a href="#">Terms</a> · <a href="#">Security</a></span>
         </div>
       </div>
