@@ -2,10 +2,10 @@ import SolutionIcon from './SolutionIcon.jsx';
 
 // Example questions a team can answer with CallsTalk, each with a sample answer from a report.
 const ANSWERS = [
-  { icon: 'Sales Leaders', q: 'Which keyword made the phone ring?', a: 'Paid search, "same-day plumbing"', d: 'drove 34 calls this week' },
+  { icon: 'Sales Leaders', q: 'Which keyword made the phone ring?', a: 'Paid Search, "same-day plumbing"', d: 'Drove 34 calls this week' },
   { icon: 'Financial Services', q: 'Which campaign earned the most revenue?', a: 'Summer tune-up', d: '$18,400 attributed this month' },
-  { icon: 'Marketing Teams', q: 'Where should next month\'s budget go?', a: 'Shift 20% from display to search', d: 'search returns 4.2x on ad spend' },
-  { icon: 'Agencies', q: 'What can I show my client on Monday?', a: 'A white-label revenue report', d: 'scheduled to send every week' },
+  { icon: 'Marketing Teams', q: 'Where should next month\'s budget go?', a: 'Shift 20% from display to search', d: 'Search returns 4.2x its ad spend' },
+  { icon: 'Agencies', q: 'What can I show my client on Monday?', a: 'A white-label revenue report', d: 'Sent automatically every week' },
 ];
 
 export default function Answers() {

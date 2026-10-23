@@ -5,7 +5,7 @@
 // The request counts as received when at least one channel delivers it.
 
 const LIMITS = { name: 80, email: 120, company: 120, phone: 40, volume: 40, message: 1000 };
-const VOLUMES = ['Under 100', '100 - 1,000', '1,000 - 10,000', 'Over 10,000'];
+const VOLUMES = ['Under 100', '100–1,000', '1,000–10,000', 'Over 10,000'];
 
 // Light per-instance throttle: 5 requests per IP every 10 minutes.
 const hits = new Map();

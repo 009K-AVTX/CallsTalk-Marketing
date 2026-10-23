@@ -10,7 +10,7 @@ export default function Footer() {
         <div className="footer__card">
           <div>
             <h2>Lost us on Telegram? Find us here.</h2>
-            <p>Questions, setup or a dropped conversation: our team answers in this chat.</p>
+            <p>Whether you have a question, need setup help or lost a conversation, our team answers here.</p>
           </div>
           <div className="actions">
             <ChatButton />

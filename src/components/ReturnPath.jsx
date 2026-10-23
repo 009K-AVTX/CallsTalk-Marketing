@@ -9,7 +9,7 @@ const SCREEN_H = Math.round(512 * (3.4 * 0.955) / (1.7 * 0.92));
 // Channel shades for the Calls / Forms / Chats cards below the scene.
 export const CHANNEL_COLORS = ['#d6a3ff', '#e8c9ff', '#ffffff'];
 
-const STEPS = ['A click from a campaign', 'The conversation that closes', 'Revenue back to the campaign'];
+const STEPS = ['A Click from a Campaign', 'The Conversation That Closes', 'Revenue Back to the Campaign'];
 
 // Seconds within one loop.
 const LOOP = 11;

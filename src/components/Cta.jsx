@@ -9,11 +9,10 @@ export default function Cta() {
           <ul className="assurances">
             <li>A specialist sets you up</li>
             <li>One snippet, live the same day</li>
-            <li>Leave whenever you like</li>
+            <li>Cancel at any time</li>
           </ul>
           <div className="actions" id="demo">
-            <a href="/request-access" className="btn btn--light">Request access</a>
-            <ChatButton className="btn btn--quiet" />
+            <ChatButton />
           </div>
         </div>
       </div>

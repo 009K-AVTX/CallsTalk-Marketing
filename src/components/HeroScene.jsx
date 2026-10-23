@@ -3,7 +3,7 @@ import { webFontsReady } from '../lib/fonts.js';
 import { buildIPhone, clipScreen, paintIPhoneChrome } from '../lib/iphone.js';
 
 // Five short 3D vignettes, one per part of the product, shown in turn.
-const STEPS = ['Call attribution', 'Lead scoring', 'Revenue by channel', 'Calls from every market', 'Conversion sync'];
+const STEPS = ['Call Attribution', 'Lead Scoring', 'Revenue by Channel', 'Calls from Every Market', 'Conversion Sync'];
 const DUR = 6.5; // seconds per vignette
 const EDGE = 0.75; // seconds of transition in and out
 

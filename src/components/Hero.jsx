@@ -18,7 +18,7 @@ export default function Hero() {
             </div>
             <ul className="assurances">
               <li>A real person sets you up</li>
-              <li>Live the day you paste one snippet</li>
+              <li>Live the same day you add one snippet</li>
             </ul>
           </div>
           <figure className="hero__film">
@@ -26,7 +26,7 @@ export default function Hero() {
           </figure>
         </div>
         <div className="works">
-          <p>Plugs into the stack you already run</p>
+          <p>Works with the tools you already use</p>
           <ul>
             {FEATURED.map((item) => (
               <li key={item.name}><BrandLogo item={item} size="sm" />{item.name}</li>

@@ -5,12 +5,12 @@ const facts = [
   { value: '3', label: 'ways customers reach you, tracked in one place' },
   { value: '1 thread', label: 'from first click to closed deal, for every lead' },
   { value: '1 snippet', label: 'is all your website needs' },
-  { value: '24/7', label: 'logging, even when nobody picks up' },
+  { value: '24/7', label: 'tracking, even when nobody picks up' },
 ];
 
 const channels = [
   { name: 'Calls', text: 'Each ring arrives with its ad and keyword.' },
-  { name: 'Forms', text: 'Each submission brings its visit history.' },
+  { name: 'Forms', text: 'Each submission arrives with its visit history.' },
   { name: 'Chats', text: 'Each chat keeps its campaign attached.' },
 ];
 

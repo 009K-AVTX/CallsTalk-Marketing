@@ -1,7 +1,7 @@
 // Tools CallsTalk connects to, grouped as on the Avortyx integrations board.
 // `logo` is a file in public/logos (Simple Icons); tools without one show a monogram tile.
 export const INTEGRATION_GROUPS = [
-  { title: 'Ad platforms', items: [
+  { title: 'Ad Platforms', items: [
     { name: 'Google Ads', logo: 'googleads', color: '#4285F4' },
     { name: 'Meta', logo: 'meta', color: '#0467DF' },
   ] },
@@ -17,18 +17,18 @@ export const INTEGRATION_GROUPS = [
     { name: 'Segment', mark: 'Sg', color: '#52BD95' },
     { name: 'Datadog', logo: 'datadog', color: '#632CA6' },
   ] },
-  { title: 'Data warehouses', items: [
+  { title: 'Data Warehouses', items: [
     { name: 'Snowflake', logo: 'snowflake', color: '#29B5E8' },
     { name: 'BigQuery', logo: 'googlebigquery', color: '#669DF6' },
     { name: 'PostgreSQL', logo: 'postgresql', color: '#4169E1' },
   ] },
-  { title: 'Team messaging', items: [
+  { title: 'Team Messaging', items: [
     { name: 'Slack', mark: 'Sl', color: '#E01E5A' },
     { name: 'Microsoft Teams', mark: 'MT', color: '#6264A7' },
     { name: 'Discord', logo: 'discord', color: '#5865F2' },
     { name: 'Telegram', logo: 'telegram', color: '#26A5E4' },
   ] },
-  { title: 'Automation & billing', items: [
+  { title: 'Automation & Billing', items: [
     { name: 'Zapier', mark: 'Za', color: '#FF4F00' },
     { name: 'Make', logo: 'make', color: '#6D00CC' },
     { name: 'Stripe', logo: 'stripe', color: '#635BFF' },

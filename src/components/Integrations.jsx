@@ -40,7 +40,7 @@ function Ring({ items, size, reverse, active = -1, tick = 0 }) {
 
 // Each tick: the core ripples, a packet flies out to one featured tool, the tool pops when it lands,
 // and the caption reports the event while the day's count ticks up.
-const EVENTS = [['Call', 'Paid search'], ['Form', 'Organic search'], ['Chat', 'Paid social'], ['Call', 'Email campaign'], ['Form', 'Paid search'], ['Chat', 'Referral']];
+const EVENTS = [['Call', 'Paid Search'], ['Form', 'Organic Search'], ['Chat', 'Paid Social'], ['Call', 'Email Campaign'], ['Form', 'Paid Search'], ['Chat', 'Referral']];
 const START = 1284;
 
 function Hub() {
@@ -92,7 +92,7 @@ export default function Integrations() {
       <div className="integrations__intro">
         <p className="integrations__count"><b>{ALL_INTEGRATIONS.length}</b> integrations</p>
         <h3>Your attribution, delivered wherever your team works.</h3>
-        <p>Every traced call, form and chat, pushed to the tools you open each morning.</p>
+        <p>Every traced call, form and chat, delivered to the tools your team uses every day.</p>
         <Hub />
       </div>
       <div className="integrations__catalog">

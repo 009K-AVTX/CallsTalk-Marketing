@@ -12,7 +12,7 @@ const suggestions = ['How does call tracking work?', 'Which plan fits my busines
 const greeting = {
   id: 'greeting',
   from: 'assistant',
-  text: 'Hi, this is CallsTalk. Ask me anything, or reach a person on our team.',
+  text: 'Hi, this is CallsTalk. Ask me anything, or speak with someone on our team.',
 };
 
 function HandoffForm({ initialMessage, onStart, onCancel }) {
@@ -184,7 +184,7 @@ export default function ChatWidget() {
           <header className="chat__head">
             <LogoMark />
             <div>
-              <b>{session ? 'CallsTalk team' : 'CallsTalk assistant'}</b>
+              <b>{session ? 'CallsTalk Team' : 'CallsTalk Assistant'}</b>
               <small>{session ? 'Replies here and by email' : 'Answers in seconds'}</small>
             </div>
             <button className="chat__close" aria-label="Close chat" onClick={() => setOpen(false)} />
@@ -225,18 +225,18 @@ export default function ChatWidget() {
           )}
 
           <footer className="chat__foot">
-            {session && <button className="chat__text-btn" onClick={endChat}>End this chat</button>}
+            {session && <button className="chat__text-btn" onClick={endChat}>End This Chat</button>}
             {!session && !handoff && liveChatEnabled && (
-              <button className="chat__text-btn" onClick={() => setHandoff(true)}>Talk to our team</button>
+              <button className="chat__text-btn" onClick={() => setHandoff(true)}>Talk to Our Team</button>
             )}
           </footer>
         </section>
       )}
 
-      <button className="chat__launcher" aria-expanded={open} aria-label={open ? 'Close chat' : 'Chat with us'} onClick={() => setOpen(!open)}>
+      <button className="chat__launcher" aria-expanded={open} aria-label={open ? 'Close Chat' : 'Chat With Us'} onClick={() => setOpen(!open)}>
         <span className={`chat__dot${unread ? ' is-unread' : ''}`} aria-hidden="true" />
         <svg className="chat__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h14a3 3 0 0 1 3 3v8a3 3 0 0 1-3 3H10l-4.5 3.4A.6.6 0 0 1 4.5 21l.6-3.1A3 3 0 0 1 2 15V7a3 3 0 0 1 3-3Z" /></svg>
-        <span className="chat__label">{open ? 'Close chat' : 'Chat with us'}</span>
+        <span className="chat__label">{open ? 'Close Chat' : 'Chat With Us'}</span>
         {unread && <span className="sr-only">New reply from the team</span>}
       </button>
     </div>
