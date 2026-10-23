@@ -2,18 +2,20 @@ import { updates } from '../data.js';
 
 export default function Updates() {
   return (
-    <section className="section section--tight" id="resources">
-      <div className="container">
+    <section className="updates" id="resources">
+      <div className="container updates__inner">
         <h2 className="h-sm">Latest from CallsTalk</h2>
-        <div className="grid grid--3">
-          {updates.map(({ title, thumb }) => (
-            <article key={title} className="card post">
-              <div className={`post__thumb ${thumb}`} />
-              <h3>{title}</h3>
-              <a href="#">Read more →</a>
-            </article>
+        <ul className="updates__list">
+          {updates.map(({ title, tag }) => (
+            <li key={title}>
+              <a href="#">
+                <span className="tag">{tag}</span>
+                <span className="updates__title">{title}</span>
+                <span className="updates__more">Read more</span>
+              </a>
+            </li>
           ))}
-        </div>
+        </ul>
       </div>
     </section>
   );

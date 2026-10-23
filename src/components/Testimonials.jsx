@@ -2,15 +2,17 @@ import { reviews } from '../data.js';
 
 export default function Testimonials() {
   return (
-    <section className="section section--alt">
+    <section className="section">
       <div className="container">
-        <h2 className="center">Trusted by teams that measure with CallsTalk.</h2>
-        <div className="grid grid--3">
+        <h2>Trusted by teams that measure with CallsTalk.</h2>
+        <div className="reviews">
           {reviews.map(({ initial, quote, name, role }) => (
-            <figure key={initial} className="card review">
-              <div className="avatar">{initial}</div>
+            <figure key={initial} className="review">
               <blockquote>{quote}</blockquote>
-              <figcaption><b>{name}</b> {role}</figcaption>
+              <figcaption>
+                <span className="avatar" aria-hidden="true">{initial}</span>
+                <span><b>{name}</b>{role}</span>
+              </figcaption>
             </figure>
           ))}
         </div>

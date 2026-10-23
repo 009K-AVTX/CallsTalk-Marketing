@@ -11,15 +11,18 @@ export default function Nav() {
       <div className="container nav__inner">
         <Logo />
         <button className="nav__toggle" aria-label="Open menu" aria-expanded={open} onClick={() => setOpen(!open)}>
-          ☰
+          <span /><span />
         </button>
         <nav className={`nav__links${open ? ' is-open' : ''}`} onClick={close}>
           {navLinks.map(({ href, label }) => (
             <a key={href} href={href}>{label}</a>
           ))}
-          <a href="#pricing" className="nav__pricing">Plans</a>
-          <a href="#demo" className="btn btn--ghost btn--sm">Schedule a Demo</a>
-          <a href="#trial" className="btn btn--primary btn--sm">Try It Free</a>
+          <a href="#pricing">Plans</a>
+          <span className="nav__actions">
+            <a href="#">Sign In</a>
+            <a href="#demo">Schedule a Demo</a>
+            <a href="#trial" className="btn btn--lamp btn--sm">Try It Free</a>
+          </span>
         </nav>
       </div>
     </header>

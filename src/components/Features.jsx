@@ -2,16 +2,17 @@ import { features } from '../data.js';
 
 export default function Features() {
   return (
-    <section className="section" id="features">
+    <section className="section features" id="features">
       <div className="container">
-        {features.map((f, i) => (
-          <div key={f.eyebrow} className={`feature${i % 2 ? ' feature--rev' : ''}`}>
-            <div className={`feature__art ${f.art}`} aria-hidden="true" />
+        {features.map((f) => (
+          <article key={f.eyebrow} className="feature">
             <div className="feature__copy">
-              <span className="eyebrow">{f.eyebrow}</span>
+              <p className="kicker">{f.eyebrow}</p>
               <h2>{f.title}</h2>
               <p>{f.body}</p>
-              <ul className="iconlinks">
+            </div>
+            <div className="feature__detail">
+              <ul className="capabilities">
                 {f.links.map((l) => <li key={l}><a href="#">{l}</a></li>)}
               </ul>
               <blockquote className="quote">
@@ -19,7 +20,7 @@ export default function Features() {
                 <cite>Full Name, Job Title</cite>
               </blockquote>
             </div>
-          </div>
+          </article>
         ))}
       </div>
     </section>

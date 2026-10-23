@@ -1,4 +1,3 @@
-import UtilityBar from './components/UtilityBar.jsx';
 import Nav from './components/Nav.jsx';
 import Hero from './components/Hero.jsx';
 import Updates from './components/Updates.jsx';
@@ -14,7 +13,6 @@ import Footer from './components/Footer.jsx';
 export default function App() {
   return (
     <>
-      <UtilityBar />
       <Nav />
       <main>
         <Hero />

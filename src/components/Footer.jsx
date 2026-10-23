@@ -19,7 +19,7 @@ export default function Footer() {
         </div>
         <div className="footer__legal">
           <span>© {new Date().getFullYear()} CallsTalk. All rights reserved.</span>
-          <span><a href="#">Privacy Policy</a> · <a href="#">Terms of Service</a> · <a href="#">Trust &amp; Security</a></span>
+          <span className="footer__links"><a href="#">Privacy Policy</a><a href="#">Terms of Service</a><a href="#">Trust &amp; Security</a></span>
         </div>
       </div>
     </footer>

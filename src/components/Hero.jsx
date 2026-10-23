@@ -1,31 +1,49 @@
-const bars = [40, 55, 48, 70, 62, 85, 78, 95];
-
-const leads = [
-  { type: 'Call', source: 'Paid Search · "same-day plumbing"', status: 'Sales-ready' },
-  { type: 'Form', source: 'Organic Search · /plans', status: 'Proposal sent' },
-  { type: 'Chat', source: 'Paid Social · Summer campaign', status: 'Awaiting reply' },
+const sources = [
+  { label: 'Paid search', y: 70 },
+  { label: 'Organic search', y: 190 },
+  { label: 'Paid social', y: 310 },
 ];
 
-function DashboardMock() {
+const outcomes = [
+  { label: 'Job booked', value: '$420', y: 70 },
+  { label: 'Proposal sent', value: '$1,800', y: 190 },
+  { label: 'Sales-ready', value: '$960', y: 310 },
+];
+
+const HUB = { x: 300, y: 190 };
+
+function Switchboard() {
   return (
-    <div className="mock">
-      <div className="mock__bar"><i /><i /><i /></div>
-      <div className="mock__body">
-        <div className="mock__stats">
-          <div><small>Total Leads</small><b>1,284</b></div>
-          <div><small>Sales-Ready</small><b>612</b></div>
-          <div><small>Attributed Revenue</small><b>$184k</b></div>
-        </div>
-        <div className="mock__chart">
-          {bars.map((h, i) => <span key={i} style={{ height: `${h}%` }} />)}
-        </div>
-        <ul className="mock__rows">
-          {leads.map((l) => (
-            <li key={l.type}><b>{l.type}</b> {l.source} <em>{l.status}</em></li>
-          ))}
-        </ul>
-      </div>
-    </div>
+    <svg className="board" viewBox="0 0 600 380" role="img"
+      aria-label="Calls from paid search, organic search and paid social routed through CallsTalk to the revenue they produced">
+      {sources.map((s, i) => {
+        const d = `M158 ${s.y} C 225 ${s.y}, 225 ${HUB.y}, ${HUB.x - 34} ${HUB.y}`;
+        return (
+          <g key={s.label}>
+            <path className="cable" d={d} />
+            <path className="pulse" d={d} pathLength="100" style={{ animationDelay: `${i * 0.9}s` }} />
+            <rect className="jack" x="8" y={s.y - 19} width="150" height="38" rx="19" />
+            <circle className="lamp" cx="30" cy={s.y} r="5" />
+            <text x="44" y={s.y + 5}>{s.label}</text>
+          </g>
+        );
+      })}
+      {outcomes.map((o, i) => {
+        const d = `M${HUB.x + 34} ${HUB.y} C 365 ${HUB.y}, 365 ${o.y}, 420 ${o.y}`;
+        return (
+          <g key={o.label}>
+            <path className="cable" d={d} />
+            <path className="pulse pulse--out" d={d} pathLength="100" style={{ animationDelay: `${i * 0.9 + 0.9}s` }} />
+            <rect className="jack jack--out" x="420" y={o.y - 19} width="172" height="38" rx="19" />
+            <text x="436" y={o.y + 5}>{o.label}</text>
+            <text className="board__value" x="578" y={o.y + 5} textAnchor="end">{o.value}</text>
+          </g>
+        );
+      })}
+      <circle className="hub" cx={HUB.x} cy={HUB.y} r="34" />
+      <circle className="hub__ring" cx={HUB.x} cy={HUB.y} r="16" />
+      <circle className="lamp" cx={HUB.x} cy={HUB.y} r="6" />
+    </svg>
   );
 }
 
@@ -34,22 +52,24 @@ export default function Hero() {
     <section className="hero">
       <div className="container hero__inner">
         <div className="hero__copy">
-          <span className="eyebrow">Call and lead attribution for ambitious teams</span>
           <h1>Discover which marketing efforts drive real revenue.</h1>
           <p className="lead">
             CallsTalk links each phone call, form submission and chat conversation to the campaign, keyword and channel
             responsible, so you can eliminate wasted budget and invest in what performs.
           </p>
           <div className="hero__ctas">
-            <a href="#trial" className="btn btn--primary">Begin Your Free 14-Day Trial</a>
-            <a href="#demo" className="btn btn--ghost">Request a Live Demo</a>
+            <a href="#trial" className="btn btn--lamp">Begin Your Free 14-Day Trial</a>
+            <a href="#demo" className="btn btn--line">Request a Live Demo</a>
           </div>
-          <p className="fine">No payment details required · Ready in minutes</p>
+          <ul className="assurances">
+            <li>No payment details required</li>
+            <li>Ready in minutes</li>
+          </ul>
         </div>
-        <div className="hero__visual">
-          <DashboardMock />
-          <a href="#how" className="play">▶ See how it works</a>
-        </div>
+        <figure className="hero__visual">
+          <Switchboard />
+          <figcaption>Every inquiry, traced from first click to closed revenue. <a href="#how">See how it works</a></figcaption>
+        </figure>
       </div>
     </section>
   );

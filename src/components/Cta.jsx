@@ -1,16 +1,18 @@
 export default function Cta() {
   return (
     <section className="cta" id="trial">
-      <div className="container center">
+      <div className="container cta__inner">
         <h2>Replace assumptions with evidence.</h2>
-        <div className="cta__tags">
-          <span>✓ Free for 14 days</span>
-          <span>✓ No payment details required</span>
-          <span>✓ No long-term commitment</span>
-        </div>
-        <div className="hero__ctas center-row" id="demo">
-          <a href="#" className="btn btn--light">Try CallsTalk Free</a>
-          <a href="#" className="btn btn--outline-light">Schedule a Demo</a>
+        <div>
+          <ul className="assurances">
+            <li>Free for 14 days</li>
+            <li>No payment details required</li>
+            <li>No long-term commitment</li>
+          </ul>
+          <div className="hero__ctas" id="demo">
+            <a href="#" className="btn btn--ink">Try CallsTalk Free</a>
+            <a href="#" className="btn btn--line">Schedule a Demo</a>
+          </div>
         </div>
       </div>
     </section>

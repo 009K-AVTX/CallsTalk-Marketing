@@ -8,9 +8,9 @@ export const navLinks = [
 ];
 
 export const updates = [
-  { title: 'AI-powered lead scoring is now included with all plans', thumb: 't1' },
-  { title: 'Introducing offline conversion sync for leading ad networks', thumb: 't2' },
-  { title: 'How to design attribution dashboards your clients will trust', thumb: 't3' },
+  { title: 'AI-powered lead scoring is now included with all plans', tag: 'Product update' },
+  { title: 'Introducing offline conversion sync for leading ad networks', tag: 'New feature' },
+  { title: 'How to design attribution dashboards your clients will trust', tag: 'Guide' },
 ];
 
 export const features = [
@@ -18,41 +18,38 @@ export const features = [
     eyebrow: 'Lead Capture',
     title: 'Never miss an opportunity.',
     body: 'Dynamic number insertion, form monitoring and chat attribution automatically record where each inquiry originated.',
-    art: 'art1',
-    links: ['📞 Call Attribution', '📝 Form Monitoring', '💬 Chat Attribution', '🛒 Purchase Tracking'],
+    links: ['Call Attribution', 'Form Monitoring', 'Chat Attribution', 'Purchase Tracking'],
   },
   {
     eyebrow: 'Lead Qualification',
     title: 'Respond with confidence.',
     body: 'Prioritize, label and value every lead from a single workspace, then assign it to the right team member while interest is high.',
-    art: 'art2',
-    links: ['⭐ Lead Prioritization', '🏷️ Labels & Comments', '🔔 Real-Time Notifications', '🎧 Conversation Recording'],
+    links: ['Lead Prioritization', 'Labels & Comments', 'Real-Time Notifications', 'Conversation Recording'],
   },
   {
     eyebrow: 'Reporting & Intelligence',
     title: 'Demonstrate your return.',
     body: 'Connect leads to closed revenue across all channels and deliver clear reports that quantify the return on every dollar invested.',
-    art: 'art3',
-    links: ['📊 Custom Dashboards', '🔁 Conversion Sync', '🧭 Cross-Channel Attribution', '📤 Automated Reporting'],
+    links: ['Custom Dashboards', 'Conversion Sync', 'Cross-Channel Attribution', 'Automated Reporting'],
   },
 ];
 
 export const solutions = {
   role: [
-    { icon: '🏢', title: 'Agencies', text: 'Demonstrate measurable value with white-label client reporting.' },
-    { icon: '📈', title: 'Marketing Teams', text: 'Allocate budget to the campaigns that perform.' },
-    { icon: '🧑‍💼', title: 'Owners & Operators', text: 'Understand exactly how customers find you.' },
-    { icon: '🛎️', title: 'Sales Leaders', text: 'Prioritize follow-up on your highest-intent prospects.' },
+    { title: 'Agencies', text: 'Demonstrate measurable value with white-label client reporting.' },
+    { title: 'Marketing Teams', text: 'Allocate budget to the campaigns that perform.' },
+    { title: 'Owners & Operators', text: 'Understand exactly how customers find you.' },
+    { title: 'Sales Leaders', text: 'Prioritize follow-up on your highest-intent prospects.' },
   ],
   industry: [
-    { icon: '🔧', title: 'Home & Field Services', text: 'Attribute each service request to its originating channel.' },
-    { icon: '⚖️', title: 'Law Firms', text: 'Calculate the acquisition cost of every retained client.' },
-    { icon: '🩺', title: 'Healthcare Providers', text: 'Attribute patient bookings with privacy built in.' },
-    { icon: '🚗', title: 'Auto Dealerships', text: 'Link dealership visits to the campaigns that drove them.' },
-    { icon: '🏠', title: 'Property & Real Estate', text: 'Identify the listings that generate the most interest.' },
-    { icon: '🎓', title: 'Higher Education', text: 'Follow each enrollment back to its first interaction.' },
-    { icon: '🏦', title: 'Financial Services', text: 'Assess lead quality by the business it produces.' },
-    { icon: '🛍️', title: 'Online Retail', text: 'Unite phone sales with the digital journey behind them.' },
+    { title: 'Home & Field Services', text: 'Attribute each service request to its originating channel.' },
+    { title: 'Law Firms', text: 'Calculate the acquisition cost of every retained client.' },
+    { title: 'Healthcare Providers', text: 'Attribute patient bookings with privacy built in.' },
+    { title: 'Auto Dealerships', text: 'Link dealership visits to the campaigns that drove them.' },
+    { title: 'Property & Real Estate', text: 'Identify the listings that generate the most interest.' },
+    { title: 'Higher Education', text: 'Follow each enrollment back to its first interaction.' },
+    { title: 'Financial Services', text: 'Assess lead quality by the business it produces.' },
+    { title: 'Online Retail', text: 'Unite phone sales with the digital journey behind them.' },
   ],
 };
 
@@ -62,10 +59,10 @@ export const integrations = [
 ];
 
 export const steps = [
-  { title: 'Create your account', text: 'Registration takes less than sixty seconds.', link: 'Get started →' },
-  { title: 'Install the tracking code', text: 'Add a single snippet directly or through your tag manager.', link: 'View setup guide →' },
-  { title: 'Link your platforms', text: 'Connect your advertising accounts and CRM.', link: 'See connections →' },
-  { title: 'Work with our experts', text: 'Our specialists make sure your configuration is accurate.', link: 'Speak with us →' },
+  { title: 'Create your account', text: 'Registration takes less than sixty seconds.', link: 'Get started' },
+  { title: 'Install the tracking code', text: 'Add a single snippet directly or through your tag manager.', link: 'View setup guide' },
+  { title: 'Link your platforms', text: 'Connect your advertising accounts and CRM.', link: 'See connections' },
+  { title: 'Work with our experts', text: 'Our specialists make sure your configuration is accurate.', link: 'Speak with us' },
 ];
 
 export const pricing = {

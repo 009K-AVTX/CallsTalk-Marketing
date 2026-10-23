@@ -11,19 +11,17 @@ export default function Solutions() {
   const [active, setActive] = useState('role');
 
   return (
-    <section className="section section--alt" id="solutions">
+    <section className="section" id="solutions">
       <div className="container">
-        <div className="center">
+        <div className="section__head">
           <h2>Designed around the way you operate.</h2>
           <Tabs tabs={tabs} active={active} onChange={setActive} />
         </div>
-        <div className="grid grid--4">
-          {solutions[active].map(({ icon, title, text }) => (
-            <a key={title} className="card tile" href="#">
-              <span>{icon}</span>
+        <div className="tiles">
+          {solutions[active].map(({ title, text }) => (
+            <a key={title} className="tile" href="#">
               <h3>{title}</h3>
               <p>{text}</p>
-              <em>Explore →</em>
             </a>
           ))}
         </div>
