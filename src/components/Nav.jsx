@@ -18,7 +18,7 @@ export default function Nav() {
           {navLinks.map(({ href, label }) => (
             <a key={href} href={href}>{label}</a>
           ))}
-          <a href="#pricing">Plans</a>
+          <a href="/#pricing">Plans</a>
           <span className="nav__actions">
             <ChatButton className="">Request Access</ChatButton>
             <ChatButton className="btn btn--light btn--sm" />

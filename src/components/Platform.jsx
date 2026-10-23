@@ -1,3 +1,4 @@
+import ChatButton from './ChatButton.jsx';
 import { useRef, useState } from 'react';
 import { features } from '../data.js';
 
@@ -146,7 +147,7 @@ export default function Platform() {
                 </li>
               ))}
             </ul>
-            <a href="#" className="link">{f.cta}</a>
+            <ChatButton className="link">{`Ask about ${f.eyebrow.toLowerCase()}`}</ChatButton>
           </div>
           <div className="screen" aria-hidden="true">
             <View />

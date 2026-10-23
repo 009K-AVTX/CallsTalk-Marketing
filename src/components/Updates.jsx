@@ -8,11 +8,10 @@ export default function Updates() {
         <ul className="updates__list">
           {updates.map(({ title, tag }) => (
             <li key={title}>
-              <a href="#">
+              <div className="updates__item">
                 <span className="updates__tag">{tag}</span>
                 <span className="updates__title">{title}</span>
-                <span className="updates__more">Read more</span>
-              </a>
+              </div>
             </li>
           ))}
         </ul>

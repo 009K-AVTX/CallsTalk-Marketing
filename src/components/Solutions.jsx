@@ -21,11 +21,11 @@ export default function Solutions() {
         <ul className="index">
           {solutions[active].map(({ title, text }) => (
             <li key={title}>
-              <a href="#">
+              <div className="index__item">
                 <SolutionIcon name={title} />
                 <h3>{title}</h3>
                 <p>{text}</p>
-              </a>
+              </div>
             </li>
           ))}
         </ul>

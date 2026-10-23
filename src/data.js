@@ -1,10 +1,10 @@
 // Page content. Placeholder values (prices, testimonials, phone) must be replaced before launch.
 
 export const navLinks = [
-  { href: '#features', label: 'Platform' },
-  { href: '#solutions', label: 'Use Cases' },
-  { href: '#integrations', label: 'Connected Apps' },
-  { href: '#resources', label: 'Insights' },
+  { href: '/#features', label: 'Platform' },
+  { href: '/#solutions', label: 'Use Cases' },
+  { href: '/#integrations', label: 'Connected Apps' },
+  { href: '/#resources', label: 'Insights' },
 ];
 
 export const updates = [
@@ -77,10 +77,10 @@ export const integrations = [
 ];
 
 export const steps = [
-  { title: 'Create your account', text: 'Registration takes less than sixty seconds.', link: 'Get started' },
-  { title: 'Install the tracking code', text: 'Add a single snippet directly or through your tag manager.', link: 'View setup guide' },
-  { title: 'Link your platforms', text: 'Connect your advertising accounts and CRM.', link: 'See connections' },
-  { title: 'Work with our experts', text: 'Our specialists make sure your configuration is accurate.', link: 'Speak with us' },
+  { title: 'Create your account', text: 'Registration takes less than sixty seconds.', link: 'Get started', href: '/#access' },
+  { title: 'Install the tracking code', text: 'Add a single snippet directly or through your tag manager.', link: 'View setup guide', href: '/#how' },
+  { title: 'Link your platforms', text: 'Connect your advertising accounts and CRM.', link: 'See connections', href: '/#integrations' },
+  { title: 'Work with our experts', text: 'Our specialists make sure your configuration is accurate.', link: 'Speak with us', href: '/#access' },
 ];
 
 export const pricing = {
@@ -106,8 +106,8 @@ export const reviews = ['A', 'B', 'C', 'D', 'E', 'F'].map((initial) => ({
 }));
 
 export const footerColumns = [
-  { title: 'Platform', links: ['Call Attribution', 'Form Monitoring', 'Chat Attribution', 'Analytics & Reports'] },
-  { title: 'Use Cases', links: ['Agencies', 'Marketing Teams', 'Owners & Operators', 'Sales Leaders'] },
-  { title: 'Learn', links: ['Articles', 'Support Center', 'Developer Documentation', 'Connected Apps'] },
-  { title: 'About', links: ['Our Story', 'Join Our Team', 'Contact Us', 'Plans & Pricing'] },
+  { title: 'Platform', links: [['Call Attribution', '/#features'], ['Lead Scoring', '/#features'], ['Reporting', '/#features'], ['Plans & Pricing', '/#pricing']] },
+  { title: 'Use Cases', links: [['Agencies', '/#solutions'], ['Marketing Teams', '/#solutions'], ['Owners & Operators', '/#solutions'], ['Sales Leaders', '/#solutions']] },
+  { title: 'Resources', links: [['Getting Started', '/#how'], ['Integrations', '/#integrations'], ['Latest Updates', '/#resources']] },
+  { title: 'Legal', links: [['Legal Center', '/legal'], ['Terms of Service', '/terms'], ['Privacy Policy', '/privacy'], ['Cookie Policy', '/cookies']] },
 ];
