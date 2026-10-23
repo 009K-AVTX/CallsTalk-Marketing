@@ -39,6 +39,9 @@ function Estimator() {
         <strong>{money(monthly)}</strong>
       </div>
       <p className="estimate__once">Plus {money(numbers * BILLING.number)} once for {numbers} tracking {numbers === 1 ? 'number' : 'numbers'}.</p>
+      <ul className="ratecard__included">
+        {BILLING.included.map((b) => <li key={b}>{b}</li>)}
+      </ul>
     </div>
   );
 }
@@ -56,22 +59,19 @@ export default function Pricing() {
 
         <div className="rates">
           <div className="ratecard">
-            <span className="ratecard__tag">Every Account</span>
-            <div className="ratecard__price">
-              <strong>${BILLING.portal}</strong>
-              <span>per month<br />for the platform</span>
+            <div className="ratecard__top">
+              <span className="ratecard__tag">The Platform</span>
+              <div className="ratecard__price"><strong>${BILLING.portal}</strong><span>/month</span></div>
+              <p>Attribution, dashboards and reports in one place. Then pay as you go:</p>
             </div>
-            <ul className="ratecard__sheet">
+            <ul className="ratetiles">
               {BILLING.rates.map((r) => (
-                <li key={r.name}>
-                  <span><b>{r.name}</b><small>{r.note}</small></span>
-                  <i aria-hidden="true" />
+                <li key={r.name} className={r.free ? 'is-free' : undefined}>
+                  <span>{r.name}</span>
                   <strong>{r.value}{r.unit && <em>{r.unit}</em>}</strong>
+                  <small>{r.note}</small>
                 </li>
               ))}
-            </ul>
-            <ul className="ratecard__included">
-              {BILLING.included.map((b) => <li key={b}>{b}</li>)}
             </ul>
             <a href="/request-access" className="btn btn--light">Request Access</a>
           </div>
