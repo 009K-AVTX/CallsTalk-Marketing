@@ -88,19 +88,19 @@ export const steps = [
 export const BILLING = {
   portal: 49,
   perMinute: 0.35,
-  rates: [
-    { name: 'Call Minutes', value: '$0.35', unit: '/min', note: 'Rounded up to the nearest minute' },
-    { name: 'Tracking Numbers', value: '$15', unit: 'once', note: 'Local or toll-free, yours to keep' },
-    { name: 'Call Recording', value: '$0.005', unit: '/min', note: 'Only on calls you choose to record' },
-    { name: 'Blocked Calls', value: '$0.01', unit: '/call', note: 'Stopped before they reach you' },
-    { name: 'Spam Screening', value: 'Free', unit: '', note: 'Every call is checked before it rings', free: true },
-  ],
   recording: 0.005,
   number: 15,
-  included: [
-    'Calls, forms and chats in one dashboard',
+  terms: [
+    { name: 'Platform', value: '$49', unit: 'per month', note: 'Attribution, dashboards and reports' },
+    { name: 'Call Minutes', value: '$0.35', unit: 'per minute', note: 'Rounded up to the nearest minute' },
+    { name: 'Recording', value: '$0.005', unit: 'per minute', note: 'Only on calls you choose to record' },
+    { name: 'Tracking Numbers', value: '$15', unit: 'one-time', note: 'Local or toll-free, yours to keep' },
+  ],
+  extras: [
+    'Spam screening on every call, free',
+    'Blocked calls at $0.01 each',
+    'No setup fees',
     'Prepaid balance with optional auto top-up',
-    'Itemized cost on every call',
   ],
 };
 

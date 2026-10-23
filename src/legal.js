@@ -1,6 +1,7 @@
 // Legal Center content, structured after the Avortyx Legal Center and adapted to CallsTalk.
 // Contact addresses live here so they can be changed in one place.
 export const SUPPORT_EMAIL = 'support@callstalk.com';
+export const TELEGRAM_HANDLE = 'callstalk';
 export const LEGAL_EMAIL = 'legal@callstalk.com';
 const EFFECTIVE = 'October 23, 2026';
 

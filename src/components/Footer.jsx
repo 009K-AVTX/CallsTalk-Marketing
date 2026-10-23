@@ -1,7 +1,7 @@
 import Logo from './Logo.jsx';
 import ChatButton from './ChatButton.jsx';
 import { footerColumns } from '../data.js';
-import { SUPPORT_EMAIL } from '../legal.js';
+import ContactLinks from './ContactLinks.jsx';
 
 export default function Footer() {
   return (
@@ -10,11 +10,11 @@ export default function Footer() {
         <div className="footer__card">
           <div className="footer__card-copy">
             <h2>Get in Touch</h2>
-            <p>Questions or setup help? Message our team and we will reply in the chat or by email.</p>
+            <p>Questions or setup help? Message us on Telegram, send an email or start a chat, and our team will get back to you.</p>
           </div>
           <div className="footer__card-actions">
+            <ContactLinks />
             <ChatButton />
-            <a href={`mailto:${SUPPORT_EMAIL}`} className="btn btn--quiet">Email Support</a>
           </div>
         </div>
         <div className="footer__cols">
