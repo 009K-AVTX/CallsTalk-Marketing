@@ -1,3 +1,4 @@
+import ChatButton from './ChatButton.jsx';
 import { useState } from 'react';
 import Tabs from './Tabs.jsx';
 import { pricing } from '../data.js';
@@ -22,9 +23,9 @@ function Plan({ name, price, note, items, popular, sales }) {
           <li key={value}>{label && <span>{label}</span>} <b>{value}</b></li>
         ))}
       </ul>
-      <a href={sales ? '#demo' : '#access'} className={`btn ${popular ? 'btn--light' : 'btn--quiet'}`}>
-        {sales ? 'Contact Sales' : 'Request Access'}
-      </a>
+      <ChatButton className={`btn ${popular ? 'btn--light' : 'btn--quiet'}`}>
+        {sales ? 'Chat with us' : 'Request Access'}
+      </ChatButton>
     </div>
   );
 }

@@ -28,10 +28,10 @@ export default function Statement() {
         </dl>
         <div className="statement__inner">
           <div>
-            <p className="statement__text">
+            <h2 className="statement__text">
               Most reports stop at the click. The conversations that close business rarely make it back to the
               campaign that started them.
-            </p>
+            </h2>
             <p className="statement__answer">CallsTalk closes that gap, across every way a customer reaches you.</p>
           </div>
           <ReturnPath />

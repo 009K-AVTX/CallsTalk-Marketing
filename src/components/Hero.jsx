@@ -1,3 +1,4 @@
+import ChatButton from './ChatButton.jsx';
 import HeroScene from './HeroScene.jsx';
 
 const tools = ['Advertising networks', 'CRM platforms', 'Web analytics', 'Contact centers', 'Team messaging'];
@@ -14,8 +15,8 @@ export default function Hero() {
               channel responsible, so you can eliminate wasted budget and invest in what performs.
             </p>
             <div className="actions">
-              <a href="#access" className="btn btn--light">Request Access</a>
-              <a href="#demo" className="btn btn--quiet">Book a Live Demo</a>
+              <ChatButton />
+              <a href="#pricing" className="btn btn--quiet">See Plans</a>
             </div>
             <ul className="assurances">
               <li>Setup help from our specialists</li>

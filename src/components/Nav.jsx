@@ -1,3 +1,4 @@
+import ChatButton from './ChatButton.jsx';
 import { useState } from 'react';
 import Logo from './Logo.jsx';
 import { navLinks } from '../data.js';
@@ -19,8 +20,8 @@ export default function Nav() {
           ))}
           <a href="#pricing">Plans</a>
           <span className="nav__actions">
-            <a href="#access">Request Access</a>
-            <a href="#demo" className="btn btn--light btn--sm">Book a Demo</a>
+            <ChatButton className="">Request Access</ChatButton>
+            <ChatButton className="btn btn--light btn--sm" />
           </span>
         </nav>
       </div>

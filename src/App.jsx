@@ -1,4 +1,5 @@
 import Nav from './components/Nav.jsx';
+import ScrollProgress from './components/ScrollProgress.jsx';
 import Hero from './components/Hero.jsx';
 import Statement from './components/Statement.jsx';
 import Platform from './components/Platform.jsx';
@@ -14,6 +15,7 @@ import ChatWidget from './components/ChatWidget.jsx';
 export default function App() {
   return (
     <>
+      <ScrollProgress />
       <Nav />
       <main>
         <Hero />

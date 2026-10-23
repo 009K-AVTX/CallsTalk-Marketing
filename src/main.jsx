@@ -1,10 +1,13 @@
 import { StrictMode } from 'react';
-import { createRoot } from 'react-dom/client';
+import { hydrateRoot } from 'react-dom/client';
 import App from './App.jsx';
+import './fonts.css';
 import './index.css';
 
-createRoot(document.getElementById('root')).render(
+// The page is pre-rendered at build time; hydrate attaches React to that HTML.
+hydrateRoot(
+  document.getElementById('root'),
   <StrictMode>
     <App />
-  </StrictMode>
+  </StrictMode>,
 );

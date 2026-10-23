@@ -1,3 +1,4 @@
+import ChatButton from './ChatButton.jsx';
 export default function Cta() {
   return (
     <section className="cta" id="access">
@@ -10,8 +11,8 @@ export default function Cta() {
             <li>No long-term commitment</li>
           </ul>
           <div className="actions" id="demo">
-            <a href="#" className="btn btn--light">Request Access</a>
-            <a href="#" className="btn btn--quiet">Schedule a Demo</a>
+            <ChatButton />
+            <a href="#pricing" className="btn btn--quiet">See Plans</a>
           </div>
         </div>
       </div>

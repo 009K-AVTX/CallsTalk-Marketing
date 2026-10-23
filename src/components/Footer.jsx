@@ -12,7 +12,7 @@ export default function Footer() {
           </div>
           {footerColumns.map(({ title, links }) => (
             <div key={title}>
-              <h4>{title}</h4>
+              <h3>{title}</h3>
               {links.map((l) => <a key={l} href="#">{l}</a>)}
             </div>
           ))}

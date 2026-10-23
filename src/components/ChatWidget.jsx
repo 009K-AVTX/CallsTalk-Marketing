@@ -51,7 +51,9 @@ function HandoffForm({ initialMessage, onStart, onCancel }) {
 
 export default function ChatWidget() {
   const [open, setOpen] = useState(false);
-  const [session, setSession] = useState(() => (liveChatEnabled ? loadSession() : null));
+  const [session, setSession] = useState(null);
+  const sessionRef = useRef(null);
+  sessionRef.current = session;
   const [handoff, setHandoff] = useState(false);
   const [aiMessages, setAiMessages] = useState([greeting]);
   const [teamMessages, setTeamMessages] = useState([]);
@@ -91,9 +93,16 @@ export default function ChatWidget() {
     return () => clearInterval(id);
   }, [session, open, refresh]);
 
+  useEffect(() => {
+    if (liveChatEnabled) setSession(loadSession());
+  }, []);
+
   // Other parts of the page (the hero picker) can open the chat.
   useEffect(() => {
-    const openChat = () => setOpen(true);
+    const openChat = (e) => {
+      setOpen(true);
+      if (e.detail?.team && liveChatEnabled) setHandoff((h) => h || !sessionRef.current);
+    };
     window.addEventListener('callstalk:open-chat', openChat);
     return () => window.removeEventListener('callstalk:open-chat', openChat);
   }, []);

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { webFontsReady } from '../lib/fonts.js';
 
 // Five short 3D vignettes, one per part of the product, shown in turn.
 const STEPS = ['Call attribution', 'Lead scoring', 'Revenue by channel', 'Calls from every market', 'Conversion sync'];
@@ -77,21 +78,20 @@ const pointShader = {
 };
 
 async function mount(el, onStep, reducedMotion) {
-  const [THREE, { RoundedBoxGeometry }] = await Promise.all([
-    import('three'),
-    import('three/examples/jsm/geometries/RoundedBoxGeometry.js'),
-  ]);
-  await document.fonts?.ready;
+  const THREE = await import('../lib/three.js');
+  const { RoundedBoxGeometry } = THREE;
+  await webFontsReady();
 
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   el.prepend(renderer.domElement);
+  requestAnimationFrame(() => el.classList.add('is-live'));
 
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(32, 16 / 9, 0.1, 100);
-  scene.add(new THREE.AmbientLight(0xffffff, 0.5));
-  const key = new THREE.DirectionalLight(0xffffff, 2.2);
+  scene.add(new THREE.AmbientLight(0xffffff, 0.85));
+  const key = new THREE.DirectionalLight(0xffffff, 2.8);
   key.position.set(-3, 6, 6);
   scene.add(key);
   const warm = new THREE.PointLight(ORANGE, 16, 10, 2);
@@ -165,7 +165,7 @@ async function mount(el, onStep, reducedMotion) {
     ad.mesh.position.set(-2.1, 0.85, -0.3);
     ad.mesh.rotation.y = 0.35;
     g.add(ad.mesh);
-    const chip = canvasPlane(2.2, 0.46, 640, 134);
+    const chip = canvasPlane(2.5, 0.46, 740, 136);
     chip.mesh.position.set(-1.65, -1.05, 0.4);
     g.add(chip.mesh);
     chip.paint('chip', (ctx, W, H) => {
@@ -180,7 +180,7 @@ async function mount(el, onStep, reducedMotion) {
       ctx.beginPath();
       ctx.arc(46, H / 2, 9, 0, Math.PI * 2);
       ctx.fill();
-      text(ctx, 'Source: Paid search, "same-day plumbing"', 70, H / 2 + 11, '500 30px Geist, sans-serif', '#ffffff');
+      text(ctx, 'Source: Paid search, "same-day plumbing"', 72, H / 2 + 10, '500 28px Geist, sans-serif', '#ffffff');
     });
     // Ends at the phone's left edge, not on its screen.
     const arc = new THREE.QuadraticBezierCurve3(new THREE.Vector3(-1.0, 0.6, -0.1), new THREE.Vector3(-0.1, 1.9, 0.4), new THREE.Vector3(0.5, 0.55, 0.3));
@@ -328,7 +328,8 @@ async function mount(el, onStep, reducedMotion) {
   function revenueVignette() {
     const g = new THREE.Group();
     const inner = new THREE.Group();
-    inner.position.set(-0.55, -1.25, 0);
+    inner.position.set(-1.05, -1.3, 0);
+    inner.scale.setScalar(0.92);
     inner.rotation.y = -0.18;
     g.add(inner);
     const CH = [['Paid search', 18400], ['Organic search', 9200], ['Paid social', 5100], ['Email', 3600]];
@@ -571,7 +572,11 @@ async function mount(el, onStep, reducedMotion) {
   const stars = new THREE.Points(starGeo, new THREE.PointsMaterial({ size: 0.03, vertexColors: true, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }));
   scene.add(stars);
 
-  const vignettes = [callVignette(), scoreVignette(), revenueVignette(), globeVignette(), syncVignette()];
+  const vignettes = [];
+  for (const build of [callVignette, scoreVignette, revenueVignette, globeVignette, syncVignette]) {
+    vignettes.push(build());
+    await new Promise((r) => setTimeout(r, 0));
+  }
   vignettes.forEach((v) => {
     scene.add(v.g);
     // Cache every material once so the transition can fade the whole vignette.
@@ -612,8 +617,8 @@ async function mount(el, onStep, reducedMotion) {
       });
     });
     stars.rotation.z = t * 0.004;
-    camera.position.set(pointer.x * 0.35, 0.55 - pointer.y * 0.2, 9.6);
-    camera.lookAt(0, 0.2, 0);
+    camera.position.set(pointer.x * 0.3, 0.45 - pointer.y * 0.15, 8.1);
+    camera.lookAt(0, 0.15, 0);
     renderer.render(scene, camera);
   };
 
@@ -692,11 +697,36 @@ export default function HeroScene() {
     const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     if (reducedMotion) setPlaying(false);
     let cancelled = false;
-    mount(ref.current, setStep, reducedMotion)
-      .then((a) => (cancelled ? a.dispose() : (api.current = a)))
-      .catch(() => setFailed(true));
+    let idle = 0;
+    const start = () => {
+      mount(ref.current, setStep, reducedMotion)
+        .then((a) => (cancelled ? a.dispose() : (api.current = a)))
+        .catch(() => setFailed(true));
+    };
+    // Defer the 3D library until the page has loaded so it never delays the first paint.
+    const EVENTS = ['pointermove', 'pointerdown', 'scroll', 'keydown', 'touchstart'];
+    let timer = 0;
+    let started = false;
+    const go = () => {
+      if (started) return;
+      started = true;
+      clearTimeout(timer);
+      EVENTS.forEach((e) => window.removeEventListener(e, go));
+      idle = window.requestIdleCallback ? requestIdleCallback(start, { timeout: 1500 }) : setTimeout(start, 200);
+    };
+    // The poster image shows immediately; the live 3D takes over after the visitor engages or within a few seconds.
+    const schedule = () => {
+      EVENTS.forEach((e) => window.addEventListener(e, go, { once: true, passive: true }));
+      timer = setTimeout(go, 3500);
+    };
+    if (document.readyState === 'complete') schedule();
+    else window.addEventListener('load', schedule, { once: true });
     return () => {
       cancelled = true;
+      clearTimeout(timer);
+      EVENTS.forEach((e) => window.removeEventListener(e, go));
+      window.removeEventListener('load', schedule);
+      (window.cancelIdleCallback || clearTimeout)(idle);
       api.current?.dispose();
     };
   }, []);

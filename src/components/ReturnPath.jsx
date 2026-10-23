@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { webFontsReady } from '../lib/fonts.js';
 
 // Channel shades for the Calls / Forms / Chats cards below the scene.
 export const CHANNEL_COLORS = ['#ff5300', '#ff8a4c', '#ffffff'];
@@ -217,11 +218,9 @@ const strandShader = {
 };
 
 async function mount(el, onStep, reducedMotion) {
-  const [THREE, { RoundedBoxGeometry }] = await Promise.all([
-    import('three'),
-    import('three/examples/jsm/geometries/RoundedBoxGeometry.js'),
-  ]);
-  await document.fonts?.ready;
+  const THREE = await import('../lib/three.js');
+  const { RoundedBoxGeometry } = THREE;
+  await webFontsReady();
 
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
