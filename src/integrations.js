@@ -34,7 +34,6 @@ export const INTEGRATION_GROUPS = [
     { name: 'Stripe', logo: 'stripe', color: '#635BFF' },
   ] },
   { title: 'Telephony', items: [
-    { name: 'Twilio', mark: 'Tw', color: '#F22F46' },
     { name: 'Bandwidth', mark: 'Bw', color: '#0072CE' },
     { name: 'Plivo', mark: 'Pl', color: '#5856D6' },
   ] },
