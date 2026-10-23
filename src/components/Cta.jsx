@@ -4,7 +4,7 @@ export default function Cta() {
   return (
     <section className="cta" id="access">
       <div className="container cta__inner">
-        <h2>Stop guessing which ad rang.</h2>
+        <h2>Turn every call into a clear answer.</h2>
         <div className="cta__side">
           <ul className="assurances">
             <li>A specialist sets you up</li>
