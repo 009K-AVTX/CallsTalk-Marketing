@@ -20,6 +20,7 @@
 
 * { box-sizing: border-box; }
 html { scroll-behavior: smooth; }
+html, body { overflow-x: clip; } /* nothing animated may widen the page */
 body {
   margin: 0;
   font-family: var(--sans);
@@ -407,7 +408,8 @@ h3 { font-size: 1.5rem; }
 /* Footer */
 /* Bottom padding keeps the legal links clear of the fixed chat button. */
 .footer { background: var(--abyss); color: var(--on-dark-soft); padding: 0 0 104px; font-size: .95rem; overflow: hidden; }
-.footer__card { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 28px; margin-bottom: 72px; padding: 40px 44px; border-radius: 26px; background: linear-gradient(120deg, rgba(150, 90, 220, .26), rgba(150, 90, 220, 0) 55%), #120f16; border: 1px solid rgba(214, 163, 255, .25); }
+.footer__card { position: relative; overflow: hidden; isolation: isolate; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 28px; margin-bottom: 72px; padding: 40px 44px; border-radius: 26px; background: #120f16; border: 1px solid rgba(214, 163, 255, .25); }
+.footer__card::before { content: ""; position: absolute; z-index: -1; left: -10%; top: -60%; width: 70%; height: 220%; border-radius: 50%; background: radial-gradient(closest-side, rgba(150, 90, 220, .35), transparent); }
 .footer__card h2 { margin: 0 0 8px; font-size: clamp(1.6rem, 3vw, 2.2rem); color: var(--white); }
 .footer__card p { margin: 0; color: var(--on-dark-soft); }
 .footer__wordmark { margin: 64px 0 0; font: 700 clamp(4rem, 17vw, 15rem)/.85 var(--serif); letter-spacing: -.05em; text-align: center; background: linear-gradient(180deg, rgba(214, 163, 255, .32), rgba(214, 163, 255, 0) 85%); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; user-select: none; }
@@ -561,10 +563,15 @@ h3 { font-size: 1.5rem; }
   .intro__toggle::before, .intro__toggle::after { top: 11px; }
   .intro__toggle::before { left: 13px; }
   .intro__toggle::after { left: 19px; }
-  .works { padding-top: 96px; flex-direction: column; align-items: center; }
-  .facts { grid-template-columns: 1fr; }
-  .facts > div, .facts > div + div { padding: 24px 0; border-left: 0; }
-  .facts > div + div { border-top: 1px solid var(--rule); }
+  .works { padding: 28px 0 40px; }
+  .works ul { gap: 12px 22px; }
+  .works li { font-size: .9rem; }
+  .facts { grid-template-columns: 1fr 1fr; margin-bottom: 64px; }
+  .facts > div, .facts > div + div { padding: 20px 12px 20px 0; border-left: 0; border-top: 0; }
+  .facts > div:nth-child(even) { padding-left: 16px; border-left: 1px solid var(--rule); }
+  .facts > div:nth-child(n + 3) { border-top: 1px solid var(--rule); }
+  .facts dt { font-size: 2rem; }
+  .facts dd { font-size: .88rem; }
   .pillars { margin-top: 48px; }
   .pillar { flex-direction: column; gap: 4px; padding-bottom: 16px; }
   .pillar b { font-size: 1.1rem; }
@@ -574,7 +581,14 @@ h3 { font-size: 1.5rem; }
   .feed__meta { display: none; }
   .lead-card { flex-direction: column; align-items: flex-start; }
   .lead-facts dd { font-size: 1.2rem; }
-  .capabilities, .steps, .plans, .reviews, .footer__cols { grid-template-columns: 1fr; }
+  .capabilities, .steps, .reviews { grid-template-columns: 1fr; }
+  .footer__cols { grid-template-columns: 1fr 1fr; row-gap: 28px; }
+  .footer__cols > div:first-child { grid-column: 1 / -1; }
+  /* Plans become a swipeable row on phones. */
+  .plans { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; gap: 12px; margin: 12px -16px 0; padding: 12px 16px 8px; border: 0; scrollbar-width: none; }
+  .plans::-webkit-scrollbar { display: none; }
+  .plan { flex: 0 0 82%; scroll-snap-align: center; border: 1px solid var(--rule-dark) !important; border-radius: 20px; background: #0d0b10; }
+  .plan.plan--hot { background: var(--abyss-raised); }
   .answers__grid, .legal__cards { grid-template-columns: 1fr; }
   .integrations__tiles { grid-template-columns: 1fr 1fr; gap: 8px; }
   .integration { flex-direction: column; align-items: flex-start; gap: 10px; padding: 12px; }
@@ -603,7 +617,12 @@ h3 { font-size: 1.5rem; }
   .index .index__item .solution-icon { grid-row: span 2; width: 48px; height: 48px; border-radius: 14px; }
   .index .index__item .solution-icon svg { width: 30px; height: 30px; }
   .index h3 { font-size: 1.3rem; }
-  .hero .actions .btn, .cta .actions .btn { width: 100%; }
+  .cta .actions .btn { width: 100%; }
+  .hero .actions { flex-wrap: nowrap; }
+  .hero .actions .btn { flex: 1; padding-left: 12px; padding-right: 12px; }
+  .hero__copy .lead { font-size: 1.05rem; }
+  .hero__copy .actions { margin: 24px 0 16px; }
+  .hero .assurances { font-size: .85rem; gap: 6px 18px; }
   .chat { right: 12px; bottom: 12px; }
   /* A compact round button on phones, so it doesn't cover content. */
   .chat__launcher { position: relative; width: 52px; height: 52px; padding: 0; justify-content: center; border-radius: 50%; }
