@@ -61,17 +61,15 @@ async function sendTelegram(data, req) {
   const chatId = process.env.TELEGRAM_CHAT_ID?.trim();
   if (!token || !chatId) return 'off';
   const lines = [
-    '🆕 <b>New access request</b>',
-    '',
-    `👤 <b>${escape(data.name)}</b>`,
-    `🏢 ${escape(data.company)}`,
-    `✉️ ${escape(data.email)}`,
-    data.phone && `📞 ${escape(data.phone)}`,
-    data.volume && `📈 Calls per month: ${escape(data.volume)}`,
-    data.message && `\n💬 ${escape(data.message)}`,
-    '',
-    '📥 Full request sent to email for review. Approve to send a CallsTalk.io login link.',
-    `🌐 ${escape(source(req))}`,
+    '<b>New access request</b>\n',
+    `<b>Name:</b> ${escape(data.name)}`,
+    `<b>Company:</b> ${escape(data.company)}`,
+    `<b>Email:</b> ${escape(data.email)}`,
+    data.phone && `<b>Phone:</b> ${escape(data.phone)}`,
+    data.volume && `<b>Calls per month:</b> ${escape(data.volume)}`,
+    `<b>Page:</b> ${escape(source(req))}`,
+    data.message && `\n<b>Message</b>\n<blockquote>${escape(data.message)}</blockquote>`,
+    '\n<b>Approve</b> to send a CallsTalk.io login link.',
   ].filter(Boolean);
   const thread = process.env.TELEGRAM_THREAD_ID?.trim();
   try {
