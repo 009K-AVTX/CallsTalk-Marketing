@@ -52,12 +52,21 @@ if (config.serveSite) {
   // Same handler Vercel runs, so the AI assistant behaves identically here.
   const { default: assistant } = await import('../../api/chat.js');
   app.all('/api/chat', assistant);
+  // The request-access form; it posts to the same Telegram chat with the bot token above.
+  const { default: requestAccess } = await import('../../api/request-access.js');
+  app.all('/api/request-access', requestAccess);
 
   const index = path.join(config.siteDir, 'index.html');
+  const notFound = path.join(config.siteDir, '404.html');
   if (!existsSync(index)) console.warn(`[server] SERVE_SITE is on but ${index} is missing. Run "npm run build" in the site folder.`);
   app.use('/assets', express.static(path.join(config.siteDir, 'assets'), { immutable: true, maxAge: '1y' }));
-  app.use(express.static(config.siteDir, { maxAge: '1h' }));
-  app.use((req, res, next) => (req.method === 'GET' && req.accepts('html') ? res.sendFile(index) : next()));
+  // Pre-rendered pages are served without .html (/legal -> legal.html), as Vercel's cleanUrls does.
+  app.use(express.static(config.siteDir, { maxAge: '1h', extensions: ['html'] }));
+  app.use((req, res, next) => {
+    if (req.method !== 'GET' || !req.accepts('html')) return next();
+    if (existsSync(notFound)) return res.status(404).sendFile(notFound);
+    res.sendFile(index);
+  });
 }
 
 app.use((req, res) => res.status(404).json({ detail: 'Not found.' }));

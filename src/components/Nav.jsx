@@ -1,7 +1,9 @@
 import ChatButton from './ChatButton.jsx';
 import { useState } from 'react';
 import Logo from './Logo.jsx';
+import { TelegramIcon } from './ContactLinks.jsx';
 import { navLinks } from '../data.js';
+import { TELEGRAM_HANDLE } from '../legal.js';
 
 export default function Nav() {
   const [open, setOpen] = useState(false);
@@ -20,6 +22,10 @@ export default function Nav() {
           ))}
           <a href="/#pricing">Plans</a>
           <span className="nav__actions">
+            <a className="nav__telegram" href={`https://t.me/${TELEGRAM_HANDLE}`} target="_blank" rel="noopener noreferrer" aria-label="Message Us on Telegram">
+              <TelegramIcon />
+              <span className="nav__telegram-label">Telegram</span>
+            </a>
             <a href="/request-access">Request Access</a>
             <ChatButton className="btn btn--light btn--sm" />
           </span>

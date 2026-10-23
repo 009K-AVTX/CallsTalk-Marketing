@@ -94,6 +94,11 @@ h3 { font-size: 1.5rem; }
 .nav__links > a, .nav__actions > a:not(.btn) { color: var(--on-dark-soft); transition: color .2s; }
 .nav__links > a:hover, .nav__actions > a:not(.btn):hover { color: var(--white); }
 .nav__actions { display: flex; align-items: center; gap: 24px; margin-left: auto; }
+.nav__telegram { display: inline-flex; align-items: center; gap: 10px; }
+.nav__telegram .contact__icon { flex-basis: 30px; width: 30px; height: 30px; transition: transform .2s; }
+.nav__telegram:hover .contact__icon { transform: scale(1.08); }
+/* Icon only in the bar; the open phone menu adds the word. */
+.nav__telegram-label { display: none; }
 .nav__toggle { display: none; width: 44px; height: 44px; background: none; border: 0; cursor: pointer; padding: 12px 10px; }
 .nav__toggle span { display: block; height: 1px; background: var(--on-dark); margin: 7px 0; }
 
@@ -672,6 +677,7 @@ h3 { font-size: 1.5rem; }
   }
   .nav__links.is-open { display: flex; }
   .nav__actions { flex-direction: column; align-items: stretch; gap: 18px; margin: 0; padding-top: 18px; border-top: 1px solid var(--rule-dark); }
+  .nav__telegram-label { display: inline; }
 }
 @media (max-width: 960px) {
   .section { padding: 104px 0; }
