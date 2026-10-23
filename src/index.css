@@ -460,9 +460,17 @@ h3 { font-size: 1.5rem; }
 
 /* CTA */
 .cta { padding: 160px 0 136px; background: radial-gradient(55% 80% at 30% 60%, rgba(126, 72, 190, .26), transparent 70%), var(--abyss); color: var(--on-dark); }
-.cta__inner { display: grid; grid-template-columns: 1fr 1fr; gap: 64px; align-items: center; }
-.cta__copy { display: grid; gap: 28px; }
-.cta__copy h2 { margin: 0; }
+.cta__inner { display: grid; grid-template-columns: 1.3fr 1fr; gap: 64px; align-items: end; }
+.cta__side { display: grid; gap: 28px; }
+/* Request access page */
+.access-page { padding: 72px 0 120px; background: radial-gradient(50% 50% at 80% 10%, rgba(126, 72, 190, .22), transparent 70%); }
+.access-page__inner { display: grid; grid-template-columns: 1fr 1fr; gap: 64px; align-items: start; }
+.access-page h1 { font-size: clamp(2.3rem, 4.2vw, 3.6rem); letter-spacing: -.03em; margin: 0 0 18px; color: var(--white); }
+.access-page__steps { list-style: none; margin: 40px 0 0; padding: 0; display: grid; gap: 22px; }
+.access-page__steps li { display: flex; gap: 16px; align-items: flex-start; }
+.access-page__steps span { flex: none; display: grid; place-items: center; width: 36px; height: 36px; border-radius: 50%; font: 600 .95rem var(--serif); color: #160f1f; background: linear-gradient(145deg, #e8c9ff, #b07ef0); }
+.access-page__steps b { display: block; color: var(--white); margin-bottom: 2px; }
+.access-page__steps p { margin: 0; color: var(--on-dark-soft); font-size: .95rem; }
 /* Request access card */
 .access-card { display: grid; gap: 18px; padding: 34px; border-radius: 24px; border: 1px solid rgba(214, 163, 255, .35); background: radial-gradient(70% 60% at 100% 0%, rgba(150, 90, 220, .22), transparent 70%), #110e15; box-shadow: 0 40px 90px -40px rgba(150, 90, 220, .55); }
 .access-card h3 { margin: 0; font-size: 1.6rem; color: var(--white); }
@@ -602,7 +610,7 @@ h3 { font-size: 1.5rem; }
 @media (max-width: 960px) {
   .section { padding: 104px 0; }
   .hero { padding-top: 88px; }
-  .hero__grid, .platform__intro, .stage, .statement__inner, .updates__inner, .cta__inner, .legal__body { grid-template-columns: 1fr; gap: 40px; }
+  .hero__grid, .platform__intro, .stage, .statement__inner, .updates__inner, .cta__inner, .access-page__inner, .legal__body { grid-template-columns: 1fr; gap: 40px; }
   .integrations { grid-template-columns: 1fr; }
   .answers__grid { grid-template-columns: repeat(2, 1fr); }
   .legal__cards { grid-template-columns: 1fr 1fr; }

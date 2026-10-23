@@ -77,10 +77,10 @@ export const integrations = [
 ];
 
 export const steps = [
-  { title: 'Open an account', text: 'Takes under a minute.', link: 'Get started', href: '/#access' },
+  { title: 'Open an account', text: 'Takes under a minute.', link: 'Get started', href: '/request-access' },
   { title: 'Paste the snippet', text: 'Or drop it in your tag manager.', link: 'View setup guide', href: '/#how' },
   { title: 'Plug in your platforms', text: 'Ad accounts, CRM, messaging.', link: 'See connections', href: '/#integrations' },
-  { title: 'Get a setup check', text: 'A specialist confirms it all lines up.', link: 'Speak with us', href: '/#access' },
+  { title: 'Get a setup check', text: 'A specialist confirms it all lines up.', link: 'Speak with us', href: '/request-access' },
 ];
 
 // Billing defaults from the Avortyx platform (app.avortyx.io): a prepaid balance, a monthly portal fee,

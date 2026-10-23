@@ -20,7 +20,7 @@ export default function Nav() {
           ))}
           <a href="/#pricing">Plans</a>
           <span className="nav__actions">
-            <a href="/#access">Request Access</a>
+            <a href="/request-access">Request Access</a>
             <ChatButton className="btn btn--light btn--sm" />
           </span>
         </nav>

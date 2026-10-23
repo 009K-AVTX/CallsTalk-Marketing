@@ -35,7 +35,7 @@ export default function Pricing() {
             <ul className="billing__balance">
               {BILLING.balance.map((b) => <li key={b}>{b}</li>)}
             </ul>
-            <a href="#access" className="btn btn--light">Request Access</a>
+            <a href="/request-access" className="btn btn--light">Request Access</a>
           </div>
 
           <div className="billing__enterprise">
