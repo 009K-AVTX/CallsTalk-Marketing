@@ -224,9 +224,10 @@ export default function ChatWidget() {
         </section>
       )}
 
-      <button className="chat__launcher" aria-expanded={open} onClick={() => setOpen(!open)}>
+      <button className="chat__launcher" aria-expanded={open} aria-label={open ? 'Close chat' : 'Chat with us'} onClick={() => setOpen(!open)}>
         <span className={`chat__dot${unread ? ' is-unread' : ''}`} aria-hidden="true" />
-        {open ? 'Close chat' : 'Chat with us'}
+        <svg className="chat__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h14a3 3 0 0 1 3 3v8a3 3 0 0 1-3 3H10l-4.5 3.4A.6.6 0 0 1 4.5 21l.6-3.1A3 3 0 0 1 2 15V7a3 3 0 0 1 3-3Z" /></svg>
+        <span className="chat__label">{open ? 'Close chat' : 'Chat with us'}</span>
         {unread && <span className="sr-only">New reply from the team</span>}
       </button>
     </div>

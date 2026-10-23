@@ -300,6 +300,7 @@ h3 { font-size: 1.5rem; }
   background: var(--abyss); color: var(--white); border: 1px solid rgba(255, 83, 0, .55); font: inherit; font-weight: 500; font-size: .97rem;
   box-shadow: 0 0 0 4px rgba(255, 83, 0, .12), 0 18px 40px -16px rgba(0, 0, 0, .6);
 }
+.chat__icon { display: none; width: 22px; height: 22px; fill: var(--white); }
 .chat__launcher:hover { background: var(--abyss-raised); border-color: var(--accent); }
 .chat__dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
 .chat__dot.is-unread { background: var(--ice); box-shadow: 0 0 0 4px rgba(212, 212, 212, .25); }
@@ -383,6 +384,11 @@ h3 { font-size: 1.5rem; }
   .hero { padding-top: 64px; }
   .hero__film { padding: 5px; border-radius: 16px; }
   .hero-scene { border-radius: 12px; }
+  .hero-scene .intro__toggle { top: 8px; bottom: auto; right: 8px; width: 30px; height: 30px; }
+  .hero-scene .intro__toggle::before, .hero-scene .intro__toggle::after { top: 9px; height: 10px; width: 2.5px; }
+  .hero-scene .intro__toggle::before { left: 10px; }
+  .hero-scene .intro__toggle::after { left: 15px; }
+  .hero-scene .intro__toggle.is-paused::before { left: 11px; border-width: 5px 0 5px 9px; }
   .hero-scene__caption { left: 8px; top: 8px; bottom: auto; gap: 8px; padding: 4px 10px; font-size: .7rem; }
   .hero-scene__caption li { width: 4px; height: 4px; }
   .hero-scene__caption li.is-active { width: 10px; }
@@ -409,5 +415,9 @@ h3 { font-size: 1.5rem; }
   .index a, .updates__list a { grid-template-columns: 1fr; gap: 8px; }
   .hero .actions .btn, .cta .actions .btn { width: 100%; }
   .chat { right: 12px; bottom: 12px; }
-  .chat__launcher { padding: 12px 18px; }
+  /* A compact round button on phones, so it doesn't cover content. */
+  .chat__launcher { position: relative; width: 52px; height: 52px; padding: 0; justify-content: center; border-radius: 50%; }
+  .chat__launcher .chat__label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .chat__launcher .chat__icon { display: block; }
+  .chat__launcher .chat__dot { position: absolute; top: 12px; right: 12px; width: 9px; height: 9px; border: 2px solid var(--abyss); box-sizing: content-box; }
 }

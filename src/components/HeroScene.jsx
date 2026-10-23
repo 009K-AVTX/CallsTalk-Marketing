@@ -146,14 +146,18 @@ async function mount(el, onStep, reducedMotion) {
   function callVignette() {
     const g = new THREE.Group();
     const phone = new THREE.Group();
-    phone.position.set(1.15, 0.05, 0);
+    phone.position.set(1.35, -0.05, 0.3);
+    phone.scale.setScalar(1.08);
     g.add(phone);
-    phone.add(new THREE.Mesh(new RoundedBoxGeometry(1.5, 3.0, 0.16, 6, 0.22), metal(0x111111)));
-    const screen = canvasPlane(1.36, 2.82, 400, 830);
+    const body = metal(0x1d1d1d);
+    body.emissiveIntensity = 0.06;
+    phone.add(new THREE.Mesh(new RoundedBoxGeometry(1.5, 3.0, 0.16, 6, 0.22), body));
+    const screen = canvasPlane(1.38, 2.86, 560, 1160);
     screen.mesh.position.z = 0.085;
     phone.add(screen.mesh);
     const rings = [0, 1, 2].map(() => {
-      const r = new THREE.Mesh(new THREE.TorusGeometry(1, 0.012, 8, 96), new THREE.MeshBasicMaterial({ color: ORANGE, transparent: true }));
+      const r = new THREE.Mesh(new THREE.TorusGeometry(1, 0.01, 8, 96), new THREE.MeshBasicMaterial({ color: ORANGE, transparent: true }));
+      r.position.z = -0.25; // behind the phone so the screen stays clear
       phone.add(r);
       return r;
     });
@@ -178,7 +182,8 @@ async function mount(el, onStep, reducedMotion) {
       ctx.fill();
       text(ctx, 'Source: Paid search, "same-day plumbing"', 70, H / 2 + 11, '500 30px Geist, sans-serif', '#ffffff');
     });
-    const arc = new THREE.QuadraticBezierCurve3(new THREE.Vector3(-1.0, 0.6, -0.1), new THREE.Vector3(0, 2.0, 0.4), new THREE.Vector3(1.0, 0.6, 0.2));
+    // Ends at the phone's left edge, not on its screen.
+    const arc = new THREE.QuadraticBezierCurve3(new THREE.Vector3(-1.0, 0.6, -0.1), new THREE.Vector3(-0.1, 1.9, 0.4), new THREE.Vector3(0.5, 0.55, 0.3));
     const flow = particles(60, (k) => TYPE_COLORS[k % 3], () => 0.1 + Math.random() * 0.06);
     g.add(flow.points);
     const seeds = Array.from({ length: 60 }, () => Math.random());
@@ -187,6 +192,9 @@ async function mount(el, onStep, reducedMotion) {
     const update = (u) => {
       const ringing = u < 3.2;
       screen.paint(ringing ? 'ring' : u < 4.6 ? 'live' : 'done', (ctx, W, H) => {
+        ctx.setTransform(1.4, 0, 0, 1.4, 0, 0);
+        W = 400;
+        H = 830;
         const bg = ctx.createLinearGradient(0, 0, 0, H);
         bg.addColorStop(0, '#1c1c1c');
         bg.addColorStop(1, '#0a0a0a');
@@ -224,12 +232,12 @@ async function mount(el, onStep, reducedMotion) {
       });
       rings.forEach((r, i) => {
         const ph = (u * 0.9 + i / 3) % 1;
-        const s = 0.9 + ph * 1.4;
+        const s = 1.0 + ph * 0.85;
         r.scale.set(s, s * 1.25, s);
-        r.userData.alpha = ringing && u > 0.6 ? (1 - ph) * 0.8 : 0;
+        r.userData.alpha = ringing && u > 0.6 ? (1 - ph) * 0.6 : 0;
       });
-      phone.rotation.y = -0.45 + Math.sin(u * 0.6) * 0.12;
-      phone.rotation.x = 0.08;
+      phone.rotation.y = -0.2 + Math.sin(u * 0.6) * 0.07;
+      phone.rotation.x = 0.04;
       seeds.forEach((sd, k) => {
         const p = (u * 0.55 + sd) % 1;
         arc.getPoint(p, pt);
