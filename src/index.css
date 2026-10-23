@@ -460,9 +460,28 @@ h3 { font-size: 1.5rem; }
 
 /* CTA */
 .cta { padding: 160px 0 136px; background: radial-gradient(55% 80% at 30% 60%, rgba(126, 72, 190, .26), transparent 70%), var(--abyss); color: var(--on-dark); }
-.cta__inner { display: grid; grid-template-columns: 1.3fr 1fr; gap: 64px; align-items: end; }
+.cta__inner { display: grid; grid-template-columns: 1fr 1fr; gap: 64px; align-items: center; }
+.cta__copy { display: grid; gap: 28px; }
+.cta__copy h2 { margin: 0; }
+/* Request access card */
+.access-card { display: grid; gap: 18px; padding: 34px; border-radius: 24px; border: 1px solid rgba(214, 163, 255, .35); background: radial-gradient(70% 60% at 100% 0%, rgba(150, 90, 220, .22), transparent 70%), #110e15; box-shadow: 0 40px 90px -40px rgba(150, 90, 220, .55); }
+.access-card h3 { margin: 0; font-size: 1.6rem; color: var(--white); }
+.access-card__lead { margin: -8px 0 0; color: var(--on-dark-soft); font-size: .95rem; }
+.access-card__grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.access-card label { display: grid; gap: 6px; font-size: .86rem; font-weight: 500; color: var(--on-dark); }
+.access-card__name { display: block; }
+.access-card__name i { font-style: normal; font-weight: 400; color: var(--slate); margin-left: 4px; }
+.access-card__wide { grid-column: 1 / -1; }
+.access-card input, .access-card select, .access-card textarea { width: 100%; font: inherit; font-size: .95rem; padding: 11px 13px; border-radius: 12px; border: 1px solid #2c2632; background: #0a080c; color: var(--white); resize: vertical; transition: border-color .2s, box-shadow .2s; }
+.access-card select { appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M4 6l4 4 4-4' fill='none' stroke='%23b3abbd' stroke-width='1.6' stroke-linecap='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; background-size: 14px; }
+.access-card input:focus, .access-card select:focus, .access-card textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(214, 163, 255, .18); }
+.access-card__trap { position: absolute; left: -9999px; width: 1px; height: 1px; opacity: 0; }
+.access-card__error { margin: 0; padding: 10px 14px; border-radius: 10px; background: #1a1220; border-left: 3px solid var(--accent); color: var(--white); font-size: .9rem; }
+.access-card .btn { width: 100%; }
+.access-card--sent { justify-items: center; text-align: center; padding: 48px 34px; }
+.access-card--sent p { margin: 0; color: var(--on-dark-soft); max-width: 26em; }
+.access-card__check { width: 56px; height: 56px; border-radius: 50%; background: rgba(214, 163, 255, .16) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7.5' fill='none' stroke='%23d6a3ff' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / 28px no-repeat; box-shadow: 0 0 0 8px rgba(214, 163, 255, .06); }
 .cta h2 { font-size: clamp(2.8rem, 6vw, 5.2rem); margin: 0; max-width: 12ch; line-height: 1; color: #d6a3ff; background: linear-gradient(180deg, #e8c9ff, #c08df5); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
-.cta__side { display: grid; gap: 28px; }
 
 /* Footer */
 /* Bottom padding keeps the legal links clear of the fixed chat button. */
@@ -679,6 +698,8 @@ h3 { font-size: 1.5rem; }
   .hero__copy .actions { margin: 24px 0 16px; }
   .hero .assurances { font-size: .85rem; gap: 6px 18px; }
   .chat { right: 12px; bottom: 12px; }
+  .access-card { padding: 24px 20px; }
+  .access-card__grid { grid-template-columns: 1fr; }
   /* A compact round button on phones, so it doesn't cover content. */
   .chat__launcher { position: relative; width: 52px; height: 52px; padding: 0; justify-content: center; border-radius: 50%; }
   .chat__launcher .chat__label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
