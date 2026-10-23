@@ -3,12 +3,12 @@ export default function Cta() {
   return (
     <section className="cta" id="access">
       <div className="container cta__inner">
-        <h2>Replace assumptions with evidence.</h2>
+        <h2>Stop guessing which ad rang.</h2>
         <div className="cta__side">
           <ul className="assurances">
-            <li>Personal onboarding from our specialists</li>
-            <li>Live in minutes with one snippet</li>
-            <li>No long-term commitment</li>
+            <li>A specialist sets you up</li>
+            <li>One snippet, live the same day</li>
+            <li>Leave whenever you like</li>
           </ul>
           <div className="actions" id="demo">
             <ChatButton />

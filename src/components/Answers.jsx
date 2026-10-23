@@ -13,8 +13,8 @@ export default function Answers() {
     <section className="section answers">
       <div className="container">
         <div className="section__head">
-          <h2>The questions CallsTalk answers.</h2>
-          <p className="lead">Every call, form and chat comes back to a campaign, so the answers come from data, not guesswork.</p>
+          <h2>Questions you can finally answer.</h2>
+          <p className="lead">Pulled from your own calls, forms and chats.</p>
         </div>
         <div className="answers__grid">
           {ANSWERS.map(({ icon, q, a, d }) => (

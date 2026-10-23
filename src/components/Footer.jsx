@@ -9,8 +9,8 @@ export default function Footer() {
       <div className="container">
         <div className="footer__card">
           <div>
-            <h2>Talk to the CallsTalk team.</h2>
-            <p>Questions, setup help or a lost conversation: reach us here any time.</p>
+            <h2>Lost us on Telegram? Find us here.</h2>
+            <p>Questions, setup or a dropped conversation: our team answers in this chat.</p>
           </div>
           <div className="actions">
             <ChatButton />
@@ -20,7 +20,7 @@ export default function Footer() {
         <div className="footer__cols">
           <div>
             <Logo light />
-            <p>Attribution software that links every inquiry to the revenue it generates.</p>
+            <p>Every conversation, traced back to the campaign that started it.</p>
           </div>
           {footerColumns.map(({ title, links }) => (
             <div key={title}>

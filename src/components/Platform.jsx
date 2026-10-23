@@ -112,8 +112,8 @@ export default function Platform() {
     <section className="section section--white" id="features">
       <div className="container">
         <div className="platform__intro">
-          <h2>One platform, from first ring to closed revenue.</h2>
-          <p className="lead">Capture every inquiry, act on the best ones first, and show exactly what your marketing returned.</p>
+          <h2>Hear it. Score it. Prove it.</h2>
+          <p className="lead">The three jobs behind every lead, in one CallsTalk workspace.</p>
         </div>
 
         <div className="pillars" role="tablist" aria-label="Platform capabilities" onKeyDown={onKeyDown}>
@@ -149,8 +149,23 @@ export default function Platform() {
             </ul>
             <ChatButton className="link">{`Ask about ${f.eyebrow.toLowerCase()}`}</ChatButton>
           </div>
-          <div className="screen" aria-hidden="true">
-            <View />
+          <div className="app" aria-hidden="true">
+            <div className="app__bar">
+              <i /><i /><i />
+              <span className="app__url">app.callstalk.com/{['inquiries', 'leads/4821', 'reports/revenue'][active]}</span>
+            </div>
+            <div className="app__body">
+              <nav className="app__side">
+                {['M4 6h16M4 12h16M4 18h10', 'M12 3v18M3 12h18', 'M5 19V9M12 19V5M19 19v-7'].map((d, i) => (
+                  <span key={d} className={i === active ? 'is-on' : undefined}>
+                    <svg viewBox="0 0 24 24"><path d={d} /></svg>
+                  </span>
+                ))}
+              </nav>
+              <div className="screen">
+                <View />
+              </div>
+            </div>
           </div>
         </div>
       </div>

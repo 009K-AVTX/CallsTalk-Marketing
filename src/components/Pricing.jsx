@@ -37,7 +37,7 @@ export default function Pricing() {
     <section className="section section--dark" id="pricing">
       <div className="container">
         <div className="section__head">
-          <h2>Transparent pricing that grows with you.</h2>
+          <h2>Plans priced by the leads you track.</h2>
           <Tabs tabs={tabs} active={active} onChange={setActive} />
         </div>
         <div className="plans">

@@ -12,7 +12,7 @@ const suggestions = ['How does call tracking work?', 'Which plan fits my busines
 const greeting = {
   id: 'greeting',
   from: 'assistant',
-  text: 'Hello. Ask me anything about CallsTalk, or talk to our team directly.',
+  text: 'Hi, this is CallsTalk. Ask me anything, or reach a person on our team.',
 };
 
 function HandoffForm({ initialMessage, onStart, onCancel }) {
