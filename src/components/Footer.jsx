@@ -8,7 +8,7 @@ export default function Footer() {
         <div className="footer__cols">
           <div>
             <Logo light />
-            <p>Marketing attribution that connects every lead to revenue.</p>
+            <p>Attribution software that links every inquiry to the revenue it generates.</p>
           </div>
           {footerColumns.map(({ title, links }) => (
             <div key={title}>
@@ -19,7 +19,7 @@ export default function Footer() {
         </div>
         <div className="footer__legal">
           <span>© {new Date().getFullYear()} CallsTalk. All rights reserved.</span>
-          <span><a href="#">Privacy</a> · <a href="#">Terms</a> · <a href="#">Security</a></span>
+          <span><a href="#">Privacy Policy</a> · <a href="#">Terms of Service</a> · <a href="#">Trust &amp; Security</a></span>
         </div>
       </div>
     </footer>

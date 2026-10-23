@@ -15,8 +15,8 @@ export default function Features() {
                 {f.links.map((l) => <li key={l}><a href="#">{l}</a></li>)}
               </ul>
               <blockquote className="quote">
-                “Placeholder testimonial. Replace with a real customer quote.”
-                <cite>Customer Name, Title</cite>
+                “Placeholder: insert a genuine customer testimonial here.”
+                <cite>Full Name, Job Title</cite>
               </blockquote>
             </div>
           </div>

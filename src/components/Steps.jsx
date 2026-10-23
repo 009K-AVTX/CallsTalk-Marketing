@@ -4,7 +4,7 @@ export default function Steps() {
   return (
     <section className="section section--alt" id="how">
       <div className="container">
-        <h2 className="center">Up and running in four steps.</h2>
+        <h2 className="center">Get started in four simple steps.</h2>
         <ol className="steps">
           {steps.map(({ title, text, link }, i) => (
             <li key={title}>

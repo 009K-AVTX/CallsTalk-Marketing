@@ -1,98 +1,98 @@
 // Page content. Placeholder values (prices, testimonials, phone) must be replaced before launch.
 
 export const navLinks = [
-  { href: '#features', label: 'Features' },
-  { href: '#solutions', label: 'Solutions' },
-  { href: '#integrations', label: 'Integrations' },
-  { href: '#resources', label: 'Resources' },
+  { href: '#features', label: 'Platform' },
+  { href: '#solutions', label: 'Use Cases' },
+  { href: '#integrations', label: 'Connected Apps' },
+  { href: '#resources', label: 'Insights' },
 ];
 
 export const updates = [
-  { title: 'AI lead scoring is now available on every plan', thumb: 't1' },
-  { title: 'New report: offline conversions sent back to your ad platforms', thumb: 't2' },
-  { title: 'Guide: building a client-ready attribution dashboard', thumb: 't3' },
+  { title: 'AI-powered lead scoring is now included with all plans', thumb: 't1' },
+  { title: 'Introducing offline conversion sync for leading ad networks', thumb: 't2' },
+  { title: 'How to design attribution dashboards your clients will trust', thumb: 't3' },
 ];
 
 export const features = [
   {
-    eyebrow: 'Lead Tracking',
-    title: 'Capture every lead.',
-    body: 'Dynamic phone numbers, form capture and chat tracking record the full source of every inquiry automatically.',
+    eyebrow: 'Lead Capture',
+    title: 'Never miss an opportunity.',
+    body: 'Dynamic number insertion, form monitoring and chat attribution automatically record where each inquiry originated.',
     art: 'art1',
-    links: ['📞 Call Tracking', '📝 Form Tracking', '💬 Chat Tracking', '🛒 Transaction Tracking'],
+    links: ['📞 Call Attribution', '📝 Form Monitoring', '💬 Chat Attribution', '🛒 Purchase Tracking'],
   },
   {
-    eyebrow: 'Lead Management',
-    title: 'Qualify faster.',
-    body: 'Score, tag and assign value to leads in one inbox, then route them to the right person before they go cold.',
+    eyebrow: 'Lead Qualification',
+    title: 'Respond with confidence.',
+    body: 'Prioritize, label and value every lead from a single workspace, then assign it to the right team member while interest is high.',
     art: 'art2',
-    links: ['⭐ Lead Scoring', '🏷️ Tagging & Notes', '🔔 Alerts', '🎧 Call Recording'],
+    links: ['⭐ Lead Prioritization', '🏷️ Labels & Comments', '🔔 Real-Time Notifications', '🎧 Conversation Recording'],
   },
   {
-    eyebrow: 'Analytics & Insights',
-    title: 'Prove the ROI.',
-    body: 'Tie leads to revenue across every channel and share clear reports that show what each dollar returned.',
+    eyebrow: 'Reporting & Intelligence',
+    title: 'Demonstrate your return.',
+    body: 'Connect leads to closed revenue across all channels and deliver clear reports that quantify the return on every dollar invested.',
     art: 'art3',
-    links: ['📊 Dashboards', '🔁 Offline Conversions', '🧭 Multi-touch Attribution', '📤 Scheduled Reports'],
+    links: ['📊 Custom Dashboards', '🔁 Conversion Sync', '🧭 Cross-Channel Attribution', '📤 Automated Reporting'],
   },
 ];
 
 export const solutions = {
   role: [
-    { icon: '🏢', title: 'Agencies', text: 'Prove results to every client with branded reports.' },
-    { icon: '📈', title: 'Marketers', text: 'Know which campaigns deserve more budget.' },
-    { icon: '🧑‍💼', title: 'Business Owners', text: 'See where your customers really come from.' },
-    { icon: '🛎️', title: 'Sales Teams', text: 'Follow up on the hottest leads first.' },
+    { icon: '🏢', title: 'Agencies', text: 'Demonstrate measurable value with white-label client reporting.' },
+    { icon: '📈', title: 'Marketing Teams', text: 'Allocate budget to the campaigns that perform.' },
+    { icon: '🧑‍💼', title: 'Owners & Operators', text: 'Understand exactly how customers find you.' },
+    { icon: '🛎️', title: 'Sales Leaders', text: 'Prioritize follow-up on your highest-intent prospects.' },
   ],
   industry: [
-    { icon: '🔧', title: 'Home Services', text: 'Track every service call to its source.' },
-    { icon: '⚖️', title: 'Legal', text: 'Measure cost per signed case.' },
-    { icon: '🩺', title: 'Healthcare', text: 'Attribute appointments, privately and securely.' },
-    { icon: '🚗', title: 'Automotive', text: 'Connect showroom visits to campaigns.' },
-    { icon: '🏠', title: 'Real Estate', text: 'Know which listings drive inquiries.' },
-    { icon: '🎓', title: 'Education', text: 'Trace enrollments to their first touch.' },
-    { icon: '🏦', title: 'Finance', text: 'Value leads by the deals they close.' },
-    { icon: '🛍️', title: 'E‑commerce', text: 'Pair phone orders with online journeys.' },
+    { icon: '🔧', title: 'Home & Field Services', text: 'Attribute each service request to its originating channel.' },
+    { icon: '⚖️', title: 'Law Firms', text: 'Calculate the acquisition cost of every retained client.' },
+    { icon: '🩺', title: 'Healthcare Providers', text: 'Attribute patient bookings with privacy built in.' },
+    { icon: '🚗', title: 'Auto Dealerships', text: 'Link dealership visits to the campaigns that drove them.' },
+    { icon: '🏠', title: 'Property & Real Estate', text: 'Identify the listings that generate the most interest.' },
+    { icon: '🎓', title: 'Higher Education', text: 'Follow each enrollment back to its first interaction.' },
+    { icon: '🏦', title: 'Financial Services', text: 'Assess lead quality by the business it produces.' },
+    { icon: '🛍️', title: 'Online Retail', text: 'Unite phone sales with the digital journey behind them.' },
   ],
 };
 
 export const integrations = [
-  'Ad Platforms', 'CRMs', 'Analytics', 'Call Centers', 'Email', 'Chat Widgets',
-  'Form Builders', 'Webhooks', 'Zapier‑style Automations', 'Data Warehouses', 'Slack', 'REST API',
+  'Advertising Networks', 'CRM Platforms', 'Web Analytics', 'Contact Centers', 'Email Marketing', 'Live Chat',
+  'Online Forms', 'Custom Webhooks', 'Workflow Automation', 'Cloud Data Warehouses', 'Team Messaging', 'Developer API',
 ];
 
 export const steps = [
-  { title: 'Start your trial', text: 'Create an account in under a minute.', link: 'Sign up →' },
-  { title: 'Add the script', text: 'Paste one snippet or use a tag manager.', link: 'Install guide →' },
-  { title: 'Connect your tools', text: 'Link ad accounts and your CRM.', link: 'Integrations →' },
-  { title: 'Get support', text: 'Our team helps you configure it right.', link: 'Contact us →' },
+  { title: 'Create your account', text: 'Registration takes less than sixty seconds.', link: 'Get started →' },
+  { title: 'Install the tracking code', text: 'Add a single snippet directly or through your tag manager.', link: 'View setup guide →' },
+  { title: 'Link your platforms', text: 'Connect your advertising accounts and CRM.', link: 'See connections →' },
+  { title: 'Work with our experts', text: 'Our specialists make sure your configuration is accurate.', link: 'Speak with us →' },
 ];
 
 export const pricing = {
   business: [
-    { name: 'Starter', price: '$29', note: 'For a single location getting started.', items: [['Leads', '100/mo'], ['Users', '2'], [null, 'Form & chat tracking']] },
-    { name: 'Growth', price: '$79', note: 'Add call tracking and scoring.', items: [['Leads', '500/mo'], ['Users', '5'], [null, 'Call tracking & recording']] },
-    { name: 'Pro', price: '$149', note: 'Full attribution and reporting.', popular: true, items: [['Leads', '2,000/mo'], ['Users', 'Unlimited'], [null, 'Offline conversions']] },
-    { name: 'Enterprise', price: 'Custom', note: 'Volume, SSO and dedicated support.', sales: true, items: [['Leads', 'Custom'], ['SLA', 'Included'], [null, 'Dedicated manager']] },
+    { name: 'Essentials', price: '$29', note: 'Ideal for single-location businesses.', items: [['Monthly leads', '100'], ['Seats', '2'], [null, 'Form and chat attribution']] },
+    { name: 'Standard', price: '$79', note: 'Adds call attribution and lead scoring.', items: [['Monthly leads', '500'], ['Seats', '5'], [null, 'Call attribution and recording']] },
+    { name: 'Premium', price: '$149', note: 'Complete attribution and advanced reporting.', popular: true, items: [['Monthly leads', '2,000'], ['Seats', 'Unlimited'], [null, 'Offline conversion sync']] },
+    { name: 'Enterprise', price: 'Tailored', note: 'High-volume plans with SSO and priority support.', sales: true, items: [['Monthly leads', 'Flexible'], ['SLA', 'Guaranteed'], [null, 'Dedicated account manager']] },
   ],
   agency: [
-    { name: 'Agency Lite', price: '$99', note: 'Up to 5 client accounts.', items: [['Clients', '5'], [null, 'White‑label reports']] },
-    { name: 'Agency', price: '$249', note: 'Up to 20 client accounts.', items: [['Clients', '20'], [null, 'Client dashboards']] },
-    { name: 'Agency Pro', price: '$499', note: 'Unlimited clients.', popular: true, items: [['Clients', 'Unlimited'], [null, 'Custom domain']] },
-    { name: 'Agency Enterprise', price: 'Custom', note: 'Built around your portfolio.', sales: true, items: [['Clients', 'Custom'], [null, 'API & SSO']] },
+    { name: 'Agency Starter', price: '$99', note: 'Manage up to 5 client accounts.', items: [['Client accounts', '5'], [null, 'White-label reporting']] },
+    { name: 'Agency Plus', price: '$249', note: 'Manage up to 20 client accounts.', items: [['Client accounts', '20'], [null, 'Dedicated client portals']] },
+    { name: 'Agency Premium', price: '$499', note: 'No limit on client accounts.', popular: true, items: [['Client accounts', 'Unlimited'], [null, 'Branded custom domain']] },
+    { name: 'Agency Enterprise', price: 'Tailored', note: 'Designed around your client portfolio.', sales: true, items: [['Client accounts', 'Flexible'], [null, 'API access and SSO']] },
   ],
 };
 
 export const reviews = ['A', 'B', 'C', 'D', 'E', 'F'].map((initial) => ({
   initial,
-  quote: 'Placeholder review: add a real customer quote here.',
-  name: 'Name',
-  role: 'Title, Company',
+  quote: 'Placeholder: insert a genuine customer testimonial here.',
+  name: 'Full Name',
+  role: 'Job Title, Organization',
 }));
 
 export const footerColumns = [
-  { title: 'Product', links: ['Call Tracking', 'Form Tracking', 'Chat Tracking', 'Reporting'] },
-  { title: 'Solutions', links: ['Agencies', 'Marketers', 'Business Owners', 'Sales Teams'] },
-  { title: 'Resources', links: ['Blog', 'Help Center', 'API Docs', 'Integrations'] },
-  { title: 'Company', links: ['About', 'Careers', 'Contact', 'Pricing'] },
+  { title: 'Platform', links: ['Call Attribution', 'Form Monitoring', 'Chat Attribution', 'Analytics & Reports'] },
+  { title: 'Use Cases', links: ['Agencies', 'Marketing Teams', 'Owners & Operators', 'Sales Leaders'] },
+  { title: 'Learn', links: ['Articles', 'Support Center', 'Developer Documentation', 'Connected Apps'] },
+  { title: 'About', links: ['Our Story', 'Join Our Team', 'Contact Us', 'Plans & Pricing'] },
 ];

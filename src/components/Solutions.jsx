@@ -3,8 +3,8 @@ import Tabs from './Tabs.jsx';
 import { solutions } from '../data.js';
 
 const tabs = [
-  { id: 'role', label: 'By Role' },
-  { id: 'industry', label: 'By Industry' },
+  { id: 'role', label: 'By Team' },
+  { id: 'industry', label: 'By Sector' },
 ];
 
 export default function Solutions() {
@@ -14,7 +14,7 @@ export default function Solutions() {
     <section className="section section--alt" id="solutions">
       <div className="container">
         <div className="center">
-          <h2>Built for how you work.</h2>
+          <h2>Designed around the way you operate.</h2>
           <Tabs tabs={tabs} active={active} onChange={setActive} />
         </div>
         <div className="grid grid--4">
@@ -23,7 +23,7 @@ export default function Solutions() {
               <span>{icon}</span>
               <h3>{title}</h3>
               <p>{text}</p>
-              <em>Learn more →</em>
+              <em>Explore →</em>
             </a>
           ))}
         </div>

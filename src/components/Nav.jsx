@@ -17,9 +17,9 @@ export default function Nav() {
           {navLinks.map(({ href, label }) => (
             <a key={href} href={href}>{label}</a>
           ))}
-          <a href="#pricing" className="nav__pricing">Pricing</a>
-          <a href="#demo" className="btn btn--ghost btn--sm">Book a Demo</a>
-          <a href="#trial" className="btn btn--primary btn--sm">Start Free Trial</a>
+          <a href="#pricing" className="nav__pricing">Plans</a>
+          <a href="#demo" className="btn btn--ghost btn--sm">Schedule a Demo</a>
+          <a href="#trial" className="btn btn--primary btn--sm">Try It Free</a>
         </nav>
       </div>
     </header>
