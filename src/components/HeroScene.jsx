@@ -330,8 +330,8 @@ async function mount(el, onStep, reducedMotion) {
   function revenueVignette() {
     const g = new THREE.Group();
     const inner = new THREE.Group();
-    inner.position.set(-1.05, -1.3, 0);
-    inner.scale.setScalar(0.92);
+    inner.position.set(-0.75, -1.15, 0);
+    inner.scale.setScalar(0.85);
     inner.rotation.y = -0.18;
     g.add(inner);
     const CH = [['Paid search', 18400], ['Organic search', 9200], ['Paid social', 5100], ['Email', 3600]];
