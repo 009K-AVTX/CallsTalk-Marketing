@@ -10,7 +10,7 @@ export default function Hero() {
         <div className="hero__grid">
           <div className="hero__copy">
             <p className="hero__eyebrow"><span />Every conversation, traced to its campaign</p>
-            <h1 className="hero__title">Know which campaign made the phone ring.</h1>
+            <h1 className="hero__title">See exactly what your marketing earns.</h1>
             <p className="lead">CallsTalk follows every call, form and chat back to the ad that started it, so your budget goes where deals close.</p>
             <div className="actions">
               <ChatButton />
