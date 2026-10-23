@@ -8,8 +8,8 @@ export function LogoMark({ className = 'logo__mark' }) {
     <svg className={className} viewBox="0 0 32 32" aria-hidden="true">
       <defs>
         <linearGradient id={id} x1="4" y1="2" x2="28" y2="30" gradientUnits="userSpaceOnUse">
-          <stop offset="0" stopColor="#ff8a4c" />
-          <stop offset="1" stopColor="#ff5300" />
+          <stop offset="0" stopColor="#d6a3ff" />
+          <stop offset="1" stopColor="#7f4bd0" />
         </linearGradient>
       </defs>
       <path

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { webFontsReady } from '../lib/fonts.js';
 
 // Channel shades for the Calls / Forms / Chats cards below the scene.
-export const CHANNEL_COLORS = ['#ff5300', '#ff8a4c', '#ffffff'];
+export const CHANNEL_COLORS = ['#d6a3ff', '#e8c9ff', '#ffffff'];
 
 const STEPS = ['A click from a campaign', 'The conversation that closes', 'Revenue back to the campaign'];
 
@@ -34,8 +34,8 @@ function roundRect(ctx, x, y, w, h, r) {
 
 function drawMark(ctx, x, y, s) {
   const g = ctx.createLinearGradient(x, y, x + s, y + s);
-  g.addColorStop(0, '#ff8a4c');
-  g.addColorStop(1, '#ff5300');
+  g.addColorStop(0, '#d6a3ff');
+  g.addColorStop(1, '#7f4bd0');
   ctx.fillStyle = g;
   roundRect(ctx, x, y + s * 0.09, s * 0.875, s * 0.69, s * 0.22);
   ctx.fill();
@@ -56,15 +56,15 @@ function paintScreen(ctx, phase) {
   const W = 512;
   const H = 1040;
   const bg = ctx.createLinearGradient(0, 0, 0, H);
-  bg.addColorStop(0, '#1c1c1c');
-  bg.addColorStop(0.55, '#111111');
-  bg.addColorStop(1, '#0a0a0a');
+  bg.addColorStop(0, '#1c1820');
+  bg.addColorStop(0.55, '#121015');
+  bg.addColorStop(1, '#0b090d');
   ctx.fillStyle = bg;
   ctx.fillRect(0, 0, W, H);
   const glow = ctx.createRadialGradient(W / 2, 382, 30, W / 2, 382, 230);
-  glow.addColorStop(0, 'rgba(255,122,51,.42)');
-  glow.addColorStop(0.5, 'rgba(255,83,0,.12)');
-  glow.addColorStop(1, 'rgba(255,83,0,0)');
+  glow.addColorStop(0, 'rgba(199,146,247,.42)');
+  glow.addColorStop(0.5, 'rgba(214,163,255,.12)');
+  glow.addColorStop(1, 'rgba(214,163,255,0)');
   ctx.fillStyle = glow;
   ctx.fillRect(0, 0, W, H);
 
@@ -100,7 +100,7 @@ function paintScreen(ctx, phase) {
   roundRect(ctx, 44, 700, W - 88, 170, 26);
   ctx.fillStyle = 'rgba(255,255,255,.05)';
   ctx.fill();
-  ctx.strokeStyle = phase === 'ring' ? 'rgba(212,212,212,.25)' : 'rgba(255,83,0,.8)';
+  ctx.strokeStyle = phase === 'ring' ? 'rgba(212,212,212,.25)' : 'rgba(214,163,255,.8)';
   ctx.lineWidth = 2;
   ctx.stroke();
   ctx.font = '400 24px Geist, sans-serif';
@@ -110,12 +110,12 @@ function paintScreen(ctx, phase) {
   ctx.fillStyle = phase === 'ring' ? '#949494' : '#ffffff';
   ctx.fillText(phase === 'ring' ? 'Identifying...' : 'Paid search', 76, 800);
   ctx.font = '400 24px Geist, sans-serif';
-  ctx.fillStyle = '#ff8a4c';
+  ctx.fillStyle = '#e8c9ff';
   ctx.fillText(phase === 'ring' ? '' : '"same-day plumbing"', 76, 840);
 
   ctx.textAlign = 'center';
   roundRect(ctx, W / 2 - 150, 930, 300, 70, 35);
-  ctx.fillStyle = phase === 'ring' ? '#ff5300' : 'rgba(255,83,0,.18)';
+  ctx.fillStyle = phase === 'ring' ? '#d6a3ff' : 'rgba(214,163,255,.18)';
   ctx.fill();
   ctx.font = '600 26px Poppins, sans-serif';
   ctx.fillStyle = '#fff';
@@ -128,13 +128,13 @@ function paintAd(ctx, credited) {
   const H = 400;
   ctx.clearRect(0, 0, W, H);
   roundRect(ctx, 6, 6, W - 12, H - 12, 34);
-  ctx.fillStyle = '#1c1c1c';
+  ctx.fillStyle = '#1c1820';
   ctx.fill();
   ctx.lineWidth = credited ? 5 : 2;
-  ctx.strokeStyle = credited ? '#ff5300' : '#262626';
+  ctx.strokeStyle = credited ? '#d6a3ff' : '#2a2430';
   ctx.stroke();
 
-  ['#262626', '#262626', '#262626'].forEach((c, i) => {
+  ['#2a2430', '#2a2430', '#2a2430'].forEach((c, i) => {
     ctx.fillStyle = c;
     ctx.beginPath();
     ctx.arc(46 + i * 26, 44, 8, 0, Math.PI * 2);
@@ -155,7 +155,7 @@ function paintAd(ctx, credited) {
   ctx.fillText('Licensed plumbers, on site in 60 minutes.', 40, 212);
 
   roundRect(ctx, 40, 250, 200, 64, 32);
-  ctx.fillStyle = '#ff5300';
+  ctx.fillStyle = '#d6a3ff';
   ctx.fill();
   ctx.fillStyle = '#fff';
   ctx.font = '600 26px Poppins, sans-serif';
@@ -163,9 +163,9 @@ function paintAd(ctx, credited) {
 
   if (credited) {
     roundRect(ctx, 300, 250, 300, 64, 32);
-    ctx.fillStyle = 'rgba(255,83,0,.2)';
+    ctx.fillStyle = 'rgba(214,163,255,.2)';
     ctx.fill();
-    ctx.strokeStyle = '#ff8a4c';
+    ctx.strokeStyle = '#e8c9ff';
     ctx.lineWidth = 2;
     ctx.stroke();
     ctx.fillStyle = '#ffffff';
@@ -235,7 +235,7 @@ async function mount(el, onStep, reducedMotion) {
   const key = new THREE.DirectionalLight(0xffffff, 2.4);
   key.position.set(-4, 5, 6);
   scene.add(key);
-  const rim = new THREE.DirectionalLight(0xff7a33, 1.6);
+  const rim = new THREE.DirectionalLight(0xc792f7, 1.6);
   rim.position.set(5, -2, -4);
   scene.add(rim);
 
@@ -267,7 +267,7 @@ async function mount(el, onStep, reducedMotion) {
   world.add(phone);
   phone.add(new THREE.Mesh(
     new RoundedBoxGeometry(1.7, 3.4, 0.18, 6, 0.24),
-    new THREE.MeshStandardMaterial({ color: 0x0e0e0e, metalness: 0.75, roughness: 0.32 }),
+    new THREE.MeshStandardMaterial({ color: 0x0f0d11, metalness: 0.75, roughness: 0.32 }),
   ));
   const screenCanvas = document.createElement('canvas');
   screenCanvas.width = 512;
@@ -295,7 +295,7 @@ async function mount(el, onStep, reducedMotion) {
   outlineShape.quadraticCurveTo(-ow, -oh, -ow + orad, -oh);
   const outlineGeo = new THREE.BufferGeometry().setFromPoints(outlineShape.getPoints(24));
   [0.42, 0.26, 0.14].forEach((opacity, i) => {
-    const line = new THREE.LineLoop(outlineGeo, new THREE.LineBasicMaterial({ color: 0xff5300, transparent: true, opacity }));
+    const line = new THREE.LineLoop(outlineGeo, new THREE.LineBasicMaterial({ color: 0xd6a3ff, transparent: true, opacity }));
     line.position.set(0.16 * (i + 1), -0.12 * (i + 1), -0.28 * (i + 1));
     phone.add(line);
   });
@@ -344,8 +344,8 @@ async function mount(el, onStep, reducedMotion) {
     uReturn: { value: 0 },
     uFade: { value: 1 },
     uGain: { value: 0.42 },
-    uColorA: { value: new THREE.Color('#ffd9c2') },
-    uColorB: { value: new THREE.Color('#ff6a1f') },
+    uColorA: { value: new THREE.Color('#f3e6ff') },
+    uColorB: { value: new THREE.Color('#e2bcff') },
   };
   const strandMat = new THREE.ShaderMaterial({
     ...strandShader,
