@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 
 // Channel shades for the Calls / Forms / Chats cards below the scene.
-export const CHANNEL_COLORS = ['#6cc8f2', '#3fa9e0', '#0a84bf'];
+export const CHANNEL_COLORS = ['#ff5300', '#ff8a4c', '#ffffff'];
 
 const STEPS = ['A click from a campaign', 'The conversation that closes', 'Revenue back to the campaign'];
 
@@ -33,8 +33,8 @@ function roundRect(ctx, x, y, w, h, r) {
 
 function drawMark(ctx, x, y, s) {
   const g = ctx.createLinearGradient(x, y, x + s, y + s);
-  g.addColorStop(0, '#6cc8f2');
-  g.addColorStop(1, '#0a84bf');
+  g.addColorStop(0, '#ff8a4c');
+  g.addColorStop(1, '#ff5300');
   ctx.fillStyle = g;
   roundRect(ctx, x, y + s * 0.09, s * 0.875, s * 0.69, s * 0.22);
   ctx.fill();
@@ -55,14 +55,15 @@ function paintScreen(ctx, phase) {
   const W = 512;
   const H = 1040;
   const bg = ctx.createLinearGradient(0, 0, 0, H);
-  bg.addColorStop(0, '#0d2a42');
-  bg.addColorStop(0.55, '#081a2b');
-  bg.addColorStop(1, '#06121f');
+  bg.addColorStop(0, '#1c1c1c');
+  bg.addColorStop(0.55, '#111111');
+  bg.addColorStop(1, '#0a0a0a');
   ctx.fillStyle = bg;
   ctx.fillRect(0, 0, W, H);
-  const glow = ctx.createRadialGradient(W / 2, 360, 20, W / 2, 360, 340);
-  glow.addColorStop(0, 'rgba(63,169,224,.45)');
-  glow.addColorStop(1, 'rgba(63,169,224,0)');
+  const glow = ctx.createRadialGradient(W / 2, 382, 30, W / 2, 382, 230);
+  glow.addColorStop(0, 'rgba(255,122,51,.42)');
+  glow.addColorStop(0.5, 'rgba(255,83,0,.12)');
+  glow.addColorStop(1, 'rgba(255,83,0,0)');
   ctx.fillStyle = glow;
   ctx.fillRect(0, 0, W, H);
 
@@ -71,13 +72,13 @@ function paintScreen(ctx, phase) {
   ctx.fill();
 
   ctx.textAlign = 'center';
-  ctx.fillStyle = '#e8edf3';
+  ctx.fillStyle = '#ffffff';
   ctx.font = '600 30px Poppins, sans-serif';
   ctx.fillText(phase === 'ring' ? 'Incoming call' : phase === 'live' ? 'Connected' : 'Job booked', W / 2, 200);
 
   if (phase === 'ring') {
     [150, 112, 74].forEach((r, i) => {
-      ctx.strokeStyle = `rgba(108,200,242,${0.18 + i * 0.2})`;
+      ctx.strokeStyle = `rgba(255,138,76,${0.18 + i * 0.2})`;
       ctx.lineWidth = 3;
       ctx.beginPath();
       ctx.arc(W / 2, 380, r, 0, Math.PI * 2);
@@ -90,7 +91,7 @@ function paintScreen(ctx, phase) {
   ctx.fillStyle = '#ffffff';
   ctx.fillText(phase === 'done' ? '$420' : '(555) 014-2290', W / 2, 580);
   ctx.font = '400 26px Geist, sans-serif';
-  ctx.fillStyle = '#8ec8e5';
+  ctx.fillStyle = '#d4d4d4';
   ctx.fillText(phase === 'ring' ? 'Ringing' : phase === 'live' ? 'Talking 3:12' : 'Same-day repair', W / 2, 628);
 
   // Source panel: unknown while ringing, then identified.
@@ -98,22 +99,22 @@ function paintScreen(ctx, phase) {
   roundRect(ctx, 44, 700, W - 88, 170, 26);
   ctx.fillStyle = 'rgba(255,255,255,.05)';
   ctx.fill();
-  ctx.strokeStyle = phase === 'ring' ? 'rgba(142,200,229,.25)' : 'rgba(63,169,224,.8)';
+  ctx.strokeStyle = phase === 'ring' ? 'rgba(212,212,212,.25)' : 'rgba(255,83,0,.8)';
   ctx.lineWidth = 2;
   ctx.stroke();
   ctx.font = '400 24px Geist, sans-serif';
-  ctx.fillStyle = '#8c9aab';
+  ctx.fillStyle = '#949494';
   ctx.fillText(phase === 'done' ? 'Revenue credited to' : 'Source', 76, 752);
   ctx.font = '600 30px Poppins, sans-serif';
-  ctx.fillStyle = phase === 'ring' ? '#8c9aab' : '#ffffff';
+  ctx.fillStyle = phase === 'ring' ? '#949494' : '#ffffff';
   ctx.fillText(phase === 'ring' ? 'Identifying...' : 'Paid search', 76, 800);
   ctx.font = '400 24px Geist, sans-serif';
-  ctx.fillStyle = '#6cc8f2';
+  ctx.fillStyle = '#ff8a4c';
   ctx.fillText(phase === 'ring' ? '' : '"same-day plumbing"', 76, 840);
 
   ctx.textAlign = 'center';
   roundRect(ctx, W / 2 - 150, 930, 300, 70, 35);
-  ctx.fillStyle = phase === 'ring' ? '#0a84bf' : 'rgba(63,169,224,.18)';
+  ctx.fillStyle = phase === 'ring' ? '#ff5300' : 'rgba(255,83,0,.18)';
   ctx.fill();
   ctx.font = '600 26px Poppins, sans-serif';
   ctx.fillStyle = '#fff';
@@ -126,34 +127,34 @@ function paintAd(ctx, credited) {
   const H = 400;
   ctx.clearRect(0, 0, W, H);
   roundRect(ctx, 6, 6, W - 12, H - 12, 34);
-  ctx.fillStyle = '#0f2436';
+  ctx.fillStyle = '#1c1c1c';
   ctx.fill();
   ctx.lineWidth = credited ? 5 : 2;
-  ctx.strokeStyle = credited ? '#3fa9e0' : '#22344a';
+  ctx.strokeStyle = credited ? '#ff5300' : '#262626';
   ctx.stroke();
 
-  ['#22344a', '#22344a', '#22344a'].forEach((c, i) => {
+  ['#262626', '#262626', '#262626'].forEach((c, i) => {
     ctx.fillStyle = c;
     ctx.beginPath();
     ctx.arc(46 + i * 26, 44, 8, 0, Math.PI * 2);
     ctx.fill();
   });
   roundRect(ctx, 130, 30, W - 170, 28, 14);
-  ctx.fillStyle = '#0a1622';
+  ctx.fillStyle = '#000000';
   ctx.fill();
 
-  ctx.fillStyle = '#8ec8e5';
+  ctx.fillStyle = '#d4d4d4';
   ctx.font = '500 24px Geist, sans-serif';
   ctx.fillText('Ad · Paid search', 40, 118);
   ctx.fillStyle = '#ffffff';
   ctx.font = '600 38px Poppins, sans-serif';
   ctx.fillText('Same-day plumbing', 40, 170);
-  ctx.fillStyle = '#8c9aab';
+  ctx.fillStyle = '#949494';
   ctx.font = '400 24px Geist, sans-serif';
   ctx.fillText('Licensed plumbers, on site in 60 minutes.', 40, 212);
 
   roundRect(ctx, 40, 250, 200, 64, 32);
-  ctx.fillStyle = '#0a84bf';
+  ctx.fillStyle = '#ff5300';
   ctx.fill();
   ctx.fillStyle = '#fff';
   ctx.font = '600 26px Poppins, sans-serif';
@@ -161,9 +162,9 @@ function paintAd(ctx, credited) {
 
   if (credited) {
     roundRect(ctx, 300, 250, 300, 64, 32);
-    ctx.fillStyle = 'rgba(63,169,224,.2)';
+    ctx.fillStyle = 'rgba(255,83,0,.2)';
     ctx.fill();
-    ctx.strokeStyle = '#6cc8f2';
+    ctx.strokeStyle = '#ff8a4c';
     ctx.lineWidth = 2;
     ctx.stroke();
     ctx.fillStyle = '#ffffff';
@@ -210,6 +211,7 @@ const strandShader = {
         alpha = mix(broken, shimmer, lit) + head * 1.6;
       }
       vec3 color = mix(uColorA, uColorB, smoothstep(0.0, 1.0, vU));
+      if (vU >= uSplit) color = mix(color, vec3(1.0, 0.93, 0.86), clamp(exp(-pow(((vU - uSplit) / (1.0 - uSplit) - uReturn) * 30.0, 2.0)), 0.0, 1.0));
       gl_FragColor = vec4(color, alpha * uGain * uFade);
     }`,
 };
@@ -230,11 +232,11 @@ async function mount(el, onStep, reducedMotion) {
   const camera = new THREE.PerspectiveCamera(34, 1, 0.1, 100);
   camera.position.set(0, 0.1, 10.5);
 
-  scene.add(new THREE.AmbientLight(0x9fc9e6, 0.6));
-  const key = new THREE.DirectionalLight(0xcfe9ff, 2.4);
+  scene.add(new THREE.AmbientLight(0xd4d4d4, 0.6));
+  const key = new THREE.DirectionalLight(0xffffff, 2.4);
   key.position.set(-4, 5, 6);
   scene.add(key);
-  const rim = new THREE.DirectionalLight(0x3fa9e0, 3);
+  const rim = new THREE.DirectionalLight(0xff7a33, 1.6);
   rim.position.set(5, -2, -4);
   scene.add(rim);
 
@@ -246,7 +248,7 @@ async function mount(el, onStep, reducedMotion) {
   const count = 900;
   const stars = new Float32Array(count * 3);
   const shades = new Float32Array(count * 3);
-  const tint = new THREE.Color(0x8ec8e5);
+  const tint = new THREE.Color(0xd4d4d4);
   for (let i = 0; i < count; i++) {
     const r = Math.sqrt(Math.random());
     const a = Math.random() * Math.PI * 2;
@@ -266,7 +268,7 @@ async function mount(el, onStep, reducedMotion) {
   world.add(phone);
   phone.add(new THREE.Mesh(
     new RoundedBoxGeometry(1.7, 3.4, 0.18, 6, 0.24),
-    new THREE.MeshStandardMaterial({ color: 0x0b1724, metalness: 0.75, roughness: 0.32 }),
+    new THREE.MeshStandardMaterial({ color: 0x0e0e0e, metalness: 0.75, roughness: 0.32 }),
   ));
   const screenCanvas = document.createElement('canvas');
   screenCanvas.width = 512;
@@ -294,7 +296,7 @@ async function mount(el, onStep, reducedMotion) {
   outlineShape.quadraticCurveTo(-ow, -oh, -ow + orad, -oh);
   const outlineGeo = new THREE.BufferGeometry().setFromPoints(outlineShape.getPoints(24));
   [0.42, 0.26, 0.14].forEach((opacity, i) => {
-    const line = new THREE.LineLoop(outlineGeo, new THREE.LineBasicMaterial({ color: 0x3fa9e0, transparent: true, opacity }));
+    const line = new THREE.LineLoop(outlineGeo, new THREE.LineBasicMaterial({ color: 0xff5300, transparent: true, opacity }));
     line.position.set(0.16 * (i + 1), -0.12 * (i + 1), -0.28 * (i + 1));
     phone.add(line);
   });
@@ -342,9 +344,9 @@ async function mount(el, onStep, reducedMotion) {
     uSplit: { value: split },
     uReturn: { value: 0 },
     uFade: { value: 1 },
-    uGain: { value: 0.22 },
-    uColorA: { value: new THREE.Color('#8fdcff') },
-    uColorB: { value: new THREE.Color('#0a84bf') },
+    uGain: { value: 0.42 },
+    uColorA: { value: new THREE.Color('#ffd9c2') },
+    uColorB: { value: new THREE.Color('#ff6a1f') },
   };
   const strandMat = new THREE.ShaderMaterial({
     ...strandShader,

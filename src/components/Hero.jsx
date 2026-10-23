@@ -1,40 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
-
-function IntroVideo() {
-  const video = useRef(null);
-  const [playing, setPlaying] = useState(true);
-
-  useEffect(() => {
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-      video.current.pause();
-      setPlaying(false);
-    }
-  }, []);
-
-  const toggle = () => {
-    if (playing) video.current.pause();
-    else video.current.play();
-    setPlaying(!playing);
-  };
-
-  return (
-    <div className="intro">
-      <video
-        ref={video}
-        autoPlay
-        muted
-        loop
-        playsInline
-        poster="/hero-poster.jpg"
-        aria-label="CallsTalk features: call attribution, lead scoring, revenue reporting, form and chat tracking, conversion sync and automated reports"
-      >
-        <source src="/hero.mp4" type="video/mp4" />
-      </video>
-      <button className={`intro__toggle${playing ? '' : ' is-paused'}`} onClick={toggle}
-        aria-label={playing ? 'Pause intro video' : 'Play intro video'} />
-    </div>
-  );
-}
+import HeroScene from './HeroScene.jsx';
 
 const tools = ['Advertising networks', 'CRM platforms', 'Web analytics', 'Contact centers', 'Team messaging'];
 
@@ -59,7 +23,7 @@ export default function Hero() {
             </ul>
           </div>
           <figure className="hero__film">
-            <IntroVideo />
+            <HeroScene />
           </figure>
         </div>
         <div className="works">
