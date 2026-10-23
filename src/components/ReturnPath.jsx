@@ -1,5 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { webFontsReady } from '../lib/fonts.js';
+import { buildIPhone, clipScreen, paintIPhoneChrome } from '../lib/iphone.js';
+
+const TEX_SCALE = 2; // canvases are drawn at 2x for sharp text
+const SCREEN_W = 512;
+const SCREEN_H = Math.round(512 * (3.4 * 0.955) / (1.7 * 0.92));
 
 // Channel shades for the Calls / Forms / Chats cards below the scene.
 export const CHANNEL_COLORS = ['#d6a3ff', '#e8c9ff', '#ffffff'];
@@ -53,8 +58,11 @@ function drawMark(ctx, x, y, s) {
 
 // The phone screen: an incoming call, the live conversation, then the attributed result.
 function paintScreen(ctx, phase) {
-  const W = 512;
-  const H = 1040;
+  const W = SCREEN_W;
+  const H = SCREEN_H;
+  ctx.setTransform(TEX_SCALE, 0, 0, TEX_SCALE, 0, 0);
+  ctx.save();
+  clipScreen(ctx, W, H);
   const bg = ctx.createLinearGradient(0, 0, 0, H);
   bg.addColorStop(0, '#1c1820');
   bg.addColorStop(0.55, '#121015');
@@ -68,10 +76,6 @@ function paintScreen(ctx, phase) {
   ctx.fillStyle = glow;
   ctx.fillRect(0, 0, W, H);
 
-  ctx.fillStyle = '#000';
-  roundRect(ctx, W / 2 - 70, 26, 140, 34, 17);
-  ctx.fill();
-
   ctx.textAlign = 'center';
   ctx.fillStyle = '#ffffff';
   ctx.font = '600 30px Poppins, sans-serif';
@@ -79,7 +83,7 @@ function paintScreen(ctx, phase) {
 
   if (phase === 'ring') {
     [150, 112, 74].forEach((r, i) => {
-      ctx.strokeStyle = `rgba(255,138,76,${0.18 + i * 0.2})`;
+      ctx.strokeStyle = `rgba(232,201,255,${0.18 + i * 0.2})`;
       ctx.lineWidth = 3;
       ctx.beginPath();
       ctx.arc(W / 2, 380, r, 0, Math.PI * 2);
@@ -104,10 +108,10 @@ function paintScreen(ctx, phase) {
   ctx.lineWidth = 2;
   ctx.stroke();
   ctx.font = '400 24px Geist, sans-serif';
-  ctx.fillStyle = '#949494';
+  ctx.fillStyle = '#b3abbd';
   ctx.fillText(phase === 'done' ? 'Revenue credited to' : 'Source', 76, 752);
   ctx.font = '600 30px Poppins, sans-serif';
-  ctx.fillStyle = phase === 'ring' ? '#949494' : '#ffffff';
+  ctx.fillStyle = phase === 'ring' ? '#b3abbd' : '#ffffff';
   ctx.fillText(phase === 'ring' ? 'Identifying...' : 'Paid search', 76, 800);
   ctx.font = '400 24px Geist, sans-serif';
   ctx.fillStyle = '#e8c9ff';
@@ -118,14 +122,17 @@ function paintScreen(ctx, phase) {
   ctx.fillStyle = phase === 'ring' ? '#d6a3ff' : 'rgba(214,163,255,.18)';
   ctx.fill();
   ctx.font = '600 26px Poppins, sans-serif';
-  ctx.fillStyle = '#fff';
+  ctx.fillStyle = phase === 'ring' ? '#160f1f' : '#ffffff';
   ctx.fillText(phase === 'ring' ? 'Answer' : phase === 'live' ? 'Recording' : 'Attributed', W / 2, 975);
+  paintIPhoneChrome(ctx, W, H);
+  ctx.restore();
 }
 
 // The campaign ad the click came from; credited once the conversation is traced back.
 function paintAd(ctx, credited) {
   const W = 640;
   const H = 400;
+  ctx.setTransform(TEX_SCALE, 0, 0, TEX_SCALE, 0, 0);
   ctx.clearRect(0, 0, W, H);
   roundRect(ctx, 6, 6, W - 12, H - 12, 34);
   ctx.fillStyle = '#1c1820';
@@ -150,14 +157,14 @@ function paintAd(ctx, credited) {
   ctx.fillStyle = '#ffffff';
   ctx.font = '600 38px Poppins, sans-serif';
   ctx.fillText('Same-day plumbing', 40, 170);
-  ctx.fillStyle = '#949494';
+  ctx.fillStyle = '#b3abbd';
   ctx.font = '400 24px Geist, sans-serif';
   ctx.fillText('Licensed plumbers, on site in 60 minutes.', 40, 212);
 
   roundRect(ctx, 40, 250, 200, 64, 32);
   ctx.fillStyle = '#d6a3ff';
   ctx.fill();
-  ctx.fillStyle = '#fff';
+  ctx.fillStyle = '#160f1f';
   ctx.font = '600 26px Poppins, sans-serif';
   ctx.fillText('Call now', 82, 292);
 
@@ -223,7 +230,7 @@ async function mount(el, onStep, reducedMotion) {
   await webFontsReady();
 
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setPixelRatio(Math.min(Math.max(window.devicePixelRatio, 1.5), 2));
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   el.prepend(renderer.domElement);
 
@@ -265,19 +272,18 @@ async function mount(el, onStep, reducedMotion) {
   phone.position.set(1.15, -0.15, 0.4);
   phone.rotation.set(0.14, -0.5, 0.06);
   world.add(phone);
-  phone.add(new THREE.Mesh(
-    new RoundedBoxGeometry(1.7, 3.4, 0.18, 6, 0.24),
-    new THREE.MeshStandardMaterial({ color: 0x0f0d11, metalness: 0.75, roughness: 0.32 }),
-  ));
+  const device = buildIPhone(THREE, RoundedBoxGeometry, 1.7, 3.4);
+  phone.add(device.group);
+  const maxAniso = renderer.capabilities.getMaxAnisotropy();
   const screenCanvas = document.createElement('canvas');
-  screenCanvas.width = 512;
-  screenCanvas.height = 1040;
+  screenCanvas.width = SCREEN_W * TEX_SCALE;
+  screenCanvas.height = SCREEN_H * TEX_SCALE;
   const screenCtx = screenCanvas.getContext('2d');
   const screenTex = new THREE.CanvasTexture(screenCanvas);
   screenTex.colorSpace = THREE.SRGBColorSpace;
-  screenTex.anisotropy = 4;
-  const screen = new THREE.Mesh(new THREE.PlaneGeometry(1.56, 3.17), new THREE.MeshBasicMaterial({ map: screenTex }));
-  screen.position.z = 0.092;
+  screenTex.anisotropy = maxAniso;
+  const screen = new THREE.Mesh(new THREE.PlaneGeometry(device.screenW, device.screenH), new THREE.MeshBasicMaterial({ map: screenTex, transparent: true }));
+  screen.position.z = device.frontZ;
   phone.add(screen);
 
   const outlineShape = new THREE.Shape();
@@ -302,12 +308,12 @@ async function mount(el, onStep, reducedMotion) {
 
   // The campaign ad.
   const adCanvas = document.createElement('canvas');
-  adCanvas.width = 640;
-  adCanvas.height = 400;
+  adCanvas.width = 640 * TEX_SCALE;
+  adCanvas.height = 400 * TEX_SCALE;
   const adCtx = adCanvas.getContext('2d');
   const adTex = new THREE.CanvasTexture(adCanvas);
   adTex.colorSpace = THREE.SRGBColorSpace;
-  adTex.anisotropy = 4;
+  adTex.anisotropy = maxAniso;
   const ad = new THREE.Mesh(new THREE.PlaneGeometry(2.6, 1.625), new THREE.MeshBasicMaterial({ map: adTex, transparent: true }));
   ad.position.set(-1.75, 1.05, -0.6);
   ad.rotation.set(0.05, 0.38, -0.03);

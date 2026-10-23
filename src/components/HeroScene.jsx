@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { webFontsReady } from '../lib/fonts.js';
+import { buildIPhone, clipScreen, paintIPhoneChrome } from '../lib/iphone.js';
 
 // Five short 3D vignettes, one per part of the product, shown in turn.
 const STEPS = ['Call attribution', 'Lead scoring', 'Revenue by channel', 'Calls from every market', 'Conversion sync'];
@@ -83,7 +84,7 @@ async function mount(el, onStep, reducedMotion) {
   await webFontsReady();
 
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setPixelRatio(Math.min(Math.max(window.devicePixelRatio, 1.5), 2));
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   el.prepend(renderer.domElement);
   requestAnimationFrame(() => el.classList.add('is-live'));
@@ -99,20 +100,26 @@ async function mount(el, onStep, reducedMotion) {
   scene.add(warm);
 
   // Shared helpers -----------------------------------------------------------
+  const TEX_SCALE = 2;
+  const maxAniso = renderer.capabilities.getMaxAnisotropy();
   const canvasPlane = (w, h, cw, ch) => {
     const c = document.createElement('canvas');
-    c.width = cw;
-    c.height = ch;
+    c.width = cw * TEX_SCALE;
+    c.height = ch * TEX_SCALE;
     const tex = new THREE.CanvasTexture(c);
     tex.colorSpace = THREE.SRGBColorSpace;
-    tex.anisotropy = 4;
+    tex.anisotropy = maxAniso;
     const mesh = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false }));
     let last = null;
     // Repaint only when the key changes, so live counters stay cheap.
     const paint = (keyValue, fn) => {
       if (keyValue === last) return;
       last = keyValue;
-      fn(c.getContext('2d'), cw, ch);
+      const ctx = c.getContext('2d');
+      ctx.setTransform(TEX_SCALE, 0, 0, TEX_SCALE, 0, 0);
+      ctx.save();
+      fn(ctx, cw, ch);
+      ctx.restore();
       tex.needsUpdate = true;
     };
     return { mesh, paint };
@@ -149,11 +156,10 @@ async function mount(el, onStep, reducedMotion) {
     phone.position.set(1.35, -0.05, 0.3);
     phone.scale.setScalar(1.08);
     g.add(phone);
-    const body = metal(0x1d1922);
-    body.emissiveIntensity = 0.06;
-    phone.add(new THREE.Mesh(new RoundedBoxGeometry(1.5, 3.0, 0.16, 6, 0.22), body));
-    const screen = canvasPlane(1.38, 2.86, 560, 1160);
-    screen.mesh.position.z = 0.085;
+    const device = buildIPhone(THREE, RoundedBoxGeometry, 1.5, 3.0);
+    phone.add(device.group);
+    const screen = canvasPlane(device.screenW, device.screenH, 400, Math.round(400 * device.screenH / device.screenW));
+    screen.mesh.position.z = device.frontZ;
     phone.add(screen.mesh);
     const rings = [0, 1, 2].map(() => {
       const r = new THREE.Mesh(new THREE.TorusGeometry(1, 0.01, 8, 96), new THREE.MeshBasicMaterial({ color: ORANGE, transparent: true }));
@@ -192,9 +198,7 @@ async function mount(el, onStep, reducedMotion) {
     const update = (u) => {
       const ringing = u < 3.2;
       screen.paint(ringing ? 'ring' : u < 4.6 ? 'live' : 'done', (ctx, W, H) => {
-        ctx.setTransform(1.4, 0, 0, 1.4, 0, 0);
-        W = 400;
-        H = 830;
+        clipScreen(ctx, W, H);
         const bg = ctx.createLinearGradient(0, 0, 0, H);
         bg.addColorStop(0, '#1c1820');
         bg.addColorStop(1, '#0b090d');
@@ -205,9 +209,6 @@ async function mount(el, onStep, reducedMotion) {
         glow.addColorStop(1, 'rgba(214,163,255,0)');
         ctx.fillStyle = glow;
         ctx.fillRect(0, 0, W, H);
-        ctx.fillStyle = '#000';
-        roundRect(ctx, W / 2 - 56, 22, 112, 28, 14);
-        ctx.fill();
         text(ctx, ringing ? 'Incoming call' : u < 4.6 ? 'Connected' : 'Job booked', W / 2, 150, '600 30px Poppins, sans-serif', '#ffffff', 'center');
         bars(ctx, W / 2 - 54, 246, 108);
         text(ctx, u < 4.6 ? '(555) 014-2290' : '$420', W / 2, 460, '600 36px Poppins, sans-serif', '#ffffff', 'center');
@@ -218,8 +219,9 @@ async function mount(el, onStep, reducedMotion) {
         ctx.strokeStyle = ringing ? '#302a36' : '#d6a3ff';
         ctx.lineWidth = 2;
         ctx.stroke();
-        text(ctx, 'Source', 64, 606, '400 22px Geist, sans-serif', '#949494');
-        text(ctx, ringing ? 'Identifying...' : 'Paid search', 64, 650, '600 28px Poppins, sans-serif', ringing ? '#949494' : '#ffffff');
+        text(ctx, 'Source', 64, 606, '400 22px Geist, sans-serif', '#b3abbd');
+        text(ctx, ringing ? 'Identifying...' : 'Paid search', 64, 650, '600 28px Poppins, sans-serif', ringing ? '#b3abbd' : '#ffffff');
+        paintIPhoneChrome(ctx, W, H);
       });
       ad.paint(u > 1.2 && u < 2.4 ? 'click' : 'idle', (ctx, W, H) => {
         card(ctx, W, H, u > 1.2);
@@ -228,7 +230,7 @@ async function mount(el, onStep, reducedMotion) {
         roundRect(ctx, 36, 172, 210, 70, 35);
         ctx.fillStyle = '#d6a3ff';
         ctx.fill();
-        text(ctx, 'Call now', 141, 218, '600 28px Poppins, sans-serif', '#ffffff', 'center');
+        text(ctx, 'Call now', 141, 218, '600 28px Poppins, sans-serif', '#160f1f', 'center');
       });
       rings.forEach((r, i) => {
         const ph = (u * 0.9 + i / 3) % 1;
@@ -299,7 +301,7 @@ async function mount(el, onStep, reducedMotion) {
       center.paint(score, (ctx, W, H) => {
         ctx.clearRect(0, 0, W, H);
         text(ctx, String(score), W / 2, 150, '600 130px Poppins, sans-serif', '#ffffff', 'center');
-        text(ctx, 'Lead score', W / 2, 212, '500 34px Geist, sans-serif', '#949494', 'center');
+        text(ctx, 'Lead score', W / 2, 212, '500 34px Geist, sans-serif', '#b3abbd', 'center');
       });
       const routed = u > 3.8;
       lead.paint(routed, (ctx, W, H) => {
@@ -308,16 +310,16 @@ async function mount(el, onStep, reducedMotion) {
         ctx.beginPath();
         ctx.arc(76, 82, 40, 0, Math.PI * 2);
         ctx.fill();
-        text(ctx, 'JM', 76, 96, '600 34px Poppins, sans-serif', '#ffffff', 'center');
+        text(ctx, 'JM', 76, 96, '600 34px Poppins, sans-serif', '#160f1f', 'center');
         text(ctx, 'Inbound call', 136, 76, '600 36px Poppins, sans-serif', '#ffffff');
-        text(ctx, '(555) 014-2290 · Paid search', 136, 116, '400 24px Geist, sans-serif', '#949494');
+        text(ctx, '(555) 014-2290 · Paid search', 136, 118, '400 27px Geist, sans-serif', '#c9c1d3');
         [['High intent', 36], ['Emergency repair', 220]].forEach(([t, x]) => {
           roundRect(ctx, x, 168, ctx.measureText(t).width + 60, 54, 27);
           ctx.fillStyle = '#24202a';
           ctx.fill();
           text(ctx, t, x + 24, 204, '500 24px Geist, sans-serif', '#ffffff');
         });
-        text(ctx, routed ? 'Routed to Sales team in 4 seconds' : 'Scoring intent...', 36, 300, '600 28px Poppins, sans-serif', routed ? '#d6a3ff' : '#949494');
+        text(ctx, routed ? 'Routed to Sales team in 4 seconds' : 'Scoring intent...', 36, 300, '600 28px Poppins, sans-serif', routed ? '#d6a3ff' : '#b3abbd');
       });
       lead.mesh.position.y = 0.25 + Math.sin(u * 1.2) * 0.05;
     };
@@ -363,7 +365,7 @@ async function mount(el, onStep, reducedMotion) {
       roundRect(ctx, 4, 4, W - 8, H - 8, 51);
       ctx.fillStyle = '#d6a3ff';
       ctx.fill();
-      text(ctx, 'Top revenue channel', W / 2, 68, '600 38px Poppins, sans-serif', '#ffffff', 'center');
+      text(ctx, 'Top revenue channel', W / 2, 68, '600 38px Poppins, sans-serif', '#160f1f', 'center');
     });
     inner.add(crown.mesh);
     const curves = CH.map(() => new THREE.QuadraticBezierCurve3(new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()));
@@ -386,7 +388,7 @@ async function mount(el, onStep, reducedMotion) {
         b.label.paint(`${Math.round(CH[i][1] * f / 100)}|${top}`, (ctx, W, H) => {
           ctx.clearRect(0, 0, W, H);
           text(ctx, money(CH[i][1] * f), W / 2, 74, '600 58px Poppins, sans-serif', top ? '#d6a3ff' : '#ffffff', 'center');
-          text(ctx, CH[i][0], W / 2, 124, '500 30px Geist, sans-serif', '#949494', 'center');
+          text(ctx, CH[i][0], W / 2, 130, '500 36px Geist, sans-serif', '#c9c1d3', 'center');
         });
         const s = sources[i].mesh.position;
         curves[i].v0.set(s.x + 1.15, s.y, s.z + 0.15);
@@ -396,7 +398,7 @@ async function mount(el, onStep, reducedMotion) {
         sources[i].paint(active, (ctx, W, H) => {
           card(ctx, W, H, active);
           bars(ctx, 30, 35, 80);
-          text(ctx, 'Campaign', 136, 64, '500 24px Geist, sans-serif', '#949494');
+          text(ctx, 'Campaign', 136, 62, '500 28px Geist, sans-serif', '#c9c1d3');
           text(ctx, CH[i][0], 136, 106, '600 34px Poppins, sans-serif', '#ffffff');
         });
       });
@@ -471,7 +473,7 @@ async function mount(el, onStep, reducedMotion) {
       const calls = Math.round(1284 * ease((u - 0.4) / 3.6));
       counter.paint(calls, (ctx, W, H) => {
         card(ctx, W, H, true);
-        text(ctx, 'Calls tracked today', 40, 76, '500 30px Geist, sans-serif', '#949494');
+        text(ctx, 'Calls tracked today', 40, 76, '500 30px Geist, sans-serif', '#b3abbd');
         text(ctx, calls.toLocaleString('en-US'), 40, 170, '600 92px Poppins, sans-serif', '#ffffff');
         text(ctx, 'across 14 markets', 40, 238, '500 30px Geist, sans-serif', '#d6a3ff');
       });
@@ -495,7 +497,7 @@ async function mount(el, onStep, reducedMotion) {
       const s = 200;
       const x = (W - s) / 2;
       const y = (H - s) / 2;
-      ctx.fillStyle = '#d6a3ff';
+      ctx.fillStyle = '#8a55d6';
       roundRect(ctx, x, y + s * 0.09, s * 0.875, s * 0.69, s * 0.22);
       ctx.fill();
       ctx.beginPath();
@@ -539,7 +541,7 @@ async function mount(el, onStep, reducedMotion) {
         p.paint(n, (ctx, W, H) => {
           card(ctx, W, H, n > 0);
           text(ctx, PLATFORMS[i][0], 34, 72, '600 38px Poppins, sans-serif', '#ffffff');
-          text(ctx, 'Conversions synced', 34, 128, '400 28px Geist, sans-serif', '#949494');
+          text(ctx, 'Conversions synced', 34, 130, '400 31px Geist, sans-serif', '#c9c1d3');
           text(ctx, `+${n}`, W - 34, 128, '600 32px Poppins, sans-serif', '#d6a3ff', 'right');
         });
       });

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import Tabs from './Tabs.jsx';
+import SolutionIcon from './SolutionIcon.jsx';
 import { solutions } from '../data.js';
 
 const tabs = [
@@ -21,6 +22,7 @@ export default function Solutions() {
           {solutions[active].map(({ title, text }) => (
             <li key={title}>
               <a href="#">
+                <SolutionIcon name={title} />
                 <h3>{title}</h3>
                 <p>{text}</p>
               </a>
