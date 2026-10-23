@@ -84,7 +84,9 @@ async function mount(el, onStep, reducedMotion) {
   await webFontsReady();
 
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-  renderer.setPixelRatio(Math.min(Math.max(window.devicePixelRatio, 1.5), 2));
+  // Phones get a lighter render: their screens are dense and their GPUs are slower.
+  const small = window.innerWidth < 700;
+  renderer.setPixelRatio(small ? Math.min(window.devicePixelRatio, 1.5) : Math.min(Math.max(window.devicePixelRatio, 1.5), 2));
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   el.prepend(renderer.domElement);
   requestAnimationFrame(() => el.classList.add('is-live'));

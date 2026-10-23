@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import BrandLogo from './BrandLogo.jsx';
 import { LogoMark } from './Logo.jsx';
 import { ALL_INTEGRATIONS, FEATURED, INTEGRATION_GROUPS } from '../integrations.js';
@@ -22,7 +22,10 @@ function Ring({ items, size, reverse, active = -1, tick = 0 }) {
       )}
       {size === 'inner' && active >= 0 && (
         // The data packet: re-keyed each tick so its flight restarts from the core.
-        <span key={tick} className="orbit__packet" style={{ '--tx': `${pos(active, items.length).x}%`, '--ty': `${pos(active, items.length).y}%` }} />
+        // A full-size track moved with transform (percentages of the ring), so the flight stays on the GPU.
+        <span key={tick} className="orbit__track" style={{ '--tx': `${pos(active, items.length).x - 50}%`, '--ty': `${pos(active, items.length).y - 50}%` }}>
+          <span className="orbit__packet" />
+        </span>
       )}
       {items.map((item, i) => {
         const { x, y } = pos(i, items.length);
@@ -46,18 +49,27 @@ const START = 1284;
 function Hub() {
   const [tick, setTick] = useState(0);
   const [moving, setMoving] = useState(true);
+  const [visible, setVisible] = useState(false);
+  const ref = useRef(null);
+  // Only animate while the section is on screen.
+  useEffect(() => {
+    const io = new IntersectionObserver(([e]) => setVisible(e.isIntersecting), { rootMargin: '100px' });
+    io.observe(ref.current);
+    return () => io.disconnect();
+  }, []);
   useEffect(() => {
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
       setMoving(false);
       return undefined;
     }
+    if (!visible) return undefined;
     const id = setInterval(() => setTick((t) => t + 1), 2200);
     return () => clearInterval(id);
-  }, []);
+  }, [visible]);
   const active = tick % FEATURED.length;
   const [type, source] = EVENTS[tick % EVENTS.length];
   return (
-    <div className="orbit-wrap">
+    <div className={`orbit-wrap${visible ? '' : ' is-paused'}`} ref={ref}>
       <div className={`orbit${moving ? '' : ' is-still'}`} aria-hidden="true">
         <div className="orbit__halo" />
         <Ring items={OUTER} size="outer" reverse />

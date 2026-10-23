@@ -34,7 +34,7 @@ export default function RequestAccess() {
     return (
       <div className="access-card access-card--sent" role="status">
         <span className="access-card__check" aria-hidden="true" />
-        <h3>Request Received</h3>
+        <h2>Request Received</h2>
         <p>Our team is reviewing it. Once it is approved, we will send your CallsTalk.io login link to the email address you provided.</p>
         <button type="button" className="btn btn--quiet btn--sm" onClick={() => setStatus('idle')}>Send Another</button>
       </div>
@@ -43,7 +43,7 @@ export default function RequestAccess() {
 
   return (
     <form className="access-card" onSubmit={submit} noValidate={false}>
-      <h3>Request Access</h3>
+      <h2>Request Access</h2>
       <p className="access-card__lead">Tell us about your business. Once your request is approved, we will email you a login link to your CallsTalk.io account.</p>
       <div className="access-card__grid">
         <label>Full Name<input required value={form.name} onChange={set('name')} autoComplete="name" maxLength={80} /></label>
