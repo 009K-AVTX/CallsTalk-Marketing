@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { LogoMark } from './Logo.jsx';
 import {
   askAssistant, fetchMessages, liveChatEnabled, loadSession, saveSession, sendMessage, startChat,
 } from '../lib/support.js';
@@ -172,7 +173,7 @@ export default function ChatWidget() {
       {open && (
         <section className="chat__panel" role="dialog" aria-label="Chat with CallsTalk" onKeyDown={(e) => e.key === 'Escape' && setOpen(false)}>
           <header className="chat__head">
-            <span className="logo__mark" aria-hidden="true" />
+            <LogoMark />
             <div>
               <b>{session ? 'CallsTalk team' : 'CallsTalk assistant'}</b>
               <small>{session ? 'Replies here and by email' : 'Answers in seconds'}</small>
