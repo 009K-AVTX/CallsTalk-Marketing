@@ -17,20 +17,38 @@ export const features = [
   {
     eyebrow: 'Lead Capture',
     title: 'Never miss an opportunity.',
-    body: 'Dynamic number insertion, form monitoring and chat attribution automatically record where each inquiry originated.',
-    links: ['Call Attribution', 'Form Monitoring', 'Chat Attribution', 'Purchase Tracking'],
+    body: 'Every call, form and chat is recorded the moment it arrives, with the channel, keyword, page and campaign that produced it. Nothing gets lost after the click.',
+    cta: 'Explore lead capture',
+    links: [
+      { name: 'Call Attribution', text: 'A unique number for each visitor reveals the ad and keyword behind every call.' },
+      { name: 'Form Monitoring', text: 'Each submission arrives with its full visit history, with no changes to your forms.' },
+      { name: 'Chat Attribution', text: 'Conversations stay linked to the session and campaign that started them.' },
+      { name: 'Purchase Tracking', text: 'Online and phone orders are traced back to their first touch.' },
+    ],
   },
   {
     eyebrow: 'Lead Qualification',
     title: 'Respond with confidence.',
-    body: 'Prioritize, label and value every lead from a single workspace, then assign it to the right team member while interest is high.',
-    links: ['Lead Prioritization', 'Labels & Comments', 'Real-Time Notifications', 'Conversation Recording'],
+    body: 'Score, label and value every lead in one shared workspace, then send it to the right person while interest is still high.',
+    cta: 'Explore lead qualification',
+    links: [
+      { name: 'Lead Prioritization', text: 'Leads are scored on intent, so your team calls the best ones first.' },
+      { name: 'Labels & Comments', text: 'Outcomes and notes stay with the lead for everyone who picks it up.' },
+      { name: 'Real-Time Notifications', text: 'The right person hears about a qualified lead the moment it arrives.' },
+      { name: 'Conversation Recording', text: 'Call recordings show what was said and what was promised.' },
+    ],
   },
   {
     eyebrow: 'Reporting & Intelligence',
     title: 'Demonstrate your return.',
-    body: 'Connect leads to closed revenue across all channels and deliver clear reports that quantify the return on every dollar invested.',
-    links: ['Custom Dashboards', 'Conversion Sync', 'Cross-Channel Attribution', 'Automated Reporting'],
+    body: 'Connect leads to closed revenue across every channel, and share reports that show what each dollar of spend returned.',
+    cta: 'Explore reporting',
+    links: [
+      { name: 'Custom Dashboards', text: 'Build the views each team and client needs, without exporting data.' },
+      { name: 'Conversion Sync', text: 'Qualified leads and sales flow back to your ad platforms automatically.' },
+      { name: 'Cross-Channel Attribution', text: 'Every touch along the journey gets credit, not only the last click.' },
+      { name: 'Automated Reporting', text: 'Scheduled reports reach clients and stakeholders on time.' },
+    ],
   },
 ];
 

@@ -17,14 +17,16 @@ export default function Solutions() {
           <h2>Designed around the way you operate.</h2>
           <Tabs tabs={tabs} active={active} onChange={setActive} />
         </div>
-        <div className="tiles">
+        <ul className="index">
           {solutions[active].map(({ title, text }) => (
-            <a key={title} className="tile" href="#">
-              <h3>{title}</h3>
-              <p>{text}</p>
-            </a>
+            <li key={title}>
+              <a href="#">
+                <h3>{title}</h3>
+                <p>{text}</p>
+              </a>
+            </li>
           ))}
-        </div>
+        </ul>
       </div>
     </section>
   );

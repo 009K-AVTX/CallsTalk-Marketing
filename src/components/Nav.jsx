@@ -9,7 +9,7 @@ export default function Nav() {
   return (
     <header className="nav">
       <div className="container nav__inner">
-        <Logo />
+        <Logo light />
         <button className="nav__toggle" aria-label="Open menu" aria-expanded={open} onClick={() => setOpen(!open)}>
           <span /><span />
         </button>
@@ -20,8 +20,7 @@ export default function Nav() {
           <a href="#pricing">Plans</a>
           <span className="nav__actions">
             <a href="#">Sign In</a>
-            <a href="#demo">Schedule a Demo</a>
-            <a href="#trial" className="btn btn--lamp btn--sm">Try It Free</a>
+            <a href="#trial" className="btn btn--light btn--sm">Try It Free</a>
           </span>
         </nav>
       </div>

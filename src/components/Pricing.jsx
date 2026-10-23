@@ -10,10 +10,11 @@ const tabs = [
 function Plan({ name, price, note, items, popular, sales }) {
   return (
     <div className={`plan${popular ? ' plan--hot' : ''}`}>
-      <h3>{name}{popular && <span className="tag tag--lamp">Recommended</span>}</h3>
+      <h3>{name}</h3>
+      {popular && <span className="plan__flag">Recommended</span>}
       <div className="price">
         {price}
-        {!sales && <small>/mo</small>}
+        <small>{sales ? 'Custom terms' : 'per month'}</small>
       </div>
       <p>{note}</p>
       <ul>
@@ -21,7 +22,7 @@ function Plan({ name, price, note, items, popular, sales }) {
           <li key={value}>{label && <span>{label}</span>} <b>{value}</b></li>
         ))}
       </ul>
-      <a href={sales ? '#demo' : '#trial'} className={`btn ${popular ? 'btn--lamp' : 'btn--line'}`}>
+      <a href={sales ? '#demo' : '#trial'} className={`btn ${popular ? 'btn--light' : 'btn--quiet'}`}>
         {sales ? 'Contact Sales' : 'Try It Free'}
       </a>
     </div>
@@ -32,7 +33,7 @@ export default function Pricing() {
   const [active, setActive] = useState('business');
 
   return (
-    <section className="section section--surface" id="pricing">
+    <section className="section section--dark" id="pricing">
       <div className="container">
         <div className="section__head">
           <h2>Transparent pricing that grows with you.</h2>
