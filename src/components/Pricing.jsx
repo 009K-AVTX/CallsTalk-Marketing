@@ -22,8 +22,8 @@ function Plan({ name, price, note, items, popular, sales }) {
           <li key={value}>{label && <span>{label}</span>} <b>{value}</b></li>
         ))}
       </ul>
-      <a href={sales ? '#demo' : '#trial'} className={`btn ${popular ? 'btn--light' : 'btn--quiet'}`}>
-        {sales ? 'Contact Sales' : 'Try It Free'}
+      <a href={sales ? '#demo' : '#access'} className={`btn ${popular ? 'btn--light' : 'btn--quiet'}`}>
+        {sales ? 'Contact Sales' : 'Request Access'}
       </a>
     </div>
   );

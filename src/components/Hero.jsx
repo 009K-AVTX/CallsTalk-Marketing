@@ -50,11 +50,11 @@ export default function Hero() {
               channel responsible, so you can eliminate wasted budget and invest in what performs.
             </p>
             <div className="actions">
-              <a href="#trial" className="btn btn--light">Begin Your Free 14-Day Trial</a>
-              <a href="#demo" className="btn btn--quiet">Request a Live Demo</a>
+              <a href="#access" className="btn btn--light">Request Access</a>
+              <a href="#demo" className="btn btn--quiet">Book a Live Demo</a>
             </div>
             <ul className="assurances">
-              <li>No payment details required</li>
+              <li>Setup help from our specialists</li>
               <li>Ready in minutes</li>
             </ul>
           </div>

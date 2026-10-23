@@ -19,8 +19,8 @@ export default function Nav() {
           ))}
           <a href="#pricing">Plans</a>
           <span className="nav__actions">
-            <a href="#demo">Request Access</a>
-            <a href="#trial" className="btn btn--light btn--sm">Try It Free</a>
+            <a href="#access">Request Access</a>
+            <a href="#demo" className="btn btn--light btn--sm">Book a Demo</a>
           </span>
         </nav>
       </div>

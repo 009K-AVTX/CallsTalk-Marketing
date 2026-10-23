@@ -1,9 +1,9 @@
-import SignalField, { CHANNEL_COLORS } from './SignalField.jsx';
+import ReturnPath, { CHANNEL_COLORS } from './ReturnPath.jsx';
 
 // Product facts drawn from the rest of the page.
 const facts = [
   { value: '3', label: 'channels in one place: calls, forms and chats' },
-  { value: '14 days', label: 'free trial, no payment details required' },
+  { value: '1 view', label: 'of every call, form and chat, from first click to revenue' },
   { value: '1 snippet', label: 'of tracking code, or use your tag manager' },
   { value: '24/7', label: 'every inquiry recorded the moment it arrives' },
 ];
@@ -34,7 +34,7 @@ export default function Statement() {
             </p>
             <p className="statement__answer">CallsTalk closes that gap, across every way a customer reaches you.</p>
           </div>
-          <SignalField />
+          <ReturnPath />
         </div>
         <div className="channels">
           {channels.map(({ name, text }, i) => (
