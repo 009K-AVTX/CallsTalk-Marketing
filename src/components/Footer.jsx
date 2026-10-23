@@ -8,13 +8,13 @@ export default function Footer() {
     <footer className="footer">
       <div className="container">
         <div className="footer__card">
-          <div>
-            <h2>Lost us on Telegram? Find us here.</h2>
-            <p>Whether you have a question, need setup help or lost a conversation, our team answers here.</p>
+          <div className="footer__card-copy">
+            <h2>Can’t reach us on Telegram?</h2>
+            <p>Message our team directly. We reply in the chat or by email.</p>
           </div>
-          <div className="actions">
+          <div className="footer__card-actions">
             <ChatButton />
-            <a href={`mailto:${SUPPORT_EMAIL}`} className="btn btn--quiet">{SUPPORT_EMAIL}</a>
+            <a href={`mailto:${SUPPORT_EMAIL}`} className="btn btn--quiet">Email Support</a>
           </div>
         </div>
         <div className="footer__cols">
