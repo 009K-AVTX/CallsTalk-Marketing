@@ -12,11 +12,13 @@ export const CHANNEL_COLORS = ['#d6a3ff', '#e8c9ff', '#ffffff'];
 const STEPS = ['A click from a campaign', 'The conversation that closes', 'Revenue back to the campaign'];
 
 // Seconds within one loop.
-const LOOP = 9;
+const LOOP = 11;
+const CLICK = 0.9;
 const CONNECT = 2.4;
-const RETURN_START = 3.6;
-const RETURN_END = 5.8;
-const FADE_OUT = 8.3;
+const RETURN_START = 4.2;
+const RETURN_END = 6.4;
+const FILL_END = 7.6;
+const FADE_OUT = 10.2;
 
 const STRANDS = 34;
 const SEGMENTS = 260;
@@ -194,6 +196,123 @@ function paintAd(ctx, credited) {
   }
 }
 
+const money = (v) => `$${Math.round(v).toLocaleString('en-US')}`;
+
+// The campaign report: stops at the click until CallsTalk fills in the calls and revenue.
+function paintReport(ctx, fill) {
+  const W = 560;
+  const H = 420;
+  ctx.setTransform(TEX_SCALE, 0, 0, TEX_SCALE, 0, 0);
+  ctx.clearRect(0, 0, W, H);
+  const done = fill >= 1;
+  roundRect(ctx, 6, 6, W - 12, H - 12, 30);
+  ctx.fillStyle = '#17141b';
+  ctx.fill();
+  ctx.lineWidth = done ? 4 : 2;
+  ctx.strokeStyle = done ? '#d6a3ff' : '#302a36';
+  ctx.stroke();
+  ctx.textAlign = 'left';
+  ctx.fillStyle = '#ffffff';
+  ctx.font = '600 32px Poppins, sans-serif';
+  ctx.fillText('Campaign report', 36, 64);
+  ctx.fillStyle = '#c9c1d3';
+  ctx.font = '500 22px Geist, sans-serif';
+  ctx.fillText('Same-day plumbing · Paid search', 36, 98);
+  const rows = [
+    ['Clicks', '1,240', true],
+    ['Calls', fill > 0 ? String(Math.round(86 * fill)) : '?', fill > 0],
+    ['Revenue', fill > 0 ? money(420 * fill) : '?', fill > 0],
+  ];
+  rows.forEach(([label, value, known], i) => {
+    const y = 156 + i * 62;
+    ctx.strokeStyle = '#2a2430';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(36, y - 34);
+    ctx.lineTo(W - 36, y - 34);
+    ctx.stroke();
+    ctx.textAlign = 'left';
+    ctx.fillStyle = '#c9c1d3';
+    ctx.font = '500 26px Geist, sans-serif';
+    ctx.fillText(label, 36, y);
+    ctx.textAlign = 'right';
+    ctx.fillStyle = known ? (i ? '#d6a3ff' : '#ffffff') : '#8a8294';
+    ctx.font = '600 32px Poppins, sans-serif';
+    ctx.fillText(value, W - 36, y);
+  });
+  // Status chip.
+  const y = 340;
+  roundRect(ctx, 36, y, W - 72, 52, 26);
+  ctx.fillStyle = done ? 'rgba(214,163,255,.2)' : 'rgba(255,255,255,.05)';
+  ctx.fill();
+  ctx.strokeStyle = done ? '#d6a3ff' : '#4d4555';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  ctx.fillStyle = done ? '#d6a3ff' : '#8a8294';
+  ctx.beginPath();
+  ctx.arc(64, y + 26, 7, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.textAlign = 'left';
+  ctx.fillStyle = '#ffffff';
+  ctx.font = '500 23px Geist, sans-serif';
+  ctx.fillText(done ? 'Complete with CallsTalk' : fill > 0 ? 'Tracing the conversation...' : 'Report stops at the click', 84, y + 34);
+}
+
+// The break in the return path: a question mark until CallsTalk bridges it.
+function paintGap(ctx, bridged) {
+  const S = 256;
+  ctx.setTransform(TEX_SCALE, 0, 0, TEX_SCALE, 0, 0);
+  ctx.clearRect(0, 0, S, S);
+  if (bridged) {
+    const glow = ctx.createRadialGradient(S / 2, S / 2, 20, S / 2, S / 2, S / 2);
+    glow.addColorStop(0, 'rgba(214,163,255,.55)');
+    glow.addColorStop(1, 'rgba(214,163,255,0)');
+    ctx.fillStyle = glow;
+    ctx.fillRect(0, 0, S, S);
+    ctx.fillStyle = '#17141b';
+    ctx.beginPath();
+    ctx.arc(S / 2, S / 2, 62, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.lineWidth = 5;
+    ctx.strokeStyle = '#d6a3ff';
+    ctx.stroke();
+    drawMark(ctx, S / 2 - 38, S / 2 - 40, 78);
+  } else {
+    ctx.fillStyle = 'rgba(11,9,13,.9)';
+    ctx.beginPath();
+    ctx.arc(S / 2, S / 2, 54, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.setLineDash([12, 10]);
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = '#8a8294';
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = '#c9c1d3';
+    ctx.font = '600 64px Poppins, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('?', S / 2, S / 2 + 23);
+  }
+}
+
+const sparkShader = {
+  vertexShader: /* glsl */ `
+    attribute float aAlpha;
+    varying float vAlpha;
+    void main() {
+      vAlpha = aAlpha;
+      vec4 mv = modelViewMatrix * vec4(position, 1.0);
+      gl_PointSize = 34.0 / -mv.z;
+      gl_Position = projectionMatrix * mv;
+    }`,
+  fragmentShader: /* glsl */ `
+    varying float vAlpha;
+    void main() {
+      float d = length(gl_PointCoord - 0.5);
+      float core = smoothstep(0.5, 0.0, d);
+      gl_FragColor = vec4(mix(vec3(0.84, 0.64, 1.0), vec3(1.0), core * core), core * vAlpha);
+    }`,
+};
+
 const strandShader = {
   vertexShader: /* glsl */ `
     attribute float aU;
@@ -306,6 +425,17 @@ async function mount(el, onStep, reducedMotion) {
     phone.add(line);
   });
 
+  const texPlane = (w, h, cw, ch) => {
+    const c = document.createElement('canvas');
+    c.width = cw * TEX_SCALE;
+    c.height = ch * TEX_SCALE;
+    const tex = new THREE.CanvasTexture(c);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.anisotropy = maxAniso;
+    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false }));
+    return { mesh, ctx: c.getContext('2d'), tex };
+  };
+
   // The campaign ad.
   const adCanvas = document.createElement('canvas');
   adCanvas.width = 640 * TEX_SCALE;
@@ -318,6 +448,17 @@ async function mount(el, onStep, reducedMotion) {
   ad.position.set(-1.75, 1.05, -0.6);
   ad.rotation.set(0.05, 0.38, -0.03);
   world.add(ad);
+
+  // Click ripple on the ad's call button.
+  const ripple = new THREE.Mesh(new THREE.RingGeometry(0.9, 1, 48), new THREE.MeshBasicMaterial({ color: 0xe8c9ff, transparent: true, depthWrite: false }));
+  ripple.position.set(-0.73, -0.33, 0.01);
+  ad.add(ripple);
+
+  // The campaign report, bottom left, in front of the loop.
+  const report = texPlane(2.05, 1.54, 560, 420);
+  report.mesh.position.set(-1.45, -1.3, 1.1);
+  report.mesh.rotation.set(-0.04, 0.32, 0.02);
+  world.add(report.mesh);
 
   // The loop: ad -> phone over the top (the click), phone -> ad underneath (the way back).
   const loop = new THREE.CatmullRomCurve3([
@@ -375,8 +516,39 @@ async function mount(el, onStep, reducedMotion) {
     world.add(new THREE.Line(geo, strandMat));
   }
 
+  // The gap on the way back, where most reports lose the conversation.
+  // Placed where the return path crosses the open space below the phone.
+  let gapIndex = Math.round(split * SEGMENTS);
+  let gapBest = Infinity;
+  for (let i = gapIndex; i <= SEGMENTS; i++) {
+    const d = base[i].distanceTo(new THREE.Vector3(0.35, -2.0, 0.6));
+    if (d < gapBest) {
+      gapBest = d;
+      gapIndex = i;
+    }
+  }
+  const gapAt = (gapIndex / SEGMENTS - split) / (1 - split); // share of the return path before the gap
+  const gap = texPlane(0.95, 0.95, 256, 256);
+  gap.mesh.renderOrder = 5;
+  gap.mesh.position.copy(base[gapIndex]);
+  gap.mesh.position.z += 0.3;
+  world.add(gap.mesh);
+
+  // Sparks racing along the path: forward on the click, back on the return.
+  const SPARKS = 46;
+  const sparkPos = new Float32Array(SPARKS * 3);
+  const sparkAlpha = new Float32Array(SPARKS);
+  const sparkSeed = Array.from({ length: SPARKS }, () => Math.random());
+  const sparkGeo = new THREE.BufferGeometry();
+  sparkGeo.setAttribute('position', new THREE.BufferAttribute(sparkPos, 3));
+  sparkGeo.setAttribute('aAlpha', new THREE.BufferAttribute(sparkAlpha, 1));
+  world.add(new THREE.Points(sparkGeo, new THREE.ShaderMaterial({ ...sparkShader, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending })));
+  const along = (u) => base[Math.min(SEGMENTS, Math.max(0, Math.round(u * SEGMENTS)))];
+
   let phase = null;
   let credited = null;
+  let reportKey = null;
+  let gapState = null;
   const pointer = { x: 0, y: 0 };
 
   const draw = (t) => {
@@ -396,9 +568,64 @@ async function mount(el, onStep, reducedMotion) {
     onStep(local < CONNECT ? 0 : local < RETURN_START ? 1 : 2);
 
     const r = Math.min(Math.max((local - RETURN_START) / (RETURN_END - RETURN_START), 0), 1);
+    const ret = 1 - (1 - r) ** 3;
+
+    // Report fills in once the conversation is traced back.
+    const fill = Math.min(Math.max((local - RETURN_END) / (FILL_END - RETURN_END), 0), 1);
+    const key = `${Math.round(fill * 86)}`;
+    if (key !== reportKey) {
+      reportKey = key;
+      paintReport(report.ctx, 1 - (1 - fill) ** 3);
+      report.tex.needsUpdate = true;
+    }
+
+    // The gap is bridged when the returning signal passes it.
+    const bridged = ret >= gapAt;
+    if (bridged !== gapState) {
+      gapState = bridged;
+      paintGap(gap.ctx, bridged);
+      gap.tex.needsUpdate = true;
+    }
+    const pulse = bridged ? 1 + Math.sin(t * 5) * 0.06 : 1 + Math.sin(t * 2.2) * 0.03;
+    gap.mesh.scale.setScalar(pulse * (bridged && ret < gapAt + 0.18 ? 1 + (gapAt + 0.18 - ret) * 1.5 : 1));
+
+    // Click ripple.
+    const rp = (local - CLICK) / 0.7;
+    ripple.scale.setScalar(0.05 + Math.max(0, Math.min(rp, 1)) * 0.45);
+    ripple.material.opacity = rp > 0 && rp < 1 ? (1 - rp) * 0.9 : 0;
+
+    // Sparks: forward along the click path, then back along the return path with the head.
+    const forward = local > CLICK && local < CONNECT + 0.4;
+    sparkSeed.forEach((sd, k) => {
+      let u;
+      let a = 0;
+      if (forward) {
+        const f = ((local - CLICK) * 0.7 + sd) % 1;
+        u = f * split;
+        a = Math.sin(Math.PI * f);
+      } else if (r > 0 && r < 1) {
+        u = split + (1 - split) * Math.max(0, ret - sd * 0.25);
+        a = 1 - sd;
+      } else {
+        u = 0;
+      }
+      const p = along(u);
+      sparkPos.set([p.x + Math.sin(sd * 40) * 0.06, p.y + Math.cos(sd * 30) * 0.06, p.z], k * 3);
+      sparkAlpha[k] = a;
+    });
+    sparkGeo.attributes.position.needsUpdate = true;
+    sparkGeo.attributes.aAlpha.needsUpdate = true;
     uniforms.uTime.value = t;
-    uniforms.uReturn.value = 1 - (1 - r) ** 3;
-    uniforms.uFade.value = local > FADE_OUT ? 1 - (local - FADE_OUT) / (LOOP - FADE_OUT) : Math.min(local / 0.5, 1);
+    uniforms.uReturn.value = ret;
+    const fade = local > FADE_OUT ? 1 - (local - FADE_OUT) / (LOOP - FADE_OUT) : Math.min(local / 0.5, 1);
+    uniforms.uFade.value = fade;
+    report.mesh.material.opacity = Math.min(1, fade * 1.2);
+    gap.mesh.material.opacity = Math.min(1, fade * 1.2);
+
+    // Slow cinematic push-in over the loop.
+    camera.position.z = 11.3 - Math.min(local / LOOP, 1) * 0.7;
+    report.mesh.position.y = -1.25 + Math.sin(t * 0.8 + 1) * 0.04;
+    ad.position.y = 1.05 + Math.sin(t * 0.7) * 0.04;
 
     world.rotation.y = Math.sin(t * 0.25) * 0.08 + pointer.x * 0.12;
     world.rotation.x = pointer.y * 0.06;
@@ -416,7 +643,7 @@ async function mount(el, onStep, reducedMotion) {
   resize();
   const ro = new ResizeObserver(() => {
     resize();
-    if (reducedMotion) draw(RETURN_END + 1);
+    if (reducedMotion) draw(FILL_END + 0.5);
   });
   ro.observe(el);
 
@@ -440,7 +667,7 @@ async function mount(el, onStep, reducedMotion) {
   });
 
   if (reducedMotion) {
-    draw(RETURN_END + 1);
+    draw(FILL_END + 0.5);
   } else {
     io.observe(el);
     window.addEventListener('pointermove', onPointer);
@@ -485,7 +712,10 @@ export default function ReturnPath() {
       gate.disconnect();
       mount(el, onStep, reducedMotion)
         .then((dispose) => (cancelled ? dispose() : (cleanup = dispose)))
-        .catch(() => el.classList.add('is-unavailable'));
+        .catch((err) => {
+          console.error('ReturnPath failed', err);
+          el.classList.add('is-unavailable');
+        });
     }, { rootMargin: '400px' });
     gate.observe(el);
 
@@ -502,7 +732,7 @@ export default function ReturnPath() {
         className="return__stage"
         ref={ref}
         role="img"
-        aria-label="A click on a campaign ad leads to a phone call. CallsTalk traces the call back to the ad and credits it with $420 of revenue."
+        aria-label="A click on a campaign ad leads to a phone call. The campaign report stops at the click, with calls and revenue unknown. CallsTalk bridges the gap, traces the call back to the ad, and the report fills in: 86 calls and $420 of revenue."
       />
       <ol className="return__steps">
         {STEPS.map((s, i) => (
