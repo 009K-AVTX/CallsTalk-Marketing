@@ -83,27 +83,24 @@ export const steps = [
   { title: 'Get a setup check', text: 'A specialist confirms it all lines up.', link: 'Speak with us', href: '/#access' },
 ];
 
-// Rates mirror the Avortyx platform's published usage pricing: committing more each month lowers every rate.
-export const RATE_COLUMNS = ['Pay as you go', '$50', '$250', '$1,000', '$4,000', '$8,000'];
-export const RATES = [
-  { name: 'Tracking number', unit: 'per number / month', values: ['$4.00', '$3.00', '$2.00', '$1.50', '$1.00', '$1.00'] },
-  { name: 'Spam tag protection', unit: 'per number / month', values: ['$5.00', '$4.00', '$3.00', '$2.50', '$2.00', '$2.00'] },
-  { name: 'Local call tracking', unit: 'per minute', values: ['$0.0550', '$0.0500', '$0.0400', '$0.0350', '$0.0300', '$0.0250'] },
-  { name: 'Toll-free call tracking', unit: 'per minute', values: ['$0.0600', '$0.0550', '$0.0450', '$0.0400', '$0.0350', '$0.0300'] },
-  { name: 'Outbound to consumer', unit: 'per minute', values: ['$0.0450', '$0.0400', '$0.0300', '$0.0250', '$0.0200', '$0.0150'] },
-  { name: 'SMS out', unit: 'per message', values: ['$0.0400', '$0.0350', '$0.0300', '$0.0250', '$0.0200', '$0.0150'] },
-  { name: 'AI transcription', unit: 'per minute', values: ['$0.0350', '$0.0325', '$0.0300', '$0.0275', '$0.0250', '$0.0200'] },
-  { name: 'Recording retention', unit: 'per minute / month', values: ['$0.00040', '$0.00040', '$0.00040', '$0.00040', '$0.00025', '$0.00015'] },
-];
-
-// The plan cards show four of the commit levels and the headline rates from the table above.
-const col = (i) => ({ number: RATES[0].values[i], local: RATES[2].values[i], tollFree: RATES[3].values[i], transcription: RATES[6].values[i] });
-export const PLANS = [
-  { name: 'Pay as you go', price: '$0', unit: 'monthly commit', note: 'Start tracking with no commitment.', ...col(0) },
-  { name: 'Starter', price: '$250', unit: 'monthly commit', note: 'For a growing team on a few channels.', ...col(2) },
-  { name: 'Growth', price: '$1,000', unit: 'monthly commit', note: 'Lower rates for busy call lines.', popular: true, ...col(3) },
-  { name: 'Enterprise', price: 'Custom', unit: 'tailored rates', note: 'Dedicated number pools, 99.99% uptime SLA and a dedicated account manager.', sales: true },
-];
+// Billing defaults from the Avortyx platform (app.avortyx.io): a prepaid balance, a monthly portal fee,
+// and per-minute and per-call charges. Calls bill per minute, rounded up to the whole minute.
+export const BILLING = {
+  portalFee: '$49.99',
+  perMinute: '$0.45',
+  fees: [
+    { name: 'Call time', value: '$0.45', unit: 'per minute', note: 'Rounded up to the whole minute' },
+    { name: 'Tracking number', value: '$20.00', unit: 'per number', note: 'One-time, when you add a number' },
+    { name: 'Call recording', value: '$0.0025', unit: 'per minute', note: 'Only on recorded calls' },
+    { name: 'VoIP Shield', value: '$0.01', unit: 'per call', note: 'Each call screened for spam' },
+    { name: 'Rejected call', value: '$0.015', unit: 'per call', note: 'Calls refused before routing' },
+  ],
+  balance: [
+    'Prepaid balance, top up anytime',
+    'Auto-recharge $50 when you drop below $10',
+    'Every charge itemized on the call',
+  ],
+};
 
 export const reviews = ['A', 'B', 'C', 'D', 'E', 'F'].map((initial) => ({
   initial,

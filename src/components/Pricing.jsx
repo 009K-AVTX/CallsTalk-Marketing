@@ -1,89 +1,57 @@
 import ChatButton from './ChatButton.jsx';
-import { useState } from 'react';
-import Tabs from './Tabs.jsx';
-import { PLANS, RATES, RATE_COLUMNS } from '../data.js';
-
-const tabs = [
-  { id: 'plans', label: 'Plans' },
-  { id: 'rates', label: 'Full rate sheet' },
-];
-
-function Plan({ name, price, unit, note, popular, sales, number, local, tollFree, transcription }) {
-  return (
-    <div className={`plan${popular ? ' plan--hot' : ''}`}>
-      <h3>{name}</h3>
-      {popular && <span className="plan__flag">Recommended</span>}
-      <div className="price">
-        {price}
-        <small>{unit}</small>
-      </div>
-      <p>{note}</p>
-      {!sales && (
-        <ul>
-          <li><span>Tracking number</span> <b>{number}<em>/mo</em></b></li>
-          <li><span>Local calls</span> <b>{local}<em>/min</em></b></li>
-          <li><span>Toll-free calls</span> <b>{tollFree}<em>/min</em></b></li>
-          <li><span>AI transcription</span> <b>{transcription}<em>/min</em></b></li>
-        </ul>
-      )}
-      {sales && (
-        <ul>
-          <li><b>Dedicated number pools</b></li>
-          <li><b>Custom integrations</b></li>
-          <li><b>24/7 dedicated support</b></li>
-        </ul>
-      )}
-      <ChatButton className={`btn ${popular ? 'btn--light' : 'btn--quiet'}`}>
-        {sales ? 'Chat with us' : 'Request Access'}
-      </ChatButton>
-    </div>
-  );
-}
-
-function RateSheet() {
-  return (
-    <div className="rates" role="region" aria-label="Rates by monthly commit" tabIndex={0}>
-      <table>
-        <thead>
-          <tr>
-            <th scope="col">Monthly commit</th>
-            {RATE_COLUMNS.map((c) => <th key={c} scope="col">{c}</th>)}
-          </tr>
-        </thead>
-        <tbody>
-          {RATES.map((r) => (
-            <tr key={r.name}>
-              <th scope="row">{r.name}<small>{r.unit}</small></th>
-              {r.values.map((v, i) => <td key={i}>{v}</td>)}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
+import { BILLING } from '../data.js';
 
 export default function Pricing() {
-  const [active, setActive] = useState('plans');
-
   return (
     <section className="section section--dark" id="pricing">
       <div className="container">
         <div className="section__head">
           <div>
             <h2>Pay for the calls you track.</h2>
-            <p className="lead">Usage-based rates that drop as you commit more each month. No onboarding fees, every charge itemized.</p>
+            <p className="lead">One simple account. A monthly portal fee, then pay only for the minutes and calls you use.</p>
           </div>
-          <Tabs tabs={tabs} active={active} onChange={setActive} />
         </div>
-        {active === 'plans' ? (
-          <div className="plans">
-            {PLANS.map((plan) => <Plan key={plan.name} {...plan} />)}
+
+        <div className="billing">
+          <div className="billing__main">
+            <span className="plan__flag">Standard account</span>
+            <div className="billing__headline">
+              <div>
+                <div className="price">{BILLING.portalFee}<small>portal access per month</small></div>
+              </div>
+              <span className="billing__plus" aria-hidden="true">+</span>
+              <div>
+                <div className="price">{BILLING.perMinute}<small>per call minute</small></div>
+              </div>
+            </div>
+            <ul className="billing__fees">
+              {BILLING.fees.map((f) => (
+                <li key={f.name}>
+                  <span><b>{f.name}</b><small>{f.note}</small></span>
+                  <strong>{f.value}<em>{f.unit}</em></strong>
+                </li>
+              ))}
+            </ul>
+            <ul className="billing__balance">
+              {BILLING.balance.map((b) => <li key={b}>{b}</li>)}
+            </ul>
+            <ChatButton className="btn btn--light">Request Access</ChatButton>
           </div>
-        ) : (
-          <RateSheet />
-        )}
-        <p className="fine">Your monthly commit is the least you pay each month and is used up by your usage. Calls bill per minute, rounded up. Rates are before taxes and fees.</p>
+
+          <div className="billing__enterprise">
+            <h3>Enterprise</h3>
+            <div className="price">Custom<small>rates for high volume</small></div>
+            <p>Negotiated per-minute rates, dedicated number pools and a dedicated account manager.</p>
+            <ul>
+              <li>Volume per-minute pricing</li>
+              <li>Dedicated number pools</li>
+              <li>99.99% routing uptime SLA</li>
+              <li>24/7 dedicated support</li>
+            </ul>
+            <ChatButton className="btn btn--quiet">Chat with us</ChatButton>
+          </div>
+        </div>
+        <p className="fine">No onboarding fees. Rates shown are standard account defaults, before taxes and fees.</p>
       </div>
     </section>
   );

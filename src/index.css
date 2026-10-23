@@ -400,17 +400,36 @@ h3 { font-size: 1.5rem; }
 .plan li b { font-weight: 500; text-align: right; margin-left: auto; }
 .plan li b:only-child { margin-left: 0; text-align: left; }
 
-.plan li b em { font-style: normal; font-weight: 400; color: var(--on-dark-soft); font-size: .85em; margin-left: 2px; }
 #pricing .section__head .lead { margin-top: 14px; max-width: 34em; }
-.rates { overflow-x: auto; border: 1px solid var(--rule-dark); border-radius: 20px; background: #0d0b10; }
-.rates table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; min-width: 760px; }
-.rates th, .rates td { padding: 14px 16px; text-align: right; border-bottom: 1px solid var(--rule-dark); white-space: nowrap; font-size: .93rem; }
-.rates thead th { position: sticky; top: 0; background: #120f16; color: var(--on-dark-soft); font-weight: 500; font-size: .85rem; }
-.rates thead th:nth-child(5), .rates td:nth-child(5) { color: var(--accent); }
-.rates th[scope="row"], .rates thead th:first-child { text-align: left; color: var(--white); font-weight: 500; }
-.rates th[scope="row"] small { display: block; margin-top: 2px; font-size: .78rem; font-weight: 400; color: var(--slate); }
-.rates tbody tr:last-child th, .rates tbody tr:last-child td { border-bottom: 0; }
-.rates tbody tr:hover { background: rgba(214, 163, 255, .04); }
+.billing { display: grid; grid-template-columns: 1.6fr 1fr; gap: 16px; margin-top: 12px; }
+.billing__main, .billing__enterprise { position: relative; display: flex; flex-direction: column; padding: 40px 36px 34px; border-radius: 24px; border: 1px solid var(--rule-dark); background: #0d0b10; }
+.billing__main { border-color: rgba(214, 163, 255, .45); background: radial-gradient(70% 60% at 0% 0%, rgba(150, 90, 220, .2), transparent 70%), #110e15; box-shadow: 0 40px 90px -50px rgba(170, 110, 240, .6); }
+.billing__main .plan__flag { left: 36px; }
+.billing__headline { display: flex; align-items: flex-end; gap: 22px; flex-wrap: wrap; }
+.billing__plus { font: 300 2.4rem var(--serif); color: var(--accent); padding-bottom: 30px; }
+.billing .price { margin-top: 6px; }
+.billing__fees { list-style: none; margin: 30px 0 0; padding: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 0 28px; }
+.billing__fees li { display: flex; justify-content: space-between; align-items: baseline; gap: 14px; padding: 14px 0; border-top: 1px solid var(--rule-dark); }
+.billing__fees b { display: block; font-weight: 500; color: var(--white); }
+.billing__fees small { display: block; margin-top: 2px; font-size: .8rem; color: var(--slate); }
+.billing__fees strong { font: 600 1.05rem var(--serif); color: var(--white); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.billing__fees em { font: 400 .8rem var(--sans); font-style: normal; color: var(--on-dark-soft); margin-left: 4px; }
+.billing__balance { list-style: none; margin: 22px 0 28px; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+.billing__balance li { padding: 7px 13px; border-radius: 999px; border: 1px solid rgba(214, 163, 255, .25); background: rgba(214, 163, 255, .06); font-size: .85rem; color: var(--on-dark); }
+.billing__main .btn { align-self: flex-start; min-width: 220px; }
+.billing__enterprise h3 { font-size: 1.5rem; margin: 0; color: var(--white); }
+.billing__enterprise p { color: var(--on-dark-soft); margin: 16px 0 20px; }
+.billing__enterprise ul { list-style: none; margin: 0 0 28px; padding: 0; flex: 1; }
+.billing__enterprise li { padding: 11px 0; border-top: 1px solid var(--rule-dark); font-size: .95rem; }
+@media (max-width: 960px) { .billing { grid-template-columns: 1fr; } }
+@media (max-width: 600px) {
+  .billing__main, .billing__enterprise { padding: 32px 22px 26px; }
+  .billing__main .plan__flag { left: 22px; }
+  .billing__fees { grid-template-columns: 1fr; }
+  .billing__plus { padding-bottom: 24px; font-size: 2rem; }
+  .billing__headline { gap: 14px; }
+  .billing__main .btn { align-self: stretch; }
+}
 
 /* Reviews */
 .answers { background: radial-gradient(50% 70% at 15% 40%, rgba(126, 72, 190, .14), transparent 70%); }
