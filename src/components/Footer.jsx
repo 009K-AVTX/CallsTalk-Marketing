@@ -9,8 +9,8 @@ export default function Footer() {
       <div className="container">
         <div className="footer__card">
           <div className="footer__card-copy">
-            <h2>Can’t reach us on Telegram?</h2>
-            <p>Message our team directly. We reply in the chat or by email.</p>
+            <h2>Get in Touch</h2>
+            <p>Questions or setup help? Message our team and we will reply in the chat or by email.</p>
           </div>
           <div className="footer__card-actions">
             <ChatButton />
