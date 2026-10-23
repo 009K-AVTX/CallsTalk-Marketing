@@ -7,50 +7,73 @@ import { ALL_INTEGRATIONS, FEATURED, INTEGRATION_GROUPS } from '../integrations.
 // an outer ring. The rings turn in opposite directions; each icon counter-turns so it stays upright.
 const OUTER = ALL_INTEGRATIONS.filter((i) => !FEATURED.includes(i));
 
-function Ring({ items, size, reverse, active = -1 }) {
+const pos = (i, n) => ({ x: 50 + Math.cos((i / n) * Math.PI * 2) * 50, y: 50 + Math.sin((i / n) * Math.PI * 2) * 50 });
+
+function Ring({ items, size, reverse, active = -1, tick = 0 }) {
   return (
     <div className={`orbit__ring orbit__ring--${size}${reverse ? ' is-reverse' : ''}`}>
       {size === 'inner' && (
         <svg className="orbit__spokes" viewBox="-50 -50 100 100">
           {items.map((item, i) => {
-            const a = (i / items.length) * Math.PI * 2;
-            const x = Math.cos(a) * 50;
-            const y = Math.sin(a) * 50;
-            return (
-              <g key={item.name} className={i === active ? 'is-active' : undefined}>
-                <line x1="0" y1="0" x2={x} y2={y} className="orbit__spoke" />
-                {i === active && <line key={`p${active}`} x1="0" y1="0" x2={x} y2={y} className="orbit__pulse" pathLength="100" />}
-              </g>
-            );
+            const { x, y } = pos(i, items.length);
+            return <line key={item.name} x1="0" y1="0" x2={x - 50} y2={y - 50} className={`orbit__spoke${i === active ? ' is-active' : ''}`} />;
           })}
         </svg>
       )}
-      {items.map((item, i) => (
-        <span key={item.name} className="orbit__slot" style={{ left: `${50 + Math.cos((i / items.length) * Math.PI * 2) * 50}%`, top: `${50 + Math.sin((i / items.length) * Math.PI * 2) * 50}%` }}>
-          <span className={`orbit__icon${i === active ? ' is-active' : ''}`} title={item.name}><BrandLogo item={item} /></span>
-        </span>
-      ))}
+      {size === 'inner' && active >= 0 && (
+        // The data packet: re-keyed each tick so its flight restarts from the core.
+        <span key={tick} className="orbit__packet" style={{ '--tx': `${pos(active, items.length).x}%`, '--ty': `${pos(active, items.length).y}%` }} />
+      )}
+      {items.map((item, i) => {
+        const { x, y } = pos(i, items.length);
+        return (
+          <span key={item.name} className="orbit__slot" style={{ left: `${x}%`, top: `${y}%` }}>
+            <span key={i === active ? `a${tick}` : 'idle'} className={`orbit__icon${i === active ? ' is-active' : ''}`} style={{ '--brand': item.color }} title={item.name}>
+              <BrandLogo item={item} />
+            </span>
+          </span>
+        );
+      })}
     </div>
   );
 }
 
-// Syncs one featured tool at a time: a pulse leaves the core, the tool lights up, the caption names it.
+// Each tick: the core ripples, a packet flies out to one featured tool, the tool pops when it lands,
+// and the caption reports the event while the day's count ticks up.
+const EVENTS = [['Call', 'Paid search'], ['Form', 'Organic search'], ['Chat', 'Paid social'], ['Call', 'Email campaign'], ['Form', 'Paid search'], ['Chat', 'Referral']];
+const START = 1284;
+
 function Hub() {
-  const [active, setActive] = useState(0);
+  const [tick, setTick] = useState(0);
+  const [moving, setMoving] = useState(true);
   useEffect(() => {
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return undefined;
-    const id = setInterval(() => setActive((i) => (i + 1) % FEATURED.length), 1800);
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      setMoving(false);
+      return undefined;
+    }
+    const id = setInterval(() => setTick((t) => t + 1), 2200);
     return () => clearInterval(id);
   }, []);
+  const active = tick % FEATURED.length;
+  const [type, source] = EVENTS[tick % EVENTS.length];
   return (
     <div className="orbit-wrap">
-      <div className="orbit" aria-hidden="true">
+      <div className={`orbit${moving ? '' : ' is-still'}`} aria-hidden="true">
         <div className="orbit__halo" />
         <Ring items={OUTER} size="outer" reverse />
-        <Ring items={FEATURED} size="inner" active={active} />
-        <div className="orbit__core" key={active}><LogoMark className="orbit__mark" /></div>
+        <Ring items={FEATURED} size="inner" active={active} tick={tick} />
+        <span key={`r${tick}`} className="orbit__ripple" />
+        <div key={`c${tick}`} className="orbit__core"><LogoMark className="orbit__mark" /></div>
       </div>
-      <p className="orbit__status" aria-live="off"><span />Synced to <b key={active}>{FEATURED[active].name}</b></p>
+      <div className="orbit__status" aria-live="off">
+        <p key={tick} className="orbit__event">
+          <span className={`orbit__type orbit__type--${type.toLowerCase()}`}>{type}</span>
+          <span>from {source}</span>
+          <span className="orbit__arrow" aria-hidden="true">→</span>
+          <b>{FEATURED[active].name}</b>
+        </p>
+        <p className="orbit__count"><span />{(START + tick).toLocaleString('en-US')} events synced today</p>
+      </div>
     </div>
   );
 }
