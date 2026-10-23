@@ -403,35 +403,57 @@ h3 { font-size: 1.5rem; }
 .plan li b { font-weight: 500; text-align: right; margin-left: auto; }
 .plan li b:only-child { margin-left: 0; text-align: left; }
 
-#pricing .section__head .lead { margin-top: 14px; max-width: 34em; }
-.billing { display: grid; grid-template-columns: 1.6fr 1fr; gap: 16px; margin-top: 12px; }
-.billing__main, .billing__enterprise { position: relative; display: flex; flex-direction: column; padding: 40px 36px 34px; border-radius: 24px; border: 1px solid var(--rule-dark); background: #0d0b10; }
-.billing__main { border-color: rgba(214, 163, 255, .45); background: radial-gradient(70% 60% at 0% 0%, rgba(150, 90, 220, .2), transparent 70%), #110e15; box-shadow: 0 40px 90px -50px rgba(170, 110, 240, .6); }
-.billing__main .plan__flag { left: 36px; }
-.billing__headline { display: flex; align-items: flex-end; gap: 22px; flex-wrap: wrap; }
-.billing__plus { font: 300 2.4rem var(--serif); color: var(--accent); padding-bottom: 30px; }
-.billing .price { margin-top: 6px; }
-.billing__fees { list-style: none; margin: 30px 0 0; padding: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 0 28px; }
-.billing__fees li { display: flex; justify-content: space-between; align-items: baseline; gap: 14px; padding: 14px 0; border-top: 1px solid var(--rule-dark); }
-.billing__fees b { display: block; font-weight: 500; color: var(--white); }
-.billing__fees small { display: block; margin-top: 2px; font-size: .8rem; color: var(--slate); }
-.billing__fees strong { font: 600 1.05rem var(--serif); color: var(--white); white-space: nowrap; font-variant-numeric: tabular-nums; }
-.billing__fees em { font: 400 .8rem var(--sans); font-style: normal; color: var(--on-dark-soft); margin-left: 4px; }
-.billing__balance { list-style: none; margin: 22px 0 28px; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
-.billing__balance li { padding: 7px 13px; border-radius: 999px; border: 1px solid rgba(214, 163, 255, .25); background: rgba(214, 163, 255, .06); font-size: .85rem; color: var(--on-dark); }
-.billing__main .btn { align-self: flex-start; min-width: 220px; }
-.billing__enterprise h3 { font-size: 1.5rem; margin: 0; color: var(--white); }
-.billing__enterprise p { color: var(--on-dark-soft); margin: 16px 0 20px; }
-.billing__enterprise ul { list-style: none; margin: 0 0 28px; padding: 0; flex: 1; }
-.billing__enterprise li { padding: 11px 0; border-top: 1px solid var(--rule-dark); font-size: .95rem; }
-@media (max-width: 960px) { .billing { grid-template-columns: 1fr; } }
+#pricing .section__head .lead { margin-top: 14px; max-width: 36em; }
+.rates { display: grid; grid-template-columns: 1.25fr 1fr; gap: 16px; margin-top: 12px; align-items: stretch; }
+.ratecard, .estimate { display: flex; flex-direction: column; padding: 36px 36px 32px; border-radius: 24px; border: 1px solid var(--rule-dark); background: #0d0b10; }
+.ratecard { border-color: rgba(214, 163, 255, .4); background: radial-gradient(80% 50% at 100% 0%, rgba(150, 90, 220, .18), transparent 70%), #110e15; }
+.ratecard__tag { align-self: flex-start; padding: 4px 12px; border-radius: 999px; font-size: .78rem; font-weight: 500; letter-spacing: .02em; color: var(--accent); border: 1px solid rgba(214, 163, 255, .35); }
+.ratecard__price { display: flex; align-items: center; gap: 16px; margin: 22px 0 26px; }
+.ratecard__price strong { font: 600 4rem/1 var(--serif); letter-spacing: -.03em; color: var(--white); }
+.ratecard__price span { font-size: .92rem; line-height: 1.4; color: var(--on-dark-soft); padding-left: 16px; border-left: 1px solid var(--rule-dark); }
+.ratecard__sheet { list-style: none; margin: 0; padding: 0; }
+.ratecard__sheet li { display: flex; align-items: baseline; gap: 12px; padding: 13px 0; }
+.ratecard__sheet li + li { border-top: 1px dashed #2f2836; }
+.ratecard__sheet b { display: block; font-weight: 500; color: var(--white); }
+.ratecard__sheet small { display: block; margin-top: 2px; font-size: .8rem; color: var(--slate); }
+.ratecard__sheet i { flex: 1; min-width: 12px; border-bottom: 1px dotted #4d4555; transform: translateY(-5px); }
+.ratecard__sheet strong { font: 600 1.05rem var(--serif); color: var(--white); white-space: nowrap; font-variant-numeric: tabular-nums; text-align: right; }
+.ratecard__sheet em { display: block; font: 400 .78rem var(--sans); font-style: normal; color: var(--on-dark-soft); }
+.ratecard__included { list-style: none; margin: 20px 0 28px; padding: 0; display: grid; gap: 9px; }
+.ratecard__included li { position: relative; padding-left: 26px; font-size: .92rem; color: var(--on-dark); }
+.ratecard__included li::before { content: ""; position: absolute; left: 2px; top: .42em; width: 11px; height: 6px; border-left: 2px solid var(--accent); border-bottom: 2px solid var(--accent); transform: rotate(-45deg); }
+.ratecard .btn { align-self: flex-start; min-width: 220px; margin-top: auto; }
+.estimate h3 { font-size: 1.35rem; margin: 0 0 22px; color: var(--white); }
+.estimate__field { display: block; margin-bottom: 20px; }
+.estimate__field span { display: flex; justify-content: space-between; font-size: .92rem; color: var(--on-dark-soft); margin-bottom: 10px; }
+.estimate__field output { font: 600 .98rem var(--serif); color: var(--white); font-variant-numeric: tabular-nums; }
+.estimate__field input { width: 100%; height: 6px; margin: 0; appearance: none; -webkit-appearance: none; border-radius: 999px; background: #2a2430; accent-color: var(--accent); cursor: pointer; }
+.estimate__field input::-webkit-slider-thumb { -webkit-appearance: none; width: 20px; height: 20px; border-radius: 50%; background: var(--accent); border: 4px solid #0d0b10; box-shadow: 0 0 0 1px var(--accent); }
+.estimate__field input::-moz-range-thumb { width: 14px; height: 14px; border-radius: 50%; background: var(--accent); border: 4px solid #0d0b10; box-shadow: 0 0 0 1px var(--accent); }
+.estimate__field input:focus-visible { outline: 2px solid var(--accent); outline-offset: 6px; }
+.estimate__lines { margin: auto 0 0; padding: 14px 0 0; border-top: 1px solid var(--rule-dark); }
+.estimate__lines div { display: flex; justify-content: space-between; padding: 5px 0; font-size: .92rem; }
+.estimate__lines dt { color: var(--on-dark-soft); }
+.estimate__lines dd { margin: 0; color: var(--white); font-variant-numeric: tabular-nums; }
+.estimate__total { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-top: 14px; padding: 18px 20px; border-radius: 16px; background: rgba(214, 163, 255, .08); border: 1px solid rgba(214, 163, 255, .25); }
+.estimate__total span { font-size: .92rem; color: var(--on-dark); }
+.estimate__total strong { font: 600 2rem/1 var(--serif); letter-spacing: -.02em; color: var(--accent); font-variant-numeric: tabular-nums; }
+.estimate__once { margin: 12px 0 0; font-size: .85rem; color: var(--slate); }
+.scale { display: grid; grid-template-columns: 1.3fr 1.2fr auto; align-items: center; gap: 28px; margin-top: 16px; padding: 28px 36px; border-radius: 24px; border: 1px solid var(--rule-dark); background: #0d0b10; }
+.scale h3 { font-size: 1.25rem; margin: 0; color: var(--white); }
+.scale p { margin: 8px 0 0; font-size: .95rem; color: var(--on-dark-soft); }
+.scale ul { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+.scale li { padding: 6px 12px; border-radius: 999px; border: 1px solid #3a3242; font-size: .84rem; color: var(--on-dark); }
+@media (max-width: 960px) {
+  .rates { grid-template-columns: 1fr; }
+  .scale { grid-template-columns: 1fr; gap: 18px; }
+  .scale .btn { justify-self: start; }
+}
 @media (max-width: 600px) {
-  .billing__main, .billing__enterprise { padding: 32px 22px 26px; }
-  .billing__main .plan__flag { left: 22px; }
-  .billing__fees { grid-template-columns: 1fr; }
-  .billing__plus { padding-bottom: 24px; font-size: 2rem; }
-  .billing__headline { gap: 14px; }
-  .billing__main .btn { align-self: stretch; }
+  .ratecard, .estimate { padding: 28px 22px 24px; }
+  .ratecard__price strong { font-size: 3.2rem; }
+  .ratecard .btn, .scale .btn { align-self: stretch; justify-self: stretch; }
+  .scale { padding: 24px 22px; }
 }
 
 /* Reviews */

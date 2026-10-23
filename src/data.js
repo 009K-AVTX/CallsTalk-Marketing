@@ -86,19 +86,21 @@ export const steps = [
 // Billing defaults from the Avortyx platform (app.avortyx.io): a prepaid balance, a monthly portal fee,
 // and per-minute and per-call charges. Calls bill per minute, rounded up to the whole minute.
 export const BILLING = {
-  portalFee: '$49.99',
-  perMinute: '$0.45',
-  fees: [
-    { name: 'Call Time', value: '$0.45', unit: 'per minute', note: 'Rounded up to the nearest whole minute' },
-    { name: 'Tracking Number', value: '$20.00', unit: 'per number', note: 'One-time fee when you add a number' },
-    { name: 'Call Recording', value: '$0.0025', unit: 'per minute', note: 'Charged only on recorded calls' },
-    { name: 'VoIP Shield', value: '$0.01', unit: 'per call', note: 'Each call is screened for spam' },
-    { name: 'Rejected Call', value: '$0.015', unit: 'per call', note: 'Calls declined before routing' },
+  portal: 49,
+  perMinute: 0.35,
+  rates: [
+    { name: 'Call Minutes', value: '$0.35', unit: 'per minute', note: 'Rounded up to the nearest minute' },
+    { name: 'Tracking Numbers', value: '$15', unit: 'one-time', note: 'Local or toll-free, yours to keep' },
+    { name: 'Call Recording', value: '$0.005', unit: 'per minute', note: 'Only on calls you choose to record' },
+    { name: 'Spam Screening', value: 'Included', unit: '', note: 'Every call checked before it rings' },
+    { name: 'Blocked Calls', value: '$0.01', unit: 'per call', note: 'Calls stopped before routing' },
   ],
-  balance: [
-    'Prepaid balance that you can top up at any time',
-    'Optional automatic top-up when your balance runs low',
-    'Every charge itemized per call',
+  recording: 0.005,
+  number: 15,
+  included: [
+    'Calls, forms and chats in one dashboard',
+    'Prepaid balance with optional auto top-up',
+    'Itemized cost on every call',
   ],
 };
 
