@@ -1,30 +1,19 @@
 # Website chat: backend setup
 
-The chat widget on the CallsTalk site has two parts.
+Every message in the chat widget goes to a person. The widget uses the chat server in
+[`server/`](../server/README.md), which posts each conversation to the team's Telegram (and email)
+and relays their replies back into the chat. Set `VITE_SUPPORT_API_URL` in Vercel to that server's
+API base, for example `https://chat.callstalk.com/api`, then redeploy.
 
-1. **AI assistant** answers first. It calls `api/chat.js`, a Vercel function that proxies Groq.
-   Set `GROQ_API_KEY` in the Vercel project's environment variables.
-2. **Talk to our team** hands the visitor to a person. It uses the existing `support` router
-   from `call_platform` (`support/api.py`), unchanged. Set `VITE_SUPPORT_API_URL` in Vercel to the
-   API base, for example `https://api.callstalk.com/api`, then redeploy.
+Setup, Hostinger VPS deployment and the Telegram reply commands are in [server/README.md](../server/README.md).
 
-## Endpoints the widget calls
+## How the widget uses it
 
-| Method | Path | Body | Response |
-| --- | --- | --- | --- |
-| POST | `/support/chat` | `{ name, email, message }` | `201 { session_id, message }` |
-| POST | `/support/chat/{session_id}` | `{ message }` | `200 { message }` |
-| GET | `/support/chat/{session_id}` | | `200 { session_id, status, messages: [{ id, sender, message, created_at }] }` |
-
-- `sender` is `visitor` for the website visitor; anything else is shown as a team reply.
-- Errors return `{ detail }`, which the widget shows to the visitor as written.
-- The widget checks for replies every 3 seconds while open and every 15 seconds while closed.
-
-## Backend checklist
-
-- Add the website's domain to `CORS_ALLOWED_ORIGINS`.
-- Set `TELEGRAM_BOT_TOKEN`, `TELEGRAM_SUPPORT_CHAT_ID` (and `TELEGRAM_SUPPORT_THREAD_ID` if using a topic).
-  The team replies in Telegram with `<first 8 characters of the session id> <reply>`.
-- **Email is not implemented yet.** The widget now collects a real name and email for every
-  conversation (stored on `SupportSession`). To reply by email as well, the backend needs to send
-  agent replies to `session.email`, and to forward new visitor messages to the support inbox.
+- A visitor can just type a question: that starts a chat right away with no name or email
+  (the team sees them as "Visitor"). "Talk to our team" opens a form that adds their name and email.
+- With each new chat it sends the referrer, so the team knows where the visitor came from.
+- It checks for replies every 3 seconds while open and every 15 seconds while closed.
+- A visitor can keep up to 3 chats, listed in a sidebar. Starting a 4th closes their oldest open chat after the visitor confirms (the team sees **Chat ended** in Telegram). Visitors cannot end a chat themselves, only start a new one. Ended chats clear from the sidebar by themselves. If the visitor is reading a chat when it ends, it stays on screen with the goodbye until they switch chats or start a new one.
+- The team can also get every message by email, with a link to answer in the chat (see the server README).
+- Agent replies are shown in the chat only. Nothing emails the visitor automatically; the team
+  sees the visitor's email address and can write to them directly.

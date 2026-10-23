@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { LogoMark } from './Logo.jsx';
 import {
-  askAssistant, fetchMessages, liveChatEnabled, loadSession, saveSession, sendMessage, startChat,
+  endChat as closeChat, fetchMessages, liveChatEnabled, loadChats, MAX_CHATS, saveChats, sendMessage, startChat,
 } from '../lib/support.js';
 
 const POLL_OPEN_MS = 3000;
@@ -9,11 +9,9 @@ const POLL_CLOSED_MS = 15000;
 
 const suggestions = ['How does call tracking work?', 'Which plan fits my business?'];
 
-const greeting = {
-  id: 'greeting',
-  from: 'assistant',
-  text: 'Hello. Ask me anything about CallsTalk, or talk to our team directly.',
-};
+const GREETING = 'Hello. Ask us anything about CallsTalk and our team will reply right here.';
+
+const startedAt = (time) => new Date(time).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 
 function HandoffForm({ initialMessage, onStart, onCancel }) {
   const [name, setName] = useState('');
@@ -51,193 +49,309 @@ function HandoffForm({ initialMessage, onStart, onCancel }) {
 
 export default function ChatWidget() {
   const [open, setOpen] = useState(false);
-  const [session, setSession] = useState(null);
-  const sessionRef = useRef(null);
-  sessionRef.current = session;
+  // Up to MAX_CHATS chats, oldest first. `activeId` null means the "new chat" screen.
+  const [chats, setChats] = useState([]);
+  const chatsRef = useRef(chats);
+  chatsRef.current = chats;
+  const [activeId, setActiveId] = useState(null);
+  const activeIdRef = useRef(activeId);
+  activeIdRef.current = activeId;
+  const [messages, setMessages] = useState({});
+  const [unread, setUnread] = useState({});
+  const seenReplies = useRef({});
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [handoff, setHandoff] = useState(false);
-  const [aiMessages, setAiMessages] = useState([greeting]);
-  const [teamMessages, setTeamMessages] = useState([]);
+  // Details of a chat waiting for the visitor to agree to end their oldest one.
+  const [confirm, setConfirm] = useState(null);
   const [pending, setPending] = useState(null);
   const [draft, setDraft] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const [unread, setUnread] = useState(false);
-  const seenTeamReplies = useRef(0);
   const listRef = useRef(null);
   const inputRef = useRef(null);
 
-  const refresh = useCallback(async () => {
-    if (!session) return;
-    try {
-      const messages = await fetchMessages(session.sessionId);
-      setTeamMessages(messages);
-      setPending(null);
-      const replies = messages.filter((m) => m.from === 'team').length;
-      if (replies > seenTeamReplies.current && !open) setUnread(true);
-      if (open) seenTeamReplies.current = replies;
-    } catch (err) {
-      if (/not found/i.test(err.message)) {
-        saveSession(null);
-        setSession(null);
-      }
-    }
-  }, [session, open]);
+  const active = chats.find((c) => c.sessionId === activeId) || null;
+  const hasUnread = Object.values(unread).some(Boolean);
 
-  // Poll for team replies: often while the panel is open, rarely while closed, never in a hidden tab.
+  const updateChats = useCallback((change) => {
+    const next = change(chatsRef.current);
+    chatsRef.current = next;
+    saveChats(next);
+    setChats(next);
+  }, []);
+
+  // Drops a chat from the sidebar and from memory.
+  const forget = useCallback((sessionId) => {
+    updateChats((all) => all.filter((c) => c.sessionId !== sessionId));
+    setMessages(({ [sessionId]: _, ...rest }) => rest);
+    setUnread(({ [sessionId]: _, ...rest }) => rest);
+    delete seenReplies.current[sessionId];
+  }, [updateChats]);
+
+  const refresh = useCallback(async (sessionId) => {
+    try {
+      const { ended, messages: list } = await fetchMessages(sessionId);
+      // Ended chats clear themselves; the one being read stays until the visitor moves on.
+      if (ended && sessionId !== activeIdRef.current) {
+        forget(sessionId);
+        return;
+      }
+      setMessages((all) => ({ ...all, [sessionId]: list }));
+      if (ended) updateChats((all) => all.map((c) => (c.sessionId === sessionId && !c.ended ? { ...c, ended: true } : c)));
+      const replies = list.filter((m) => m.from === 'team').length;
+      const watching = open && sessionId === activeId;
+      if (watching) seenReplies.current[sessionId] = replies;
+      else if (replies > (seenReplies.current[sessionId] ?? replies)) setUnread((u) => ({ ...u, [sessionId]: true }));
+      seenReplies.current[sessionId] ??= replies;
+    } catch (err) {
+      if (/not found/i.test(err.message)) forget(sessionId);
+    }
+  }, [open, activeId, updateChats, forget]);
+
+  // Poll every open chat for replies: often while the panel is open, rarely while closed, never in a hidden tab.
+  const openIds = chats.filter((c) => !c.ended).map((c) => c.sessionId).join(',');
   useEffect(() => {
-    if (!session) return undefined;
-    refresh();
+    if (!openIds) return undefined;
+    const poll = () => openIds.split(',').forEach(refresh);
+    poll();
     const id = setInterval(() => {
-      if (!document.hidden) refresh();
+      if (!document.hidden) poll();
     }, open ? POLL_OPEN_MS : POLL_CLOSED_MS);
     return () => clearInterval(id);
-  }, [session, open, refresh]);
+  }, [openIds, open, refresh]);
 
+  // Restore the visitor's chats, leaving out any that ended. Open ones that no longer exist on the
+  // server drop out on the first poll.
   useEffect(() => {
-    if (liveChatEnabled) setSession(loadSession());
-  }, []);
+    if (!liveChatEnabled) return;
+    updateChats(() => loadChats().filter((c) => !c.ended));
+    setActiveId(chatsRef.current.at(-1)?.sessionId ?? null);
+  }, [updateChats]);
 
   // Other parts of the page (the hero picker) can open the chat.
   useEffect(() => {
     const openChat = (e) => {
       setOpen(true);
-      if (e.detail?.team && liveChatEnabled) setHandoff((h) => h || !sessionRef.current);
+      if (e.detail?.team && liveChatEnabled) {
+        setActiveId(null);
+        setHandoff(true);
+      }
     };
     window.addEventListener('callstalk:open-chat', openChat);
     return () => window.removeEventListener('callstalk:open-chat', openChat);
   }, []);
 
   useEffect(() => {
-    if (open) {
-      setUnread(false);
-      inputRef.current?.focus();
-    }
-  }, [open]);
+    if (open && activeId) setUnread((u) => ({ ...u, [activeId]: false }));
+  }, [open, activeId, messages]);
+
+  useEffect(() => {
+    if (open) inputRef.current?.focus();
+  }, [open, activeId]);
 
   useEffect(() => {
     listRef.current?.scrollTo({ top: listRef.current.scrollHeight });
-  }, [aiMessages, teamMessages, pending, handoff, busy]);
+  }, [messages, activeId, pending, handoff]);
 
-  const ask = async (text) => {
-    const next = [...aiMessages, { id: `u${Date.now()}`, from: 'visitor', text }];
-    setAiMessages(next);
-    setBusy(true);
-    try {
-      const history = next
-        .filter((m) => m.id !== 'greeting')
-        .map((m) => ({ role: m.from === 'visitor' ? 'user' : 'assistant', content: m.text }));
-      const reply = await askAssistant(history);
-      setAiMessages((list) => [...list, { id: `a${Date.now()}`, from: 'assistant', text: reply }]);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const send = async (e) => {
-    e.preventDefault();
-    const text = draft.trim();
-    if (!text || busy) return;
-    setDraft('');
+  const selectChat = (sessionId) => {
+    if (active?.ended && active.sessionId !== sessionId) forget(active.sessionId);
+    setActiveId(sessionId);
+    setHandoff(false);
+    setConfirm(null);
     setError('');
-    if (!session) {
-      ask(text);
-      return;
-    }
-    setBusy(true);
-    setPending(text);
-    try {
-      await sendMessage(session.sessionId, text);
-      await refresh();
-    } catch (err) {
-      setPending(null);
-      setDraft(text);
-      setError(err.message);
-    } finally {
-      setBusy(false);
-    }
+    setSidebarOpen(false);
   };
 
-  const start = async ({ name, email, message }) => {
+  // Name and email are optional (empty when the visitor just types a question).
+  const start = async ({ name = '', email = '', message }) => {
     const sessionId = await startChat({ name, email, message });
-    const next = { sessionId, name, email };
-    saveSession(next);
-    setSession(next);
+    const chat = { sessionId, name, email, title: message.slice(0, 60), startedAt: Date.now() };
+    let next = [...chatsRef.current, chat];
+    // Over the limit: drop chats the team already ended first, then close the oldest open one.
+    while (next.length > MAX_CHATS) {
+      const drop = next.find((c) => c.ended) || next[0];
+      if (!drop.ended) closeChat(drop.sessionId).catch(() => { /* the team just won't see the notice */ });
+      next = next.filter((c) => c !== drop);
+    }
+    updateChats(() => next);
+    setActiveId(sessionId);
     setHandoff(false);
   };
 
-  const endChat = () => {
-    saveSession(null);
-    setSession(null);
-    setTeamMessages([]);
-    seenTeamReplies.current = 0;
+  // With MAX_CHATS chats already open, a new one would end the oldest, so the visitor is asked first.
+  const oldestOpen = chats.length >= MAX_CHATS && !chats.some((c) => c.ended) ? chats[0] : null;
+
+  const run = async (text, action) => {
+    setDraft('');
+    setError('');
+    setBusy(true);
+    setPending(text);
+    try {
+      await action();
+    } catch (err) {
+      setDraft(text);
+      setError(err.message);
+      if (active) refresh(active.sessionId); // picks up a chat the team has just ended
+    } finally {
+      setPending(null);
+      setBusy(false);
+    }
   };
 
-  const lastQuestion = [...aiMessages].reverse().find((m) => m.from === 'visitor')?.text || '';
-  const showSuggestions = !session && !handoff && aiMessages.length === 1;
+  // A message typed into the chat goes to the team: it starts a new chat if none is selected.
+  const submit = (text) => {
+    if (active) {
+      run(text, async () => {
+        await sendMessage(active.sessionId, text);
+        await refresh(active.sessionId);
+      });
+    } else if (oldestOpen) {
+      setDraft('');
+      setConfirm({ message: text });
+    } else {
+      run(text, () => start({ message: text }));
+    }
+  };
+
+  const startFromForm = (details) => {
+    if (!oldestOpen) return start(details);
+    setHandoff(false);
+    setConfirm(details);
+    return undefined;
+  };
+
+  const acceptConfirm = () => {
+    const details = confirm;
+    setConfirm(null);
+    run(details.message, () => start(details));
+  };
+
+  const cancelConfirm = () => {
+    setDraft(confirm.message);
+    setConfirm(null);
+  };
+
+  const send = (e) => {
+    e.preventDefault();
+    const text = draft.trim();
+    if (text && !busy) submit(text);
+  };
+
+  const thread = active ? messages[active.sessionId] || [] : [];
+  const showSuggestions = !active && !handoff && !pending && !confirm;
 
   return (
     <div className="chat">
       {open && (
-        <section className="chat__panel" role="dialog" aria-label="Chat with CallsTalk" onKeyDown={(e) => e.key === 'Escape' && setOpen(false)}>
+        <section
+          className={`chat__panel${chats.length ? ' has-sidebar' : ''}${sidebarOpen ? ' is-sidebar-open' : ''}`}
+          role="dialog"
+          aria-label="Chat with CallsTalk"
+          onKeyDown={(e) => e.key === 'Escape' && setOpen(false)}
+        >
           <header className="chat__head">
+            {chats.length > 0 && (
+              <button className="chat__menu" aria-label="Your chats" aria-expanded={sidebarOpen} onClick={() => setSidebarOpen(!sidebarOpen)}>
+                <span />
+              </button>
+            )}
             <LogoMark />
             <div>
-              <b>{session ? 'CallsTalk team' : 'CallsTalk assistant'}</b>
-              <small>{session ? 'Replies here and by email' : 'Answers in seconds'}</small>
+              <b>CallsTalk Support</b>
+              <small>{active?.ended ? 'This chat has ended' : active?.email ? 'Replies here and by email' : 'Replies right here'}</small>
             </div>
             <button className="chat__close" aria-label="Close chat" onClick={() => setOpen(false)} />
           </header>
 
-          <div className="chat__list" ref={listRef} aria-live="polite">
-            {aiMessages.map((m) => <p key={m.id} className={`bubble bubble--${m.from}`}>{m.text}</p>)}
-            {session && (
-              <>
-                <p className="chat__note">You are chatting with the CallsTalk team as {session.name}.</p>
-                {teamMessages.map((m) => <p key={m.id} className={`bubble bubble--${m.from}`}>{m.text}</p>)}
+          <div className="chat__body">
+            {chats.length > 0 && (
+              <nav className="chat__sidebar" aria-label="Your chats">
+                <button className={`chat__thread chat__thread--new${!active ? ' is-active' : ''}`} onClick={() => selectChat(null)}>New chat</button>
+                {[...chats].reverse().map((c) => (
+                  <button
+                    key={c.sessionId}
+                    className={`chat__thread${c.sessionId === activeId ? ' is-active' : ''}${c.ended ? ' is-ended' : ''}`}
+                    aria-current={c.sessionId === activeId ? 'true' : undefined}
+                    onClick={() => selectChat(c.sessionId)}
+                  >
+                    <span className="chat__thread-title">{c.title || 'Chat'}</span>
+                    <small>
+                      {unread[c.sessionId] && <i className="chat__thread-dot" aria-label="New reply" />}
+                      {c.ended ? 'Ended' : startedAt(c.startedAt)}
+                    </small>
+                  </button>
+                ))}
+              </nav>
+            )}
+
+            <div className="chat__main">
+              <div className="chat__list" ref={listRef} aria-live="polite">
+                {active ? (
+                  <>
+                    <p className="chat__note">You are chatting with the CallsTalk team{active.name ? ` as ${active.name}` : ''}.</p>
+                    {thread.map((m) => <p key={m.id} className={`bubble bubble--${m.from}`}>{m.text}</p>)}
+                    {active.ended && <p className="chat__note">This chat has ended. Start a new chat any time.</p>}
+                  </>
+                ) : (
+                  <p className="bubble bubble--assistant">{GREETING}</p>
+                )}
                 {pending && <p className="bubble bubble--visitor is-pending">{pending}</p>}
-              </>
-            )}
-            {busy && !session && <p className="bubble bubble--assistant is-typing" aria-label="Assistant is typing"><i /><i /><i /></p>}
-            {showSuggestions && (
-              <div className="chat__suggestions">
-                {suggestions.map((s) => <button key={s} onClick={() => ask(s)}>{s}</button>)}
+                {showSuggestions && (
+                  <div className="chat__suggestions">
+                    {suggestions.map((s) => <button key={s} onClick={() => !busy && submit(s)}>{s}</button>)}
+                  </div>
+                )}
+                {confirm && (
+                  <div className="handoff" role="alertdialog" aria-labelledby="chat-confirm-text">
+                    {oldestOpen ? (
+                      <p id="chat-confirm-text">
+                        <b>You already have {MAX_CHATS} open chats.</b> Starting a new one will end your oldest
+                        chat, &ldquo;{oldestOpen.title || 'Chat'}&rdquo;, started at {startedAt(oldestOpen.startedAt)}.
+                      </p>
+                    ) : (
+                      <p id="chat-confirm-text">Start a new chat with this message?</p>
+                    )}
+                    <div className="handoff__actions">
+                      <button type="button" className="chat__text-btn" onClick={cancelConfirm}>Cancel</button>
+                      <button type="button" className="btn btn--dark btn--sm" onClick={acceptConfirm} disabled={busy}>End it and start</button>
+                    </div>
+                  </div>
+                )}
+                {handoff && <HandoffForm initialMessage={draft} onStart={startFromForm} onCancel={() => setHandoff(false)} />}
               </div>
-            )}
-            {handoff && <HandoffForm initialMessage={lastQuestion} onStart={start} onCancel={() => setHandoff(false)} />}
+
+              {error && <p className="chat__error" role="alert">{error}</p>}
+
+              {!handoff && !confirm && !active?.ended && (
+                <form className="chat__compose" onSubmit={send}>
+                  <input
+                    ref={inputRef}
+                    value={draft}
+                    onChange={(e) => setDraft(e.target.value)}
+                    placeholder={active ? 'Message the team' : 'Ask a question'}
+                    aria-label="Message"
+                    maxLength={2000}
+                  />
+                  <button type="submit" className="chat__send" disabled={!draft.trim() || busy} aria-label="Send message" />
+                </form>
+              )}
+
+              <footer className="chat__foot">
+                {active && <button className="chat__text-btn" onClick={() => selectChat(null)}>Start a new chat</button>}
+                {!active && !handoff && liveChatEnabled && (
+                  <button className="chat__text-btn" onClick={() => setHandoff(true)}>Talk to our team</button>
+                )}
+              </footer>
+            </div>
           </div>
-
-          {error && <p className="chat__error" role="alert">{error}</p>}
-
-          {!handoff && (
-            <form className="chat__compose" onSubmit={send}>
-              <input
-                ref={inputRef}
-                value={draft}
-                onChange={(e) => setDraft(e.target.value)}
-                placeholder={session ? 'Message the team' : 'Ask a question'}
-                aria-label="Message"
-                maxLength={2000}
-              />
-              <button type="submit" className="chat__send" disabled={!draft.trim() || busy} aria-label="Send message" />
-            </form>
-          )}
-
-          <footer className="chat__foot">
-            {session && <button className="chat__text-btn" onClick={endChat}>End this chat</button>}
-            {!session && !handoff && liveChatEnabled && (
-              <button className="chat__text-btn" onClick={() => setHandoff(true)}>Talk to our team</button>
-            )}
-          </footer>
         </section>
       )}
 
       <button className="chat__launcher" aria-expanded={open} aria-label={open ? 'Close chat' : 'Chat with us'} onClick={() => setOpen(!open)}>
-        <span className={`chat__dot${unread ? ' is-unread' : ''}`} aria-hidden="true" />
+        <span className={`chat__dot${hasUnread ? ' is-unread' : ''}`} aria-hidden="true" />
         <svg className="chat__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h14a3 3 0 0 1 3 3v8a3 3 0 0 1-3 3H10l-4.5 3.4A.6.6 0 0 1 4.5 21l.6-3.1A3 3 0 0 1 2 15V7a3 3 0 0 1 3-3Z" /></svg>
         <span className="chat__label">{open ? 'Close chat' : 'Chat with us'}</span>
-        {unread && <span className="sr-only">New reply from the team</span>}
+        {hasUnread && <span className="sr-only">New reply from the team</span>}
       </button>
     </div>
   );

@@ -367,6 +367,30 @@ h3 { font-size: 1.5rem; }
 .handoff input:focus, .handoff textarea:focus { outline: none; border-color: var(--accent); }
 .handoff__actions { display: flex; justify-content: space-between; align-items: center; }
 
+/* Several chats: a list of them on the left of the panel (a drawer on phones). */
+.chat__panel.has-sidebar { width: min(580px, calc(100vw - 32px)); }
+.chat__body { flex: 1; min-height: 0; display: flex; position: relative; }
+.chat__main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.chat__sidebar { flex: none; width: 170px; display: flex; flex-direction: column; gap: 4px; padding: 12px 8px; overflow-y: auto; background: var(--abyss); border-right: 1px solid var(--rule); }
+.chat__thread { display: grid; gap: 2px; text-align: left; font: inherit; color: var(--on-dark); background: none; border: 1px solid transparent; border-radius: 12px; padding: 9px 10px; cursor: pointer; }
+.chat__thread:hover { background: var(--abyss-raised); }
+.chat__thread.is-active { background: var(--abyss-raised); border-color: var(--accent); }
+.chat__thread--new { margin-bottom: 6px; text-align: center; font-size: .9rem; font-weight: 500; border-color: var(--rule); }
+.chat__thread-title { font-size: .88rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chat__thread.is-ended .chat__thread-title { color: var(--slate); }
+.chat__thread small { display: flex; align-items: center; gap: 6px; font-size: .75rem; color: var(--slate); }
+.chat__thread-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
+.chat__menu { display: none; }
+@media (max-width: 600px) {
+  .chat__menu { display: block; flex: none; width: 34px; height: 34px; border-radius: 50%; border: 1px solid var(--rule-dark); background: none; cursor: pointer; position: relative; }
+  .chat__menu span, .chat__menu::before, .chat__menu::after { content: ""; position: absolute; left: 10px; right: 10px; height: 1px; background: var(--on-dark); }
+  .chat__menu::before { top: 12px; }
+  .chat__menu span { top: 16px; }
+  .chat__menu::after { top: 20px; }
+  .chat__sidebar { position: absolute; inset: 0 auto 0 0; z-index: 2; width: min(240px, 78%); transform: translateX(-100%); visibility: hidden; transition: transform .2s var(--ease), visibility .2s; box-shadow: 20px 0 40px -20px rgba(0, 0, 0, .7); }
+  .chat__panel.is-sidebar-open .chat__sidebar { transform: none; visibility: visible; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
   *, *::before, *::after { animation: none !important; transition: none !important; }
