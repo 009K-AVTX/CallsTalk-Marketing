@@ -400,6 +400,18 @@ h3 { font-size: 1.5rem; }
 .plan li b { font-weight: 500; text-align: right; margin-left: auto; }
 .plan li b:only-child { margin-left: 0; text-align: left; }
 
+.plan li b em { font-style: normal; font-weight: 400; color: var(--on-dark-soft); font-size: .85em; margin-left: 2px; }
+#pricing .section__head .lead { margin-top: 14px; max-width: 34em; }
+.rates { overflow-x: auto; border: 1px solid var(--rule-dark); border-radius: 20px; background: #0d0b10; }
+.rates table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; min-width: 760px; }
+.rates th, .rates td { padding: 14px 16px; text-align: right; border-bottom: 1px solid var(--rule-dark); white-space: nowrap; font-size: .93rem; }
+.rates thead th { position: sticky; top: 0; background: #120f16; color: var(--on-dark-soft); font-weight: 500; font-size: .85rem; }
+.rates thead th:nth-child(5), .rates td:nth-child(5) { color: var(--accent); }
+.rates th[scope="row"], .rates thead th:first-child { text-align: left; color: var(--white); font-weight: 500; }
+.rates th[scope="row"] small { display: block; margin-top: 2px; font-size: .78rem; font-weight: 400; color: var(--slate); }
+.rates tbody tr:last-child th, .rates tbody tr:last-child td { border-bottom: 0; }
+.rates tbody tr:hover { background: rgba(214, 163, 255, .04); }
+
 /* Reviews */
 .answers { background: radial-gradient(50% 70% at 15% 40%, rgba(126, 72, 190, .14), transparent 70%); }
 .answers__grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; }

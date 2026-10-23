@@ -83,20 +83,27 @@ export const steps = [
   { title: 'Get a setup check', text: 'A specialist confirms it all lines up.', link: 'Speak with us', href: '/#access' },
 ];
 
-export const pricing = {
-  business: [
-    { name: 'Essentials', price: '$29', note: 'For one location finding its feet.', items: [['Monthly leads', '100'], ['Seats', '2'], [null, 'Form and chat attribution']] },
-    { name: 'Standard', price: '$79', note: 'Adds call tracing and lead scores.', items: [['Monthly leads', '500'], ['Seats', '5'], [null, 'Call attribution and recording']] },
-    { name: 'Premium', price: '$149', note: 'The full trail, plus revenue reports.', popular: true, items: [['Monthly leads', '2,000'], ['Seats', 'Unlimited'], [null, 'Offline conversion sync']] },
-    { name: 'Enterprise', price: 'Tailored', note: 'Big volumes, SSO and a direct line to us.', sales: true, items: [['Monthly leads', 'Flexible'], ['SLA', 'Guaranteed'], [null, 'Dedicated account manager']] },
-  ],
-  agency: [
-    { name: 'Agency Starter', price: '$99', note: 'Up to 5 client accounts.', items: [['Client accounts', '5'], [null, 'White-label reporting']] },
-    { name: 'Agency Plus', price: '$249', note: 'Up to 20 client accounts.', items: [['Client accounts', '20'], [null, 'Dedicated client portals']] },
-    { name: 'Agency Premium', price: '$499', note: 'As many clients as you sign.', popular: true, items: [['Client accounts', 'Unlimited'], [null, 'Branded custom domain']] },
-    { name: 'Agency Enterprise', price: 'Tailored', note: 'Shaped around your client list.', sales: true, items: [['Client accounts', 'Flexible'], [null, 'API access and SSO']] },
-  ],
-};
+// Rates mirror the Avortyx platform's published usage pricing: committing more each month lowers every rate.
+export const RATE_COLUMNS = ['Pay as you go', '$50', '$250', '$1,000', '$4,000', '$8,000'];
+export const RATES = [
+  { name: 'Tracking number', unit: 'per number / month', values: ['$4.00', '$3.00', '$2.00', '$1.50', '$1.00', '$1.00'] },
+  { name: 'Spam tag protection', unit: 'per number / month', values: ['$5.00', '$4.00', '$3.00', '$2.50', '$2.00', '$2.00'] },
+  { name: 'Local call tracking', unit: 'per minute', values: ['$0.0550', '$0.0500', '$0.0400', '$0.0350', '$0.0300', '$0.0250'] },
+  { name: 'Toll-free call tracking', unit: 'per minute', values: ['$0.0600', '$0.0550', '$0.0450', '$0.0400', '$0.0350', '$0.0300'] },
+  { name: 'Outbound to consumer', unit: 'per minute', values: ['$0.0450', '$0.0400', '$0.0300', '$0.0250', '$0.0200', '$0.0150'] },
+  { name: 'SMS out', unit: 'per message', values: ['$0.0400', '$0.0350', '$0.0300', '$0.0250', '$0.0200', '$0.0150'] },
+  { name: 'AI transcription', unit: 'per minute', values: ['$0.0350', '$0.0325', '$0.0300', '$0.0275', '$0.0250', '$0.0200'] },
+  { name: 'Recording retention', unit: 'per minute / month', values: ['$0.00040', '$0.00040', '$0.00040', '$0.00040', '$0.00025', '$0.00015'] },
+];
+
+// The plan cards show four of the commit levels and the headline rates from the table above.
+const col = (i) => ({ number: RATES[0].values[i], local: RATES[2].values[i], tollFree: RATES[3].values[i], transcription: RATES[6].values[i] });
+export const PLANS = [
+  { name: 'Pay as you go', price: '$0', unit: 'monthly commit', note: 'Start tracking with no commitment.', ...col(0) },
+  { name: 'Starter', price: '$250', unit: 'monthly commit', note: 'For a growing team on a few channels.', ...col(2) },
+  { name: 'Growth', price: '$1,000', unit: 'monthly commit', note: 'Lower rates for busy call lines.', popular: true, ...col(3) },
+  { name: 'Enterprise', price: 'Custom', unit: 'tailored rates', note: 'Dedicated number pools, 99.99% uptime SLA and a dedicated account manager.', sales: true },
+];
 
 export const reviews = ['A', 'B', 'C', 'D', 'E', 'F'].map((initial) => ({
   initial,
