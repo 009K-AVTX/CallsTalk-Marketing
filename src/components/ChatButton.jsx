@@ -3,7 +3,7 @@ export function openChat() {
   window.dispatchEvent(new CustomEvent('callstalk:open-chat', { detail: { team: true } }));
 }
 
-export default function ChatButton({ className = 'btn btn--light', children = 'Chat with us' }) {
+export default function ChatButton({ className = 'btn btn--light', children = 'Chat With Us' }) {
   return (
     <a
       href="#chat"

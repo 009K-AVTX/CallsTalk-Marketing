@@ -2,16 +2,16 @@ import ReturnPath, { CHANNEL_COLORS } from './ReturnPath.jsx';
 
 // Product facts drawn from the rest of the page.
 const facts = [
-  { value: '3', label: 'channels in one place: calls, forms and chats' },
-  { value: '1 view', label: 'of every call, form and chat, from first click to revenue' },
-  { value: '1 snippet', label: 'of tracking code, or use your tag manager' },
-  { value: '24/7', label: 'every inquiry recorded the moment it arrives' },
+  { value: '3', label: 'ways customers reach you, tracked in one place' },
+  { value: '1 thread', label: 'from first click to closed deal, for every lead' },
+  { value: '1 snippet', label: 'is all your website needs' },
+  { value: '24/7', label: 'tracking, even when nobody picks up' },
 ];
 
 const channels = [
-  { name: 'Calls', text: 'Dynamic numbers reveal the ad, keyword and page behind every ring.' },
-  { name: 'Forms', text: 'Each submission carries its full visit history, from first touch to send.' },
-  { name: 'Chats', text: 'Conversations stay tied to the session and campaign that started them.' },
+  { name: 'Calls', text: 'Each ring arrives with its ad and keyword.' },
+  { name: 'Forms', text: 'Each submission arrives with its visit history.' },
+  { name: 'Chats', text: 'Each chat keeps its campaign attached.' },
 ];
 
 export default function Statement() {
@@ -32,7 +32,7 @@ export default function Statement() {
               Most reports stop at the click. The conversations that close business rarely make it back to the
               campaign that started them.
             </h2>
-            <p className="statement__answer">CallsTalk closes that gap, across every way a customer reaches you.</p>
+            <p className="statement__answer">CallsTalk brings every one of them home.</p>
           </div>
           <ReturnPath />
         </div>

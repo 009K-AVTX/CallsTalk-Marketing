@@ -3,7 +3,7 @@ import { webFontsReady } from '../lib/fonts.js';
 import { buildIPhone, clipScreen, paintIPhoneChrome } from '../lib/iphone.js';
 
 // Five short 3D vignettes, one per part of the product, shown in turn.
-const STEPS = ['Call attribution', 'Lead scoring', 'Revenue by channel', 'Calls from every market', 'Conversion sync'];
+const STEPS = ['Call Attribution', 'Lead Scoring', 'Revenue by Channel', 'Calls from Every Market', 'Conversion Sync'];
 const DUR = 6.5; // seconds per vignette
 const EDGE = 0.75; // seconds of transition in and out
 
@@ -84,7 +84,9 @@ async function mount(el, onStep, reducedMotion) {
   await webFontsReady();
 
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-  renderer.setPixelRatio(Math.min(Math.max(window.devicePixelRatio, 1.5), 2));
+  // Phones get a lighter render: their screens are dense and their GPUs are slower.
+  const small = window.innerWidth < 700;
+  renderer.setPixelRatio(small ? Math.min(window.devicePixelRatio, 1.5) : Math.min(Math.max(window.devicePixelRatio, 1.5), 2));
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   el.prepend(renderer.domElement);
   requestAnimationFrame(() => el.classList.add('is-live'));
@@ -330,8 +332,8 @@ async function mount(el, onStep, reducedMotion) {
   function revenueVignette() {
     const g = new THREE.Group();
     const inner = new THREE.Group();
-    inner.position.set(-1.05, -1.3, 0);
-    inner.scale.setScalar(0.92);
+    inner.position.set(-0.75, -1.15, 0);
+    inner.scale.setScalar(0.85);
     inner.rotation.y = -0.18;
     g.add(inner);
     const CH = [['Paid search', 18400], ['Organic search', 9200], ['Paid social', 5100], ['Email', 3600]];
@@ -739,18 +741,21 @@ export default function HeroScene() {
   };
 
   return (
-    <div
-      className={`hero-scene${failed ? ' is-unavailable' : ''}`}
-      ref={ref}
-      role="img"
-      aria-label="3D animations of CallsTalk: a ringing phone traced to its ad, a lead score dial, revenue bars by channel, calls arriving from many markets on a globe, and conversions syncing to ad platforms."
-    >
-      <div className="hero-scene__caption" aria-hidden="true">
-        <span>{STEPS[step]}</span>
-        <ol>{STEPS.map((s, i) => <li key={s} className={i === step ? 'is-active' : undefined} />)}</ol>
+    <>
+      <div
+        className={`hero-scene${failed ? ' is-unavailable' : ''}`}
+        ref={ref}
+        role="img"
+        aria-label="3D animations of CallsTalk: a ringing phone traced to its ad, a lead score dial, revenue bars by channel, calls arriving from many markets on a globe, and conversions syncing to ad platforms."
+      />
+      <div className="hero-scene__bar">
+        <div className="hero-scene__caption" aria-hidden="true">
+          <span>{STEPS[step]}</span>
+          <ol>{STEPS.map((s, i) => <li key={s} className={i === step ? 'is-active' : undefined} />)}</ol>
+        </div>
+        <button className={`intro__toggle${playing ? '' : ' is-paused'}`} onClick={toggle}
+          aria-label={playing ? 'Pause animation' : 'Play animation'} />
       </div>
-      <button className={`intro__toggle${playing ? '' : ' is-paused'}`} onClick={toggle}
-        aria-label={playing ? 'Pause animation' : 'Play animation'} />
-    </div>
+    </>
   );
 }

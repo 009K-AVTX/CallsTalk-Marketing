@@ -3,10 +3,12 @@ import { renderToString } from 'react-dom/server';
 import App from './App.jsx';
 
 // Used at build time to pre-render the page, so content appears before any JavaScript runs.
-export function render() {
+export function render(path = '/') {
   return renderToString(
     <StrictMode>
-      <App />
+      <App path={path} />
     </StrictMode>,
   );
 }
+
+export { DOCS } from './legal.js';

@@ -1,25 +1,42 @@
 import Logo from './Logo.jsx';
+import ChatButton from './ChatButton.jsx';
 import { footerColumns } from '../data.js';
+import ContactLinks from './ContactLinks.jsx';
 
 export default function Footer() {
   return (
     <footer className="footer">
       <div className="container">
+        <div className="footer__card">
+          <div className="footer__card-copy">
+            <h2>Get in Touch</h2>
+            <p>Questions or setup help? Message us on Telegram, send an email or start a chat, and our team will get back to you.</p>
+          </div>
+          <div className="footer__card-actions">
+            <ContactLinks />
+            <ChatButton />
+          </div>
+        </div>
         <div className="footer__cols">
           <div>
             <Logo light />
-            <p>Attribution software that links every inquiry to the revenue it generates.</p>
+            <p>Every conversation, traced back to the campaign that started it.</p>
           </div>
           {footerColumns.map(({ title, links }) => (
             <div key={title}>
               <h3>{title}</h3>
-              {links.map((l) => <a key={l} href="#">{l}</a>)}
+              {links.map(([label, href]) => <a key={label} href={href}>{label}</a>)}
             </div>
           ))}
         </div>
         <div className="footer__legal">
           <span>© {new Date().getFullYear()} CallsTalk. All rights reserved.</span>
-          <span className="footer__links"><a href="#">Privacy Policy</a><a href="#">Terms of Service</a><a href="#">Trust &amp; Security</a></span>
+          <span className="footer__links">
+            <a href="/privacy">Privacy Policy</a>
+            <a href="/terms">Terms of Service</a>
+            <a href="/cookies">Cookie Policy</a>
+            <a href="/legal">Legal Center</a>
+          </span>
         </div>
       </div>
     </footer>

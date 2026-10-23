@@ -15,17 +15,17 @@ export default function Solutions() {
     <section className="section" id="solutions">
       <div className="container">
         <div className="section__head">
-          <h2>Designed around the way you operate.</h2>
+          <h2>Built for whoever answers the phone.</h2>
           <Tabs tabs={tabs} active={active} onChange={setActive} />
         </div>
         <ul className="index">
           {solutions[active].map(({ title, text }) => (
             <li key={title}>
-              <a href="#">
+              <div className="index__item">
                 <SolutionIcon name={title} />
                 <h3>{title}</h3>
                 <p>{text}</p>
-              </a>
+              </div>
             </li>
           ))}
         </ul>

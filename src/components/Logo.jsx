@@ -25,7 +25,7 @@ export function LogoMark({ className = 'logo__mark' }) {
 
 export default function Logo({ light = false }) {
   return (
-    <a href="#" className={`logo${light ? ' logo--light' : ''}`} aria-label="CallsTalk home">
+    <a href="/" className={`logo${light ? ' logo--light' : ''}`} aria-label="CallsTalk home">
       <LogoMark />
       <span>Calls<b>Talk</b></span>
     </a>

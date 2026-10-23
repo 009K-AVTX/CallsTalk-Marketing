@@ -9,7 +9,7 @@ const SCREEN_H = Math.round(512 * (3.4 * 0.955) / (1.7 * 0.92));
 // Channel shades for the Calls / Forms / Chats cards below the scene.
 export const CHANNEL_COLORS = ['#d6a3ff', '#e8c9ff', '#ffffff'];
 
-const STEPS = ['A click from a campaign', 'The conversation that closes', 'Revenue back to the campaign'];
+const STEPS = ['A Click from a Campaign', 'The Conversation That Closes', 'Revenue Back to the Campaign'];
 
 // Seconds within one loop.
 const LOOP = 11;
@@ -349,7 +349,9 @@ async function mount(el, onStep, reducedMotion) {
   await webFontsReady();
 
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-  renderer.setPixelRatio(Math.min(Math.max(window.devicePixelRatio, 1.5), 2));
+  // Phones get a lighter render: their screens are dense and their GPUs are slower.
+  const small = window.innerWidth < 700;
+  renderer.setPixelRatio(small ? Math.min(window.devicePixelRatio, 1.5) : Math.min(Math.max(window.devicePixelRatio, 1.5), 2));
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   el.prepend(renderer.domElement);
 
