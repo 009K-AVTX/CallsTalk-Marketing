@@ -97,7 +97,7 @@ export const BILLING = {
   ],
   balance: [
     'Prepaid balance, top up anytime',
-    'Auto-recharge $50 when you drop below $10',
+    'Optional auto-recharge when your balance runs low',
     'Every charge itemized on the call',
   ],
 };

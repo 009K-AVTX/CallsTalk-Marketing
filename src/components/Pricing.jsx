@@ -17,7 +17,7 @@ export default function Pricing() {
             <span className="plan__flag">Standard account</span>
             <div className="billing__headline">
               <div>
-                <div className="price">{BILLING.portalFee}<small>portal access per month</small></div>
+                <div className="price">{BILLING.portalFee}<small>portal access every 30 days</small></div>
               </div>
               <span className="billing__plus" aria-hidden="true">+</span>
               <div>
