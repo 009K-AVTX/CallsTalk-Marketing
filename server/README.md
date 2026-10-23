@@ -1,9 +1,9 @@
 # CallsTalk chat server
 
-Backend for the website's "Talk to our team" chat.
+Backend for the website's "Talk to Our Team" chat.
 
 - Each new chat is posted to your team's Telegram with the visitor's name, email, referrer,
-  device, time (for example 3:20 PM EST), and their message. Name and email appear only if the visitor filled in the "Talk to our team" form;
+  device, time (for example 3:20 PM EST), and their message. Name and email appear only if the visitor filled in the "Talk to Our Team" form;
   a question typed straight into the chat shows up as **Visitor**.
 - Each later visitor message is forwarded to the same Telegram chat.
 - When someone on the team replies in Telegram, the reply appears in the visitor's chat window
@@ -163,7 +163,7 @@ VITE_SUPPORT_API_URL=https://chat.callstalk.com/api
 ```
 
 then redeploy. The variable is read at build time, so the redeploy is required. The chat widget
-now shows **Talk to our team**.
+now shows **Talk to Our Team**.
 
 ---
 

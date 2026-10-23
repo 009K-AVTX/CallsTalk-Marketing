@@ -579,7 +579,7 @@ chats ([7.6](#76-delete-old-chats)). The `node_modules` folders can be deleted a
 | Site shows `{"detail":"Not found."}` | `SERVE_SITE` is not `true`, or `dist/index.html` is missing | Set `SERVE_SITE=true`; rebuild ([6.1](#61-normal-update)); restart |
 | Browser: "DNS address could not be found" | Missing DNS record (e.g. `chat`) | Add it ([8](#8-dns-hpanel--domains--callstalkcom--dns--nameservers)) |
 | Browser certificate warning | Certificate expired, or a name isn't on it | `certbot certificates`; `certbot renew`, or `--expand` ([9](#9-https-certificates)) |
-| Site loads, no "Talk to our team" button | Site built without `VITE_SUPPORT_API_URL` | Check `/var/www/Callstalk/.env`, rebuild, restart |
+| Site loads, no "Talk to Our Team" button | Site built without `VITE_SUPPORT_API_URL` | Check `/var/www/Callstalk/.env`, rebuild, restart |
 | AI assistant answers fail | `GROQ_API_KEY` missing or revoked, or Groq is down | `pm2 logs ... \| grep api/chat`; replace the key ([11.3](#113-groq-api-key)) |
 | Log: `[config] Missing required settings` | A required `.env` value is empty | Fill it in, restart |
 | Log: `[db] cannot use PostgreSQL database` | Wrong `DB_PASSWORD`, or PostgreSQL is down | `systemctl status postgresql`; test with `PGPASSWORD=... psql -h 127.0.0.1 -U callstalk_chat -d callstalk_chat -c "select 1"` |

@@ -41,7 +41,7 @@ function HandoffForm({ initialMessage, onStart, onCancel }) {
       {error && <p className="chat__error" role="alert">{error}</p>}
       <div className="handoff__actions">
         <button type="button" className="chat__text-btn" onClick={onCancel}>Back</button>
-        <button type="submit" className="btn btn--dark btn--sm" disabled={busy}>{busy ? 'Starting chat' : 'Start chat'}</button>
+        <button type="submit" className="btn btn--dark btn--sm" disabled={busy}>{busy ? 'Starting Chat' : 'Start Chat'}</button>
       </div>
     </form>
   );
@@ -260,13 +260,13 @@ export default function ChatWidget() {
               <b>CallsTalk Support</b>
               <small>{active?.ended ? 'This chat has ended' : active?.email ? 'Replies here and by email' : 'Replies right here'}</small>
             </div>
-            <button className="chat__close" aria-label="Close chat" onClick={() => setOpen(false)} />
+            <button className="chat__close" aria-label="Close Chat" onClick={() => setOpen(false)} />
           </header>
 
           <div className="chat__body">
             {chats.length > 0 && (
               <nav className="chat__sidebar" aria-label="Your chats">
-                <button className={`chat__thread chat__thread--new${!active ? ' is-active' : ''}`} onClick={() => selectChat(null)}>New chat</button>
+                <button className={`chat__thread chat__thread--new${!active ? ' is-active' : ''}`} onClick={() => selectChat(null)}>New Chat</button>
                 {[...chats].reverse().map((c) => (
                   <button
                     key={c.sessionId}
@@ -313,7 +313,7 @@ export default function ChatWidget() {
                     )}
                     <div className="handoff__actions">
                       <button type="button" className="chat__text-btn" onClick={cancelConfirm}>Cancel</button>
-                      <button type="button" className="btn btn--dark btn--sm" onClick={acceptConfirm} disabled={busy}>End it and start</button>
+                      <button type="button" className="btn btn--dark btn--sm" onClick={acceptConfirm} disabled={busy}>End It and Start</button>
                     </div>
                   </div>
                 )}
@@ -337,9 +337,9 @@ export default function ChatWidget() {
               )}
 
               <footer className="chat__foot">
-                {active && <button className="chat__text-btn" onClick={() => selectChat(null)}>Start a new chat</button>}
+                {active && <button className="chat__text-btn" onClick={() => selectChat(null)}>Start a New Chat</button>}
                 {!active && !handoff && liveChatEnabled && (
-                  <button className="chat__text-btn" onClick={() => setHandoff(true)}>Talk to our team</button>
+                  <button className="chat__text-btn" onClick={() => setHandoff(true)}>Talk to Our Team</button>
                 )}
               </footer>
             </div>
@@ -347,10 +347,10 @@ export default function ChatWidget() {
         </section>
       )}
 
-      <button className="chat__launcher" aria-expanded={open} aria-label={open ? 'Close chat' : 'Chat with us'} onClick={() => setOpen(!open)}>
+      <button className="chat__launcher" aria-expanded={open} aria-label={open ? 'Close Chat' : 'Chat With Us'} onClick={() => setOpen(!open)}>
         <span className={`chat__dot${hasUnread ? ' is-unread' : ''}`} aria-hidden="true" />
         <svg className="chat__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h14a3 3 0 0 1 3 3v8a3 3 0 0 1-3 3H10l-4.5 3.4A.6.6 0 0 1 4.5 21l.6-3.1A3 3 0 0 1 2 15V7a3 3 0 0 1 3-3Z" /></svg>
-        <span className="chat__label">{open ? 'Close chat' : 'Chat with us'}</span>
+        <span className="chat__label">{open ? 'Close Chat' : 'Chat With Us'}</span>
         {hasUnread && <span className="sr-only">New reply from the team</span>}
       </button>
     </div>
