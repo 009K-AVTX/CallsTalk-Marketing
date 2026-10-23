@@ -29,7 +29,6 @@ export default function Footer() {
             </div>
           ))}
         </div>
-        <p className="footer__wordmark" aria-hidden="true">CallsTalk</p>
         <div className="footer__legal">
           <span>© {new Date().getFullYear()} CallsTalk. All rights reserved.</span>
           <span className="footer__links">

@@ -413,13 +413,12 @@ h3 { font-size: 1.5rem; }
 .footer__card::before { content: ""; position: absolute; z-index: -1; left: -10%; top: -60%; width: 70%; height: 220%; border-radius: 50%; background: radial-gradient(closest-side, rgba(150, 90, 220, .35), transparent); }
 .footer__card h2 { margin: 0 0 8px; font-size: clamp(1.6rem, 3vw, 2.2rem); color: var(--white); }
 .footer__card p { margin: 0; color: var(--on-dark-soft); }
-.footer__wordmark { margin: 64px 0 0; font: 700 clamp(4rem, 17vw, 15rem)/.85 var(--serif); letter-spacing: -.05em; text-align: center; background: linear-gradient(180deg, rgba(214, 163, 255, .32), rgba(214, 163, 255, 0) 85%); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; user-select: none; }
 .footer__cols { display: grid; grid-template-columns: 1.6fr repeat(4, 1fr); gap: 32px; border-top: 1px solid var(--rule-dark); padding-top: 72px; }
 .footer__cols p { max-width: 22em; margin-top: 18px; }
 .footer h3 { font-family: var(--sans); color: var(--white); margin: 0 0 16px; font-weight: 500; font-size: .97rem; letter-spacing: 0; }
 .footer__cols a:not(.logo) { display: block; margin-bottom: 10px; text-decoration: none; transition: color .2s; }
 .footer a:hover { color: var(--white); }
-.footer__legal { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; border-top: 1px solid var(--rule-dark); margin-top: 8px; padding-top: 28px; font-size: .9rem; }
+.footer__legal { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; border-top: 1px solid var(--rule-dark); margin-top: 56px; padding-top: 28px; font-size: .9rem; }
 .footer__links { display: flex; flex-wrap: wrap; gap: 24px; }
 .footer__links a { text-decoration: none; }
 
