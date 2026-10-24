@@ -62,6 +62,34 @@ const pointShader = {
     }`,
 };
 
+// A light trail along a tube: a faint lit line up to uReach, and a bright head
+// with a fading tail that travels toward the phone (uDir 1) or back to the ad (-1).
+const signalShader = {
+  vertexShader: /* glsl */ `
+    varying float vU;
+    void main() {
+      vU = uv.x;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    }`,
+  fragmentShader: /* glsl */ `
+    uniform float uHead;
+    uniform float uReach;
+    uniform float uDir;
+    uniform float uPulse;
+    uniform float uTime;
+    uniform float uFade;
+    varying float vU;
+    void main() {
+      float behind = uDir > 0.0 ? uHead - vU : vU - uHead;
+      float tail = behind >= 0.0 ? exp(-behind * 7.0) : 0.0;
+      float head = exp(-pow((vU - uHead) * 38.0, 2.0));
+      float lit = step(vU, uReach) * (0.3 + 0.08 * sin(vU * 60.0 - uTime * 6.0));
+      float a = lit + uPulse * (tail * 0.75 + head * 1.6);
+      vec3 color = mix(vec3(0.84, 0.64, 1.0), vec3(1.0), clamp(head * uPulse, 0.0, 1.0));
+      gl_FragColor = vec4(color, clamp(a, 0.0, 1.0) * uFade);
+    }`,
+};
+
 async function mount(el, onStep, reducedMotion) {
   const THREE = await import('../lib/three.js');
   const { RoundedBoxGeometry } = THREE;
@@ -174,22 +202,36 @@ async function mount(el, onStep, reducedMotion) {
       ctx.fill();
       text(ctx, 'Source: Paid search, "same-day plumbing"', 72, H / 2 + 10, '500 28px Geist, sans-serif', '#ffffff');
     });
-    // Ends at the phone's left edge, not on its screen.
-    const arc = new THREE.QuadraticBezierCurve3(new THREE.Vector3(-1.0, 0.6, -0.1), new THREE.Vector3(-0.1, 1.9, 0.4), new THREE.Vector3(0.5, 0.55, 0.3));
-    const flow = particles(60, (k) => TYPE_COLORS[k % 3], () => 0.1 + Math.random() * 0.06);
-    g.add(flow.points);
-    const seeds = Array.from({ length: 60 }, () => Math.random());
+    // The signal path: out of the ad's right edge level with Call now, arcing into the phone's left edge.
+    ad.mesh.updateMatrix();
+    const start = new THREE.Vector3(1.13, -0.36, 0.01).applyMatrix4(ad.mesh.matrix);
+    const path = new THREE.CubicBezierCurve3(start, new THREE.Vector3(-0.55, 1.55, -0.1), new THREE.Vector3(0.05, 1.5, 0.35), new THREE.Vector3(0.52, 0.35, 0.32));
+    const signalUniforms = { uHead: { value: 0 }, uReach: { value: 0 }, uDir: { value: 1 }, uPulse: { value: 0 }, uTime: { value: 0 }, uFade: { value: 1 } };
+    const signal = new THREE.Mesh(
+      new THREE.TubeGeometry(path, 140, 0.014, 8, false),
+      new THREE.ShaderMaterial({ ...signalShader, uniforms: signalUniforms, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }),
+    );
+    g.add(signal);
+    // A soft glow riding the head of the pulse.
+    const spark = particles(2, (k) => (k ? '#ffffff' : '#d6a3ff'), (k) => (k ? 0.32 : 0.9));
+    g.add(spark.points);
     const pt = new THREE.Vector3();
+    const CLICK = 0.8;
+    const ARRIVE = 1.9;
+    const BOOKED = 4.6;
+    const RETURNED = 5.6;
 
     const update = (u) => {
       const ringing = u < 3.2;
-      const phase = ringing ? 'ring' : u < 4.6 ? 'live' : 'done';
+      const credited = u > RETURNED;
+      const phase = u < ARRIVE ? 'idle' : ringing ? 'ring' : u < 4.6 ? 'live' : 'done';
       const secs = Math.floor(Math.max(0, u - 3.2) * 9) + 180;
       screen.paint(phase === 'live' ? `live${secs}` : phase, (ctx, W, H) => {
         paintCallScreen(ctx, W, H, phase, secs, 'Revenue sent to Google Ads');
       });
-      ad.paint(u > 1.2 && u < 2.4 ? 'click' : 'idle', (ctx, W, H) => {
-        card(ctx, W, H, u > 1.2);
+      const pressed = u > CLICK && u < CLICK + 0.45;
+      ad.paint(`${pressed}|${credited}|${u > CLICK}`, (ctx, W, H) => {
+        card(ctx, W, H, u > CLICK);
         roundRect(ctx, 34, 30, 112, 34, 17);
         ctx.fillStyle = 'rgba(214,163,255,.16)';
         ctx.fill();
@@ -199,7 +241,15 @@ async function mount(el, onStep, reducedMotion) {
         text(ctx, 'Licensed plumbers on site in 60 minutes.', 36, 150, '400 22px Geist, sans-serif', '#c9c1d3');
         text(ctx, '★★★★★', 36, 186, '400 20px Geist, sans-serif', '#f5c451');
         text(ctx, '4.9 · 312 reviews', 152, 186, '400 20px Geist, sans-serif', '#a59cb0');
-        const pressed = u > 1.2 && u < 2.4;
+        if (credited) {
+          roundRect(ctx, 276, 212, 270, 64, 32);
+          ctx.fillStyle = 'rgba(214,163,255,.14)';
+          ctx.fill();
+          ctx.strokeStyle = '#d6a3ff';
+          ctx.lineWidth = 2;
+          ctx.stroke();
+          text(ctx, '+$420 attributed', 411, 254, '600 24px Poppins, sans-serif', '#ffffff', 'center');
+        }
         roundRect(ctx, 36, 212, 220, 64, 32);
         ctx.fillStyle = pressed ? '#ecd4ff' : '#d6a3ff';
         ctx.fill();
@@ -210,17 +260,27 @@ async function mount(el, onStep, reducedMotion) {
         const ph = (u * 0.9 + i / 3) % 1;
         const s = 1.0 + ph * 0.85;
         r.scale.set(s, s * 1.25, s);
-        r.userData.alpha = ringing && u > 0.6 ? (1 - ph) * 0.6 : 0;
+        r.userData.alpha = ringing && u > ARRIVE ? (1 - ph) * 0.6 * ease((u - ARRIVE) / 0.3) : 0;
       });
       phone.rotation.y = -0.2 + Math.sin(u * 0.6) * 0.07;
       phone.rotation.x = 0.04;
-      seeds.forEach((sd, k) => {
-        const p = (u * 0.55 + sd) % 1;
-        arc.getPoint(p, pt);
-        flow.pos.set([pt.x, pt.y + Math.sin(sd * 30) * 0.05, pt.z], k * 3);
-        flow.alpha[k] = u > 1.4 && u < 4.2 ? Math.sin(Math.PI * p) : 0;
-      });
-      flow.commit();
+      // Click: a pulse runs to the phone. Booked: a pulse returns the revenue to the ad.
+      const out = clamp((u - CLICK) / (ARRIVE - CLICK));
+      const back = clamp((u - BOOKED) / (RETURNED - BOOKED));
+      const goingBack = u > BOOKED;
+      const head = goingBack ? 1 - smooth(back) : smooth(out);
+      const live = (u > CLICK && u < ARRIVE + 0.25) || (goingBack && u < RETURNED + 0.25);
+      signalUniforms.uHead.value = head;
+      signalUniforms.uReach.value = u > CLICK ? (goingBack ? 1 : smooth(out)) : 0;
+      signalUniforms.uDir.value = goingBack ? -1 : 1;
+      signalUniforms.uPulse.value = live ? 1 : Math.max(0, 1 - (u - (goingBack ? RETURNED : ARRIVE)) * 4);
+      signalUniforms.uTime.value = u;
+      path.getPoint(head, pt);
+      for (let k = 0; k < 2; k++) {
+        spark.pos.set([pt.x, pt.y, pt.z], k * 3);
+        spark.alpha[k] = signalUniforms.uPulse.value * (k ? 1 : 0.55);
+      }
+      spark.commit();
       const c = ease((u - 3.4) / 0.6);
       chip.mesh.scale.setScalar(0.6 + 0.4 * c);
       chip.mesh.userData.alpha = c;

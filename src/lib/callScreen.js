@@ -87,7 +87,7 @@ export function row(ctx, x, y, w, label, value, valueColor = '#ffffff') {
   ctx.fillRect(x, y + 18, w, 1.5);
 }
 
-// phase: 'ring' | 'live' | 'done'; secs: call length shown while live.
+// phase: 'idle' | 'ring' | 'live' | 'done'; secs: call length shown while live.
 export function paintCallScreen(ctx, W, H, phase, secs, doneLabel) {
   clipScreen(ctx, W, H);
   const bg = ctx.createLinearGradient(0, 0, 0, H);
@@ -102,6 +102,18 @@ export function paintCallScreen(ctx, W, H, phase, secs, doneLabel) {
   ctx.fillStyle = glow;
   ctx.fillRect(0, 0, W, H);
   const P = 34;
+  if (phase === 'idle') {
+    // Lock screen while the phone waits for the call.
+    text(ctx, 'Thursday, October 24', W / 2, 150, '500 22px Geist, sans-serif', '#c9b8dc', 'center');
+    text(ctx, '9:41', W / 2, 262, '600 104px Poppins, sans-serif', '#ffffff', 'center');
+    roundRect(ctx, P, 330, W - P * 2, 92, 24);
+    ctx.fillStyle = 'rgba(255,255,255,.06)';
+    ctx.fill();
+    text(ctx, 'CallsTalk', P + 22, 368, '600 20px Poppins, sans-serif', '#d6a3ff');
+    text(ctx, 'Tracking live on austinplumbingpros.com', P + 22, 400, '400 18px Geist, sans-serif', '#c9c1d3');
+    paintIPhoneChrome(ctx, W, H);
+    return;
+  }
   if (phase === 'ring') {
     text(ctx, 'Incoming call · CallsTalk', W / 2, 128, '500 21px Geist, sans-serif', '#c9b8dc', 'center');
     avatar(ctx, W / 2, 238, 62, 'JM');
