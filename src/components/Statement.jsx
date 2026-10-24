@@ -1,11 +1,12 @@
 import ReturnPath, { CHANNEL_COLORS } from './ReturnPath.jsx';
 
 // Product facts drawn from the rest of the page.
+// The number stays big; the unit sits beside it, smaller, so each figure keeps to one line.
 const facts = [
-  { value: '3', label: 'ways customers reach you, tracked in one place' },
-  { value: '1 thread', label: 'from first click to closed deal, for every lead' },
-  { value: '1 snippet', label: 'is all your website needs' },
-  { value: '24/7', label: 'tracking, even when nobody picks up' },
+  { value: '3', unit: 'Channels', label: 'Calls, forms and chats, tracked side by side' },
+  { value: '1', unit: 'Journey', label: 'Every lead followed from first click to closed deal' },
+  { value: '1', unit: 'Line of Code', label: 'All it takes to start tracking your website' },
+  { value: '24/7', unit: 'Coverage', label: 'Every call captured and traced, day or night' },
 ];
 
 const channels = [
@@ -19,9 +20,9 @@ export default function Statement() {
     <section className="section statement">
       <div className="container">
         <dl className="facts">
-          {facts.map(({ value, label }) => (
-            <div key={value}>
-              <dt>{value}</dt>
+          {facts.map(({ value, unit, label }) => (
+            <div key={unit}>
+              <dt>{value}<span>{unit}</span></dt>
               <dd>{label}</dd>
             </div>
           ))}

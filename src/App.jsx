@@ -34,6 +34,7 @@ function Home() {
 }
 
 // One app, several pre-rendered pages: the home page, the Legal Center documents and a 404 page.
+// Customers log in on the portal (PORTAL_URL); /login and /dashboard here redirect there (vercel.json).
 export default function App({ path = '/' }) {
   const page = path.replace(/^\/|\/$/g, '').replace(/\.html$/, '');
   let content = <Home />;

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { webFontsReady } from '../lib/fonts.js';
-import { buildIPhone, clipScreen, paintIPhoneChrome } from '../lib/iphone.js';
+import { buildIPhone } from '../lib/iphone.js';
+import { avatar, check, handset, paintCallScreen, roundRect, text } from '../lib/callScreen.js';
 
 // Five short 3D vignettes, one per part of the product, shown in turn.
 const STEPS = ['Call Attribution', 'Lead Scoring', 'Revenue by Channel', 'Calls from Every Market', 'Conversion Sync'];
@@ -14,16 +15,6 @@ const clamp = (x) => Math.min(Math.max(x, 0), 1);
 const ease = (x) => 1 - (1 - clamp(x)) ** 3;
 const smooth = (x) => { x = clamp(x); return x * x * (3 - 2 * x); };
 const money = (v) => (v >= 1000 ? `$${(v / 1000).toFixed(1)}k` : `$${Math.round(v)}`);
-
-function roundRect(ctx, x, y, w, h, r) {
-  ctx.beginPath();
-  ctx.moveTo(x + r, y);
-  ctx.arcTo(x + w, y, x + w, y + h, r);
-  ctx.arcTo(x + w, y + h, x, y + h, r);
-  ctx.arcTo(x, y + h, x, y, r);
-  ctx.arcTo(x, y, x + w, y, r);
-  ctx.closePath();
-}
 
 function card(ctx, W, H, active) {
   ctx.clearRect(0, 0, W, H);
@@ -44,13 +35,6 @@ function bars(ctx, x, y, s) {
     roundRect(ctx, x + s * bx, y + s * by, s * bw, s * bh, s * 0.06);
     ctx.fill();
   });
-}
-
-function text(ctx, str, x, y, font, color, align = 'left') {
-  ctx.font = font;
-  ctx.fillStyle = color;
-  ctx.textAlign = align;
-  ctx.fillText(str, x, y);
 }
 
 const pointShader = {
@@ -75,6 +59,34 @@ const pointShader = {
       float d = length(gl_PointCoord - 0.5);
       float core = smoothstep(0.5, 0.0, d);
       gl_FragColor = vec4(mix(vColor, vec3(1.0), core * 0.5), core * vAlpha * uFade);
+    }`,
+};
+
+// A light trail along a tube: a faint lit line up to uReach, and a bright head
+// with a fading tail that travels toward the phone (uDir 1) or back to the ad (-1).
+const signalShader = {
+  vertexShader: /* glsl */ `
+    varying float vU;
+    void main() {
+      vU = uv.x;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    }`,
+  fragmentShader: /* glsl */ `
+    uniform float uHead;
+    uniform float uReach;
+    uniform float uDir;
+    uniform float uPulse;
+    uniform float uTime;
+    uniform float uFade;
+    varying float vU;
+    void main() {
+      float behind = uDir > 0.0 ? uHead - vU : vU - uHead;
+      float tail = behind >= 0.0 ? exp(-behind * 7.0) : 0.0;
+      float head = exp(-pow((vU - uHead) * 38.0, 2.0));
+      float lit = step(vU, uReach) * (0.3 + 0.08 * sin(vU * 60.0 - uTime * 6.0));
+      float a = lit + uPulse * (tail * 0.75 + head * 1.6);
+      vec3 color = mix(vec3(0.84, 0.64, 1.0), vec3(1.0), clamp(head * uPulse, 0.0, 1.0));
+      gl_FragColor = vec4(color, clamp(a, 0.0, 1.0) * uFade);
     }`,
 };
 
@@ -169,7 +181,7 @@ async function mount(el, onStep, reducedMotion) {
       phone.add(r);
       return r;
     });
-    const ad = canvasPlane(2.3, 1.2, 600, 312);
+    const ad = canvasPlane(2.3, 1.18, 600, 308);
     ad.mesh.position.set(-2.1, 0.85, -0.3);
     ad.mesh.rotation.y = 0.35;
     g.add(ad.mesh);
@@ -190,65 +202,85 @@ async function mount(el, onStep, reducedMotion) {
       ctx.fill();
       text(ctx, 'Source: Paid search, "same-day plumbing"', 72, H / 2 + 10, '500 28px Geist, sans-serif', '#ffffff');
     });
-    // Ends at the phone's left edge, not on its screen.
-    const arc = new THREE.QuadraticBezierCurve3(new THREE.Vector3(-1.0, 0.6, -0.1), new THREE.Vector3(-0.1, 1.9, 0.4), new THREE.Vector3(0.5, 0.55, 0.3));
-    const flow = particles(60, (k) => TYPE_COLORS[k % 3], () => 0.1 + Math.random() * 0.06);
-    g.add(flow.points);
-    const seeds = Array.from({ length: 60 }, () => Math.random());
+    // The signal path: out of the ad's right edge level with Call now, arcing into the phone's left edge.
+    ad.mesh.updateMatrix();
+    const start = new THREE.Vector3(1.13, -0.36, 0.01).applyMatrix4(ad.mesh.matrix);
+    const path = new THREE.CubicBezierCurve3(start, new THREE.Vector3(-0.55, 1.55, -0.1), new THREE.Vector3(0.05, 1.5, 0.35), new THREE.Vector3(0.52, 0.35, 0.32));
+    const signalUniforms = { uHead: { value: 0 }, uReach: { value: 0 }, uDir: { value: 1 }, uPulse: { value: 0 }, uTime: { value: 0 }, uFade: { value: 1 } };
+    const signal = new THREE.Mesh(
+      new THREE.TubeGeometry(path, 140, 0.014, 8, false),
+      new THREE.ShaderMaterial({ ...signalShader, uniforms: signalUniforms, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }),
+    );
+    g.add(signal);
+    // A soft glow riding the head of the pulse.
+    const spark = particles(2, (k) => (k ? '#ffffff' : '#d6a3ff'), (k) => (k ? 0.32 : 0.9));
+    g.add(spark.points);
     const pt = new THREE.Vector3();
+    const CLICK = 0.8;
+    const ARRIVE = 1.9;
+    const BOOKED = 4.6;
+    const RETURNED = 5.6;
 
     const update = (u) => {
       const ringing = u < 3.2;
-      screen.paint(ringing ? 'ring' : u < 4.6 ? 'live' : 'done', (ctx, W, H) => {
-        clipScreen(ctx, W, H);
-        const bg = ctx.createLinearGradient(0, 0, 0, H);
-        bg.addColorStop(0, '#1c1820');
-        bg.addColorStop(1, '#0b090d');
-        ctx.fillStyle = bg;
-        ctx.fillRect(0, 0, W, H);
-        const glow = ctx.createRadialGradient(W / 2, 300, 20, W / 2, 300, 200);
-        glow.addColorStop(0, 'rgba(199,146,247,.45)');
-        glow.addColorStop(1, 'rgba(214,163,255,0)');
-        ctx.fillStyle = glow;
-        ctx.fillRect(0, 0, W, H);
-        text(ctx, ringing ? 'Incoming call' : u < 4.6 ? 'Connected' : 'Job booked', W / 2, 150, '600 30px Poppins, sans-serif', '#ffffff', 'center');
-        bars(ctx, W / 2 - 54, 246, 108);
-        text(ctx, u < 4.6 ? '(555) 014-2290' : '$420', W / 2, 460, '600 36px Poppins, sans-serif', '#ffffff', 'center');
-        text(ctx, ringing ? 'Ringing' : u < 4.6 ? 'Talking 3:12' : 'Attributed', W / 2, 500, '400 24px Geist, sans-serif', '#d4d4d4', 'center');
-        roundRect(ctx, 36, 560, W - 72, 140, 24);
-        ctx.fillStyle = 'rgba(255,255,255,.05)';
-        ctx.fill();
-        ctx.strokeStyle = ringing ? '#302a36' : '#d6a3ff';
-        ctx.lineWidth = 2;
-        ctx.stroke();
-        text(ctx, 'Source', 64, 606, '400 22px Geist, sans-serif', '#b3abbd');
-        text(ctx, ringing ? 'Identifying...' : 'Paid search', 64, 650, '600 28px Poppins, sans-serif', ringing ? '#b3abbd' : '#ffffff');
-        paintIPhoneChrome(ctx, W, H);
+      const credited = u > RETURNED;
+      const phase = u < ARRIVE ? 'idle' : ringing ? 'ring' : u < 4.6 ? 'live' : 'done';
+      const secs = Math.floor(Math.max(0, u - 3.2) * 9) + 180;
+      screen.paint(phase === 'live' ? `live${secs}` : phase, (ctx, W, H) => {
+        paintCallScreen(ctx, W, H, phase, secs, 'Revenue sent to Google Ads');
       });
-      ad.paint(u > 1.2 && u < 2.4 ? 'click' : 'idle', (ctx, W, H) => {
-        card(ctx, W, H, u > 1.2);
-        text(ctx, 'Ad · Paid search', 36, 70, '500 26px Geist, sans-serif', '#d4d4d4');
-        text(ctx, 'Same-day plumbing', 36, 124, '600 40px Poppins, sans-serif', '#ffffff');
-        roundRect(ctx, 36, 172, 210, 70, 35);
-        ctx.fillStyle = '#d6a3ff';
+      const pressed = u > CLICK && u < CLICK + 0.45;
+      ad.paint(`${pressed}|${credited}|${u > CLICK}`, (ctx, W, H) => {
+        card(ctx, W, H, u > CLICK);
+        roundRect(ctx, 34, 30, 112, 34, 17);
+        ctx.fillStyle = 'rgba(214,163,255,.16)';
         ctx.fill();
-        text(ctx, 'Call now', 141, 218, '600 28px Poppins, sans-serif', '#160f1f', 'center');
+        text(ctx, 'Sponsored', 90, 54, '600 18px Geist, sans-serif', '#d6a3ff', 'center');
+        text(ctx, 'austinplumbingpros.com', 162, 54, '400 20px Geist, sans-serif', '#a59cb0');
+        text(ctx, 'Same-day plumbing', 36, 112, '600 40px Poppins, sans-serif', '#ffffff');
+        text(ctx, 'Licensed plumbers on site in 60 minutes.', 36, 150, '400 22px Geist, sans-serif', '#c9c1d3');
+        text(ctx, '★★★★★', 36, 186, '400 20px Geist, sans-serif', '#f5c451');
+        text(ctx, '4.9 · 312 reviews', 152, 186, '400 20px Geist, sans-serif', '#a59cb0');
+        if (credited) {
+          roundRect(ctx, 276, 212, 270, 64, 32);
+          ctx.fillStyle = 'rgba(214,163,255,.14)';
+          ctx.fill();
+          ctx.strokeStyle = '#d6a3ff';
+          ctx.lineWidth = 2;
+          ctx.stroke();
+          text(ctx, '+$420 attributed', 411, 254, '600 24px Poppins, sans-serif', '#ffffff', 'center');
+        }
+        roundRect(ctx, 36, 212, 220, 64, 32);
+        ctx.fillStyle = pressed ? '#ecd4ff' : '#d6a3ff';
+        ctx.fill();
+        text(ctx, 'Call now', 166, 254, '600 26px Poppins, sans-serif', '#160f1f', 'center');
+        handset(ctx, 82, 244, 18, '#160f1f');
       });
       rings.forEach((r, i) => {
         const ph = (u * 0.9 + i / 3) % 1;
         const s = 1.0 + ph * 0.85;
         r.scale.set(s, s * 1.25, s);
-        r.userData.alpha = ringing && u > 0.6 ? (1 - ph) * 0.6 : 0;
+        r.userData.alpha = ringing && u > ARRIVE ? (1 - ph) * 0.6 * ease((u - ARRIVE) / 0.3) : 0;
       });
       phone.rotation.y = -0.2 + Math.sin(u * 0.6) * 0.07;
       phone.rotation.x = 0.04;
-      seeds.forEach((sd, k) => {
-        const p = (u * 0.55 + sd) % 1;
-        arc.getPoint(p, pt);
-        flow.pos.set([pt.x, pt.y + Math.sin(sd * 30) * 0.05, pt.z], k * 3);
-        flow.alpha[k] = u > 1.4 && u < 4.2 ? Math.sin(Math.PI * p) : 0;
-      });
-      flow.commit();
+      // Click: a pulse runs to the phone. Booked: a pulse returns the revenue to the ad.
+      const out = clamp((u - CLICK) / (ARRIVE - CLICK));
+      const back = clamp((u - BOOKED) / (RETURNED - BOOKED));
+      const goingBack = u > BOOKED;
+      const head = goingBack ? 1 - smooth(back) : smooth(out);
+      const live = (u > CLICK && u < ARRIVE + 0.25) || (goingBack && u < RETURNED + 0.25);
+      signalUniforms.uHead.value = head;
+      signalUniforms.uReach.value = u > CLICK ? (goingBack ? 1 : smooth(out)) : 0;
+      signalUniforms.uDir.value = goingBack ? -1 : 1;
+      signalUniforms.uPulse.value = live ? 1 : Math.max(0, 1 - (u - (goingBack ? RETURNED : ARRIVE)) * 4);
+      signalUniforms.uTime.value = u;
+      path.getPoint(head, pt);
+      for (let k = 0; k < 2; k++) {
+        spark.pos.set([pt.x, pt.y, pt.z], k * 3);
+        spark.alpha[k] = signalUniforms.uPulse.value * (k ? 1 : 0.55);
+      }
+      spark.commit();
       const c = ease((u - 3.4) / 0.6);
       chip.mesh.scale.setScalar(0.6 + 0.4 * c);
       chip.mesh.userData.alpha = c;
@@ -259,9 +291,9 @@ async function mount(el, onStep, reducedMotion) {
   // Vignette 2: lead scoring --------------------------------------------------
   function scoreVignette() {
     const g = new THREE.Group();
-    const N = 60;
+    const N = 96;
     const R = 1.55;
-    const seg = new THREE.InstancedMesh(new THREE.BoxGeometry(0.11, 1, 0.22), new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 0.3, roughness: 0.4 }), N);
+    const seg = new THREE.InstancedMesh(new THREE.BoxGeometry(0.05, 1, 0.14), new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 0.3, roughness: 0.4 }), N);
     seg.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(N * 3), 3);
     const dial = new THREE.Group();
     dial.position.set(1.4, 0, 0);
@@ -272,6 +304,7 @@ async function mount(el, onStep, reducedMotion) {
     center.mesh.position.set(1.4, 0.15, 0.6);
     g.add(center.mesh);
     const lead = canvasPlane(2.5, 1.55, 620, 384);
+    // 384 tall canvas holds the caller, three signals and the routing line.
     lead.mesh.position.set(-1.85, 0.25, 0.1);
     lead.mesh.rotation.y = 0.3;
     g.add(lead.mesh);
@@ -289,8 +322,8 @@ async function mount(el, onStep, reducedMotion) {
         const pop = active ? 1 : 0;
         dummy.position.set(Math.cos(a) * R, Math.sin(a) * R, 0);
         dummy.rotation.set(Math.PI / 2, 0, a);
-        dummy.scale.set(1, 0.12 + pop * 0.38, 1);
-        dummy.position.z = pop * 0.18;
+        dummy.scale.set(1, 0.16 + pop * 0.16, 1);
+        dummy.position.z = pop * 0.06;
         dummy.updateMatrix();
         seg.setMatrixAt(i, dummy.matrix);
         mix.copy(active ? on : off);
@@ -306,22 +339,26 @@ async function mount(el, onStep, reducedMotion) {
         text(ctx, 'Lead score', W / 2, 212, '500 34px Geist, sans-serif', '#b3abbd', 'center');
       });
       const routed = u > 3.8;
-      lead.paint(routed, (ctx, W, H) => {
+      const signals = Math.min(3, Math.floor((u - 0.8) / 0.9));
+      lead.paint(`${routed}|${signals}`, (ctx, W, H) => {
         card(ctx, W, H, routed);
-        ctx.fillStyle = '#d6a3ff';
-        ctx.beginPath();
-        ctx.arc(76, 82, 40, 0, Math.PI * 2);
-        ctx.fill();
-        text(ctx, 'JM', 76, 96, '600 34px Poppins, sans-serif', '#160f1f', 'center');
-        text(ctx, 'Inbound call', 136, 76, '600 36px Poppins, sans-serif', '#ffffff');
-        text(ctx, '(555) 014-2290 · Paid search', 136, 118, '400 27px Geist, sans-serif', '#c9c1d3');
-        [['High intent', 36], ['Emergency repair', 220]].forEach(([t, x]) => {
-          roundRect(ctx, x, 168, ctx.measureText(t).width + 60, 54, 27);
-          ctx.fillStyle = '#24202a';
-          ctx.fill();
-          text(ctx, t, x + 24, 204, '500 24px Geist, sans-serif', '#ffffff');
+        avatar(ctx, 72, 76, 38, 'JM');
+        text(ctx, 'Jordan Miles', 128, 70, '600 34px Poppins, sans-serif', '#ffffff');
+        text(ctx, 'Inbound call · Paid search', 128, 108, '400 24px Geist, sans-serif', '#c9c1d3');
+        [['Asked for a quote', 'High intent'], ['Call length 3:12', 'Engaged'], ['Keyword match', 'Emergency repair']].forEach(([l, v], i) => {
+          const y = 168 + i * 54;
+          const shown = i < signals;
+          ctx.globalAlpha = shown ? 1 : 0.35;
+          if (shown) check(ctx, 50, y - 8, 13);
+          else { ctx.strokeStyle = '#4d4555'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(50, y - 8, 12, 0, Math.PI * 2); ctx.stroke(); }
+          text(ctx, l, 76, y, '400 24px Geist, sans-serif', '#ffffff');
+          text(ctx, v, W - 36, y, '500 22px Geist, sans-serif', '#d6a3ff', 'right');
+          ctx.globalAlpha = 1;
         });
-        text(ctx, routed ? 'Routed to Sales team in 4 seconds' : 'Scoring intent...', 36, 300, '600 28px Poppins, sans-serif', routed ? '#d6a3ff' : '#b3abbd');
+        roundRect(ctx, 36, 318, W - 72, 46, 23);
+        ctx.fillStyle = routed ? 'rgba(214,163,255,.18)' : 'rgba(255,255,255,.04)';
+        ctx.fill();
+        text(ctx, routed ? 'Routed to Sales in 4 seconds' : 'Scoring intent...', W / 2, 349, '600 22px Poppins, sans-serif', routed ? '#d6a3ff' : '#a59cb0', 'center');
       });
       lead.mesh.position.y = 0.25 + Math.sin(u * 1.2) * 0.05;
     };
@@ -400,8 +437,8 @@ async function mount(el, onStep, reducedMotion) {
         sources[i].paint(active, (ctx, W, H) => {
           card(ctx, W, H, active);
           bars(ctx, 30, 35, 80);
-          text(ctx, 'Campaign', 136, 62, '500 28px Geist, sans-serif', '#c9c1d3');
-          text(ctx, CH[i][0], 136, 106, '600 34px Poppins, sans-serif', '#ffffff');
+          text(ctx, CH[i][0], 136, 66, '600 32px Poppins, sans-serif', '#ffffff');
+          text(ctx, `${Math.round(CH[i][1] / 45)} calls · ${Math.round(CH[i][1] / 160)} forms`, 136, 106, '400 24px Geist, sans-serif', '#c9c1d3');
         });
       });
       owner.forEach((i, k) => {
@@ -426,8 +463,34 @@ async function mount(el, onStep, reducedMotion) {
     g.add(globe);
     const R = 1.75;
     globe.add(new THREE.Mesh(new THREE.SphereGeometry(R * 0.985, 48, 48), new THREE.MeshStandardMaterial({ color: 0x0c0a0e, metalness: 0.2, roughness: 0.8 })));
-    const wire = new THREE.LineSegments(new THREE.WireframeGeometry(new THREE.IcosahedronGeometry(R, 3)), new THREE.LineBasicMaterial({ color: 0x3a3341, transparent: true, opacity: 0.6 }));
-    globe.add(wire);
+    const lineMat = new THREE.LineBasicMaterial({ color: 0x5a4d68, transparent: true, opacity: 0.5 });
+    for (let k = 1; k < 8; k++) {
+      const lat = -Math.PI / 2 + (k / 8) * Math.PI;
+      const pts = Array.from({ length: 97 }, (_, j) => {
+        const a = (j / 96) * Math.PI * 2;
+        return new THREE.Vector3(Math.cos(a) * Math.cos(lat) * R, Math.sin(lat) * R, Math.sin(a) * Math.cos(lat) * R);
+      });
+      globe.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), lineMat));
+    }
+    for (let k = 0; k < 12; k++) {
+      const lon = (k / 12) * Math.PI;
+      const pts = Array.from({ length: 97 }, (_, j) => {
+        const a = (j / 96) * Math.PI * 2;
+        return new THREE.Vector3(Math.cos(a) * Math.cos(lon) * R, Math.sin(a) * R, Math.cos(a) * Math.sin(lon) * R);
+      });
+      globe.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), lineMat));
+    }
+    // A fine dot shell gives the sphere its surface.
+    const shell = new Float32Array(1400 * 3);
+    for (let k = 0; k < 1400; k++) {
+      const y = 1 - (k / 1399) * 2;
+      const r = Math.sqrt(1 - y * y);
+      const th = k * 2.39996;
+      shell.set([Math.cos(th) * r * R * 1.002, y * R * 1.002, Math.sin(th) * r * R * 1.002], k * 3);
+    }
+    const shellGeo = new THREE.BufferGeometry();
+    shellGeo.setAttribute('position', new THREE.BufferAttribute(shell, 3));
+    globe.add(new THREE.Points(shellGeo, new THREE.PointsMaterial({ color: 0xb48be0, size: 0.03, transparent: true, opacity: 0.6, depthWrite: false })));
     // City dots on the surface.
     const cities = Array.from({ length: 14 }, (_, i) => {
       const y = 1 - (i / 13) * 1.6 - 0.2;
@@ -475,9 +538,24 @@ async function mount(el, onStep, reducedMotion) {
       const calls = Math.round(1284 * ease((u - 0.4) / 3.6));
       counter.paint(calls, (ctx, W, H) => {
         card(ctx, W, H, true);
-        text(ctx, 'Calls tracked today', 40, 76, '500 30px Geist, sans-serif', '#b3abbd');
-        text(ctx, calls.toLocaleString('en-US'), 40, 170, '600 92px Poppins, sans-serif', '#ffffff');
-        text(ctx, 'across 14 markets', 40, 238, '500 30px Geist, sans-serif', '#d6a3ff');
+        ctx.fillStyle = '#2fbf71';
+        ctx.beginPath();
+        ctx.arc(48, 64, 8, 0, Math.PI * 2);
+        ctx.fill();
+        text(ctx, 'Live · calls tracked today', 66, 72, '500 26px Geist, sans-serif', '#b3abbd');
+        text(ctx, calls.toLocaleString('en-US'), 40, 158, '600 84px Poppins, sans-serif', '#ffffff');
+        text(ctx, 'across 14 markets', W - 40, 156, '500 24px Geist, sans-serif', '#d6a3ff', 'right');
+        [['Austin', 0.42], ['Denver', 0.31], ['Miami', 0.27]].forEach(([m, share], i) => {
+          const y = 206 + i * 36;
+          text(ctx, m, 40, y + 9, '400 22px Geist, sans-serif', '#c9c1d3');
+          roundRect(ctx, 150, y - 6, W - 300, 14, 7);
+          ctx.fillStyle = 'rgba(255,255,255,.07)';
+          ctx.fill();
+          roundRect(ctx, 150, y - 6, Math.max(14, (W - 300) * share * 2 * (calls / 1284)), 14, 7);
+          ctx.fillStyle = '#d6a3ff';
+          ctx.fill();
+          text(ctx, Math.round(calls * share).toLocaleString('en-US'), W - 40, y + 9, '600 22px Geist, sans-serif', '#ffffff', 'right');
+        });
       });
       counter.mesh.position.y = 0.2 + Math.sin(u * 1.1) * 0.05;
     };
@@ -490,7 +568,7 @@ async function mount(el, onStep, reducedMotion) {
     const hub = new THREE.Group();
     g.add(hub);
     const hubBody = new THREE.Mesh(new RoundedBoxGeometry(1.2, 1.2, 0.4, 6, 0.26), metal(0x16131a));
-    hubBody.material.emissiveIntensity = 0.35;
+    hubBody.material.emissiveIntensity = 0.06;
     hub.add(hubBody);
     const face = canvasPlane(1.1, 1.1, 300, 300);
     face.mesh.position.z = 0.21;
@@ -522,10 +600,12 @@ async function mount(el, onStep, reducedMotion) {
       })),
       new THREE.LineBasicMaterial({ color: 0x3a3341, transparent: true }),
     );
+    orbitRing.renderOrder = -1;
     g.add(orbitRing);
     const PLATFORMS = [['Search ads', 34], ['Social ads', 21], ['Display ads', 12]];
     const cards = PLATFORMS.map(() => {
       const p = canvasPlane(1.7, 0.66, 460, 178);
+      p.mesh.renderOrder = 2;
       g.add(p.mesh);
       return p;
     });
@@ -542,9 +622,11 @@ async function mount(el, onStep, reducedMotion) {
         const n = Math.round(PLATFORMS[i][1] * ease((u - 0.8 - i * 0.3) / 3.4));
         p.paint(n, (ctx, W, H) => {
           card(ctx, W, H, n > 0);
-          text(ctx, PLATFORMS[i][0], 34, 72, '600 38px Poppins, sans-serif', '#ffffff');
-          text(ctx, 'Conversions synced', 34, 130, '400 31px Geist, sans-serif', '#c9c1d3');
-          text(ctx, `+${n}`, W - 34, 128, '600 32px Poppins, sans-serif', '#d6a3ff', 'right');
+          bars(ctx, 28, 36, 64);
+          text(ctx, PLATFORMS[i][0], 110, 70, '600 34px Poppins, sans-serif', '#ffffff');
+          text(ctx, n > 0 ? 'Conversions synced' : 'Waiting for calls', 110, 112, '400 26px Geist, sans-serif', '#c9c1d3');
+          text(ctx, `+${n}`, W - 30, 72, '600 34px Poppins, sans-serif', '#d6a3ff', 'right');
+          if (n === PLATFORMS[i][1]) check(ctx, W - 46, 118, 14);
         });
       });
       seeds.forEach((sd, k) => {

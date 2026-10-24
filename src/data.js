@@ -8,7 +8,7 @@ export const navLinks = [
 ];
 
 export const updates = [
-  { title: 'Lead Scores Now Come with Every Plan', tag: 'Product update' },
+  { title: 'Lead Scores Now Come with Every Account', tag: 'Product update' },
   { title: 'Closed Deals Now Sync Back to Your Ad Accounts', tag: 'New feature' },
   { title: 'Building a Client Report That Answers the Monday Question', tag: 'Guide' },
 ];
@@ -83,27 +83,6 @@ export const steps = [
   { title: 'Get a Setup Review', text: 'A specialist confirms that everything is configured correctly.', link: 'Speak With Us', href: '/request-access' },
 ];
 
-// Billing defaults from the Avortyx platform (app.avortyx.io): a prepaid balance, a monthly portal fee,
-// and per-minute and per-call charges. Calls bill per minute, rounded up to the whole minute.
-export const BILLING = {
-  portal: 49,
-  perMinute: 0.35,
-  recording: 0.005,
-  number: 15,
-  terms: [
-    { name: 'Platform', value: '$49', unit: 'per month', note: 'Attribution, dashboards and reports' },
-    { name: 'Call Minutes', value: '$0.35', unit: 'per minute', note: 'Rounded up to the nearest minute' },
-    { name: 'Recording', value: '$0.005', unit: 'per minute', note: 'Only on calls you choose to record' },
-    { name: 'Tracking Numbers', value: '$15', unit: 'one-time', note: 'Local or toll-free, yours to keep' },
-  ],
-  extras: [
-    'Spam screening on every call, free',
-    'Blocked calls at $0.01 each',
-    'No setup fees',
-    'Prepaid balance with optional auto top-up',
-  ],
-};
-
 export const reviews = ['A', 'B', 'C', 'D', 'E', 'F'].map((initial) => ({
   initial,
   quote: 'Placeholder: insert a genuine customer testimonial here.',
@@ -112,7 +91,7 @@ export const reviews = ['A', 'B', 'C', 'D', 'E', 'F'].map((initial) => ({
 }));
 
 export const footerColumns = [
-  { title: 'Platform', links: [['Call Attribution', '/#features'], ['Lead Scoring', '/#features'], ['Reporting', '/#features'], ['Plans & Pricing', '/#pricing']] },
+  { title: 'Platform', links: [['Call Attribution', '/#features'], ['Lead Scoring', '/#features'], ['Reporting', '/#features'], ['Pricing', '/#pricing']] },
   { title: 'Use Cases', links: [['Agencies', '/#solutions'], ['Marketing Teams', '/#solutions'], ['Owners & Operators', '/#solutions'], ['Sales Leaders', '/#solutions']] },
   { title: 'Resources', links: [['Getting Started', '/#how'], ['Integrations', '/#integrations'], ['Latest Updates', '/#resources']] },
   { title: 'Legal', links: [['Legal Center', '/legal'], ['Terms of Service', '/terms'], ['Privacy Policy', '/privacy'], ['Cookie Policy', '/cookies']] },

@@ -3,7 +3,7 @@ import { useState } from 'react';
 import Logo from './Logo.jsx';
 import { TelegramIcon } from './ContactLinks.jsx';
 import { navLinks } from '../data.js';
-import { TELEGRAM_HANDLE } from '../legal.js';
+import { PORTAL_LOGIN, TELEGRAM_HANDLE } from '../legal.js';
 
 export default function Nav() {
   const [open, setOpen] = useState(false);
@@ -20,12 +20,13 @@ export default function Nav() {
           {navLinks.map(({ href, label }) => (
             <a key={href} href={href}>{label}</a>
           ))}
-          <a href="/#pricing">Plans</a>
+          <a href="/#pricing">Pricing</a>
           <span className="nav__actions">
-            <a className="nav__telegram" href={`https://t.me/${TELEGRAM_HANDLE}`} target="_blank" rel="noopener noreferrer" aria-label="Message Us on Telegram">
+            <a className="nav__tg" href={`https://t.me/${TELEGRAM_HANDLE}`} target="_blank" rel="noopener noreferrer" aria-label="CallsTalk on Telegram">
               <TelegramIcon />
-              <span className="nav__telegram-label">Telegram</span>
             </a>
+            {/* Customers log in to the portal, the same login as app.callstalk.io. */}
+            <a href={PORTAL_LOGIN}>Log In</a>
             <a href="/request-access">Request Access</a>
             <ChatButton className="btn btn--light btn--sm" />
           </span>

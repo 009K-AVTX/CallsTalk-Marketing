@@ -58,6 +58,9 @@ if (config.serveSite) {
   const index = path.join(config.siteDir, 'index.html');
   const notFound = path.join(config.siteDir, '404.html');
   if (!existsSync(index)) console.warn(`[server] SERVE_SITE is on but ${index} is missing. Run "npm run build" in the site folder.`);
+  // Customers log in on the portal; old links redirect there, as vercel.json does.
+  app.get('/login', (req, res) => res.redirect(302, `${config.portalUrl}/login`));
+  app.get(['/dashboard', '/billing'], (req, res) => res.redirect(302, `${config.portalUrl}/`));
   app.use('/assets', express.static(path.join(config.siteDir, 'assets'), { immutable: true, maxAge: '1y' }));
   // Pre-rendered pages are served without .html (/legal -> legal.html), as Vercel's cleanUrls does.
   app.use(express.static(config.siteDir, { maxAge: '1h', extensions: ['html'] }));

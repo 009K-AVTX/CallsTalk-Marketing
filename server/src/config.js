@@ -53,6 +53,8 @@ export const config = {
   // Optional: serve the built marketing site and the AI assistant from this server too.
   serveSite: env('SERVE_SITE') === 'true',
   siteDir: path.resolve(root, env('SITE_DIR', '../dist')),
+  // Customer portal that /login, /dashboard and /billing redirect to (same setting as the site build).
+  portalUrl: env('VITE_PORTAL_APP_URL', 'https://callstalk-portal.vercel.app').replace(/\/$/, ''),
 };
 
 export function assertConfig() {

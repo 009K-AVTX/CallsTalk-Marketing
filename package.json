@@ -6,12 +6,17 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build && vite build --ssr src/entry-server.jsx --outDir dist-ssr && node scripts/prerender.js",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "portal": "vite --config portal/vite.config.js",
+    "portal:build": "vite build --config portal/vite.config.js",
+    "portal:preview": "vite preview --config portal/vite.config.js"
   },
   "dependencies": {
+    "@vercel/blob": "^2.8.2",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "three": "^0.169.0"
+    "three": "^0.169.0",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.4",

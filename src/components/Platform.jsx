@@ -152,7 +152,7 @@ export default function Platform() {
           <div className="app" aria-hidden="true">
             <div className="app__bar">
               <i /><i /><i />
-              <span className="app__url">app.callstalk.com/{['inquiries', 'leads/4821', 'reports/revenue'][active]}</span>
+              <span className="app__url">app.callstalk.io/{['inquiries', 'leads/4821', 'reports/revenue'][active]}</span>
             </div>
             <div className="app__body">
               <nav className="app__side">
