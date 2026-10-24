@@ -5,14 +5,12 @@
 //   POST /accounts/refresh          refresh             -> { access }
 //   GET  /billing/statement?from=  YYYY-MM-DD          -> balance and every day's bill since that date
 //   POST /billing/statement/pay     amount              -> { payment_url } (Capitalist checkout)
-//   GET  /portal/summary            from, to, group     -> totals, series, states, heatmap, call lengths
-//   GET  /portal/calls              from, to, status, q, page, page_size -> { count, results }
 //   GET  /accounts/me                                   -> profile
 //   POST /accounts/change-password  current_password, new_password
 //
 // Customers get their login from us; there is no sign-up.
 
-import { previewCalls, previewProfile, previewStatement, previewSummary } from './preview.js';
+import { previewProfile, previewStatement } from './preview.js';
 
 const BASE = (import.meta.env.VITE_PORTAL_API_URL || import.meta.env.VITE_SUPPORT_API_URL || '').replace(/\/$/, '');
 const STORAGE_KEY = 'callstalk.session';
@@ -114,8 +112,6 @@ async function authed(path, options) {
 // Bills are shown from the start of September 2026: every day since, newest first.
 export const BILLING_FROM = '2026-09-01';
 
-const qs = (params) => new URLSearchParams(Object.entries(params).filter(([, v]) => v !== '' && v != null)).toString();
-
 export const fetchStatement = () => (PREVIEW
   ? previewGuard(() => previewStatement(BILLING_FROM))
   : authed(`/billing/statement?from=${BILLING_FROM}`));
@@ -124,15 +120,6 @@ export const startPayment = (amount) => (PREVIEW
   ? Promise.reject(new Error(`Preview mode: a real login would now open the checkout for $${amount}.`))
   : authed('/billing/statement/pay', { method: 'POST', body: { amount: String(amount) } }));
 
-// Totals, a time series, states, a weekday x hour grid and call lengths for a date range.
-export const fetchSummary = ({ from, to, group = 'day' }) => (PREVIEW
-  ? previewGuard(() => previewSummary(BILLING_FROM, { from, to, group }))
-  : authed(`/portal/summary?${qs({ from, to, group })}`));
-
-// One page of the customer's calls, newest first.
-export const fetchCalls = ({ from, to, status = '', q = '', page = 1, pageSize = 25 }) => (PREVIEW
-  ? previewGuard(() => previewCalls(BILLING_FROM, { from, to, status, q, page, pageSize }))
-  : authed(`/portal/calls?${qs({ from, to, status, q, page, page_size: pageSize })}`));
 
 export const fetchProfile = () => (PREVIEW
   ? previewGuard(() => previewProfile(loadSession()?.email))

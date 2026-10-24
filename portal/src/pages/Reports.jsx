@@ -1,120 +1,68 @@
-import { useState } from 'react';
-import { fetchSummary } from '../../../src/lib/portal.js';
-import { Bars, ChartCard, Heatmap, SERIES } from '../components/Charts.jsx';
-import { ErrorNote, Kpi, PageHead, RangeBar } from '../components/Shell.jsx';
-import { bucketLabel, duration, hourLabel, money, num, pct, RANGES, rangeOf } from '../format.js';
+import { useCallback, useState } from 'react';
+import Icon from '../components/Icons.jsx';
+import { ErrorNote, PageHead } from '../components/Shell.jsx';
+import SheetViewer, { downloadReport } from '../components/SheetViewer.jsx';
+import { dayLabel, monthName } from '../format.js';
+import { listMine, showUploadLink, UPLOAD_PATH } from '../reports.js';
 import useLoad from '../useLoad.js';
 
-const REPORT_RANGES = RANGES.filter((r) => r.id !== 'today' && r.id !== 'yesterday');
-const GROUPS = [['day', 'Daily'], ['week', 'Weekly'], ['month', 'Monthly']];
-const lengthLabel = (b) => (b.to == null ? `${b.from / 60}+ min` : b.from < 60 && b.to <= 60 ? `${b.from}–${b.to}s` : `${b.from / 60}–${b.to / 60} min`);
+export const fileSize = (n) => (n >= 1024 * 1024 ? `${(n / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`);
+export const isNew = (r) => Date.now() - new Date(r.uploaded_at).getTime() < 3 * 24 * 3600 * 1000;
+export const period = (r) => (r.period_from === r.period_to ? dayLabel(r.period_from) : `${dayLabel(r.period_from)} to ${dayLabel(r.period_to)}`);
 
+export function ReportRow({ report, onOpen, onError }) {
+  return (
+    <li className="p-report">
+      <span className="p-report__icon" aria-hidden="true">{report.filename.split('.').pop().toUpperCase()}</span>
+      <button type="button" className="p-report__main" onClick={() => onOpen(report)}>
+        <b>{report.title}{isNew(report) && <em className="p-new">New</em>}</b>
+        <span>{period(report)} · {fileSize(report.size)} · added {new Date(report.uploaded_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+        {report.note && <small>{report.note}</small>}
+      </button>
+      <div className="p-report__tools">
+        <button type="button" className="btn btn--quiet btn--sm" onClick={() => onOpen(report)}>View</button>
+        <button type="button" className="p-iconbtn" aria-label={`Download ${report.filename}`} onClick={() => downloadReport(report).catch((e) => onError(e.message))}><Icon name="download" /></button>
+      </div>
+    </li>
+  );
+}
+
+// Billing reports from our team, grouped by the month they cover.
 export default function Reports() {
-  const [range, setRange] = useState('30d');
-  const [group, setGroup] = useState('day');
-  const { from, to } = rangeOf(range);
-  const { data, error, reload } = useLoad(() => fetchSummary({ from, to, group }), [from, to, group]);
-  const t = data?.totals;
+  const { data, error, reload } = useLoad(listMine, []);
+  const [open, setOpen] = useState(null);
+  const [fileError, setFileError] = useState('');
+  const close = useCallback(() => setOpen(null), []);
 
-  const series = data?.series || [];
-  const every = Math.ceil(series.length / 10);
-  const callRows = series.map((b) => ({
-    label: bucketLabel(b.bucket, group).replace('Week of ', ''),
-    values: [b.converted, b.calls - b.converted],
-    tip: { title: bucketLabel(b.bucket, group), lines: [['Converted', num(b.converted), SERIES.converted], ['Not converted', num(b.calls - b.converted), SERIES.other], ['Conversion', pct(b.converted, b.calls)]] },
-  }));
-  const spendRows = series.map((b) => ({
-    label: bucketLabel(b.bucket, group).replace('Week of ', ''),
-    values: [Number(b.spend)],
-    tip: { title: bucketLabel(b.bucket, group), lines: [['Spend', money(b.spend), SERIES.converted], ['Converted calls', num(b.converted)]] },
-  }));
-  const lengthRows = (data?.durations || []).map((b) => ({
-    label: lengthLabel(b),
-    values: [b.calls],
-    tip: { title: lengthLabel(b), lines: [['Answered calls', num(b.calls), SERIES.converted], ['Share', pct(b.calls, t?.answered)]] },
-  }));
-  const maxState = Math.max(1, ...(data?.by_state || []).map((s) => s.calls));
+  const months = {};
+  for (const r of data || []) (months[r.period_to.slice(0, 7)] ||= []).push(r);
+  const keys = Object.keys(months).sort().reverse();
 
   return (
     <>
-      <PageHead title="Reports" sub={`${from} to ${to}`}>
-        <div className="p-ranges" role="group" aria-label="Group by">
-          {GROUPS.map(([id, label]) => (
-            <button key={id} type="button" className={group === id ? 'is-on' : ''} aria-pressed={group === id} onClick={() => setGroup(id)}>{label}</button>
-          ))}
-        </div>
+      <PageHead title="Reports" sub="Billing reports from our team, as Excel files. Open one here or download it.">
+        <button type="button" className="btn btn--quiet btn--sm" onClick={reload}><Icon name="refresh" />Refresh</button>
+        {showUploadLink() && <a href={UPLOAD_PATH} target="_blank" rel="noopener" className="btn btn--light btn--sm"><Icon name="download" className="p-icon p-icon--up" />Upload Reports</a>}
       </PageHead>
-      <div className="p-filters"><RangeBar value={range} onChange={setRange} ranges={REPORT_RANGES} /></div>
-      <ErrorNote error={error} onRetry={reload} />
-
-      <div className="p-kpis">
-        {t ? (
-          <>
-            <Kpi label="Calls" icon="calls" value={num(t.calls)} note={`${num(t.answered)} answered`} />
-            <Kpi label="Converted" icon="check" value={num(t.converted)} note={`${pct(t.converted, t.calls)} conversion rate`} />
-            <Kpi label="Spend" icon="billing" value={money(t.spend)} note={`${money(t.calls ? Number(t.spend) / t.calls : 0)} per call received`} />
-            <Kpi label="Avg Call Length" icon="clock" value={duration(t.avg_duration)} note={`${num(t.short_calls)} under 30 seconds`} />
-            <Kpi label="Repeat Callers" icon="repeat" value={num(t.repeat_callers)} note="Called more than once" />
-          </>
-        ) : Array.from({ length: 5 }, (_, i) => <div key={i} className="p-kpi is-skeleton" />)}
-      </div>
-
-      <div className="p-grid">
-        <ChartCard
-          title="Calls"
-          sub={`${GROUPS.find(([id]) => id === group)[1]} calls, converted and not.`}
-          legend={[{ name: 'Converted', color: SERIES.converted }, { name: 'Not converted', color: SERIES.other }]}
-          table={data && { head: ['Period', 'Calls', 'Converted', 'Conversion'], rows: series.map((b) => [bucketLabel(b.bucket, group), num(b.calls), num(b.converted), pct(b.converted, b.calls)]) }}
-        >
-          {data ? <Bars rows={callRows} series={[{ color: SERIES.converted }, { color: SERIES.other }]} labelEvery={every} ariaLabel="Calls per period" /> : <div className="p-chart is-skeleton" />}
-        </ChartCard>
-        <ChartCard
-          title="Spend"
-          sub="What your converted calls cost."
-          table={data && { head: ['Period', 'Spend', 'Converted Calls'], rows: series.map((b) => [bucketLabel(b.bucket, group), money(b.spend), num(b.converted)]) }}
-        >
-          {data ? <Bars rows={spendRows} series={[{ color: SERIES.converted }]} labelEvery={every} yFormat={(v) => `$${num(Math.round(v))}`} ariaLabel="Spend per period" /> : <div className="p-chart is-skeleton" />}
-        </ChartCard>
-      </div>
-
-      <div className="p-grid">
-        <ChartCard
-          title="When Calls Arrive"
-          sub="Calls by weekday and hour, so you can staff for the busy times."
-          table={data && { head: ['Day', ...Array.from({ length: 24 }, (_, h) => hourLabel(h))], rows: data.heatmap.map((row, d) => [['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][d], ...row.map(num)]) }}
-        >
-          {data ? <Heatmap grid={data.heatmap} format={hourLabel} /> : <div className="p-chart is-skeleton" />}
-        </ChartCard>
-        <ChartCard
-          title="Call Length"
-          sub="How long answered calls lasted."
-          table={data && { head: ['Length', 'Answered Calls', 'Share'], rows: data.durations.map((b) => [lengthLabel(b), num(b.calls), pct(b.calls, t.answered)]) }}
-        >
-          {data ? <Bars rows={lengthRows} series={[{ color: SERIES.converted }]} ariaLabel="Answered calls by length" /> : <div className="p-chart is-skeleton" />}
-        </ChartCard>
-      </div>
-
-      <section className="p-card p-card--flush">
-        <header className="p-card__head"><div><h2>Calls by State</h2><p>Where your callers are, from their area code.</p></div></header>
-        <div className="p-tablewrap">
-          <table className="p-table">
-            <thead><tr><th scope="col">State</th><th scope="col">Calls</th><th scope="col" className="p-table__bar">Share</th><th scope="col">Converted</th><th scope="col">Conversion</th><th scope="col">Spend</th></tr></thead>
-            <tbody>
-              {data?.by_state.map((s) => (
-                <tr key={s.state}>
-                  <th scope="row">{s.state}</th>
-                  <td>{num(s.calls)}</td>
-                  <td className="p-table__bar"><span className="p-share"><i style={{ width: `${(s.calls / maxState) * 100}%` }} /></span>{pct(s.calls, t.calls)}</td>
-                  <td>{num(s.converted)}</td>
-                  <td>{pct(s.converted, s.calls)}</td>
-                  <td>{money(s.spend)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {data && !data.by_state.length && <p className="p-empty">No calls in this period.</p>}
-        </div>
-      </section>
+      <ErrorNote error={error || fileError} onRetry={error ? reload : null} />
+      {!data && !error && <div className="p-card"><div className="p-rows is-skeleton" /></div>}
+      {data && !data.length && (
+        <section className="p-card p-empty-card">
+          <span className="p-insights__icon"><Icon name="reports" /></span>
+          <h2>No reports yet</h2>
+          <p>When our team sends you a billing report, it appears here straight away.</p>
+          {showUploadLink() && <a href={UPLOAD_PATH} target="_blank" rel="noopener" className="btn btn--light btn--sm p-empty-card__cta"><Icon name="download" className="p-icon p-icon--up" />Upload a Report</a>}
+        </section>
+      )}
+      {keys.map((k) => (
+        <section className="p-card" key={k}>
+          <header className="p-card__head"><div><h2>{monthName(k)}</h2><p>{months[k].length} report{months[k].length === 1 ? '' : 's'}</p></div></header>
+          <ul className="p-reports">
+            {months[k].map((r) => <ReportRow key={r.id} report={r} onOpen={setOpen} onError={setFileError} />)}
+          </ul>
+        </section>
+      ))}
+      {open && <SheetViewer report={open} onClose={close} />}
     </>
   );
 }

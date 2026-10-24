@@ -53,12 +53,12 @@ export default function Login() {
           <span>Calls<b>Talk</b></span>
           <em>Portal</em>
         </a>
-        <h1>Every call you bought, in one place.</h1>
-        <p>Follow your calls as they arrive, see what each day cost, and settle your account online.</p>
+        <h1>Your CallsTalk bill, always up to date.</h1>
+        <p>See your balance and daily bills, open the billing reports our team sends you, and settle your account online.</p>
         <ul className="p-login__points">
-          <li>Live call list and conversions</li>
-          <li>Reports by day, hour and state</li>
-          <li>Daily bills since September, pay online</li>
+          <li>Live balance and daily bills since September</li>
+          <li>Billing reports from our team, in Excel</li>
+          <li>Pay online in a few clicks</li>
         </ul>
       </div>
       <form className="access-card p-login__card" onSubmit={submit}>
