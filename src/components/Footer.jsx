@@ -20,7 +20,7 @@ export default function Footer() {
         <div className="footer__cols">
           <div>
             <Logo light />
-            <p>Every conversation, traced back to the campaign that started it.</p>
+            <p>Every Conversation, Traced Back to the Campaign That Started It.</p>
           </div>
           {footerColumns.map(({ title, links }) => (
             <div key={title}>

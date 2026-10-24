@@ -30,10 +30,10 @@ export default function Statement() {
         <div className="statement__inner">
           <div>
             <h2 className="statement__text">
-              Most reports stop at the click. The conversations that close business rarely make it back to the
-              campaign that started them.
+              Most Reports Stop at the Click. The Conversations That Close Business Rarely Make It Back to the
+              Campaign That Started Them.
             </h2>
-            <p className="statement__answer">CallsTalk brings every one of them home.</p>
+            <p className="statement__answer">CallsTalk Brings Every One of Them Home.</p>
           </div>
           <ReturnPath />
         </div>

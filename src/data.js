@@ -8,15 +8,15 @@ export const navLinks = [
 ];
 
 export const updates = [
-  { title: 'Lead Scores Now Come with Every Account', tag: 'Product update' },
-  { title: 'Closed Deals Now Sync Back to Your Ad Accounts', tag: 'New feature' },
+  { title: 'Lead Scores Now Come with Every Account', tag: 'Product Update' },
+  { title: 'Closed Deals Now Sync Back to Your Ad Accounts', tag: 'New Feature' },
   { title: 'Building a Client Report That Answers the Monday Question', tag: 'Guide' },
 ];
 
 export const features = [
   {
     eyebrow: 'Lead Capture',
-    title: 'Every ring has a source.',
+    title: 'Every Ring Has a Source.',
     body: 'Calls, forms and chats land with the ad, keyword and page that sent them.',
     cta: 'Explore lead capture',
     links: [
@@ -28,7 +28,7 @@ export const features = [
   },
   {
     eyebrow: 'Lead Qualification',
-    title: 'Your hottest leads reach sales first.',
+    title: 'Your Hottest Leads Reach Sales First.',
     body: 'CallsTalk scores each lead on intent and hands the best ones to the right person in seconds.',
     cta: 'Explore lead qualification',
     links: [
@@ -40,7 +40,7 @@ export const features = [
   },
   {
     eyebrow: 'Reporting & Intelligence',
-    title: 'Show what every dollar returned.',
+    title: 'Show What Every Dollar Returned.',
     body: 'Closed revenue flows back to the campaign that earned it, ready for any report.',
     cta: 'Explore reporting',
     links: [

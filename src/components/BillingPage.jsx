@@ -123,7 +123,7 @@ export function History({ days, currency }) {
     <section className="billing__history" aria-labelledby="history-title">
       <div className="billing__history-head">
         <h2 id="history-title">Billing History</h2>
-        <span className="billing__history-range">Last {rows.length} days</span>
+        <span className="billing__history-range">Last {rows.length} Days</span>
       </div>
       <div className="history" role="region" aria-label={`Daily bills for the last ${rows.length} days`} tabIndex={0}>
         <table className="history__table">
@@ -234,7 +234,7 @@ export function BillingSections({ data, onPaid }) {
       <section className="billing__payments" aria-labelledby="payments-title">
         <div className="billing__history-head">
           <h2 id="payments-title">Payments</h2>
-          <span className="billing__history-range">Last {HISTORY_DAYS} days</span>
+          <span className="billing__history-range">Last {HISTORY_DAYS} Days</span>
         </div>
         {data.payments.length ? (
           <ul>

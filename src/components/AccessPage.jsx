@@ -13,8 +13,8 @@ export default function AccessPage() {
       <div className="container access-page__inner">
         <div className="access-page__copy">
           <p className="legal__crumb"><a href="/">Home</a> / Request Access</p>
-          <h1>Get your CallsTalk account.</h1>
-          <p className="lead">Trace every call, form and chat back to the campaign that started it. Request access, and a specialist will set you up.</p>
+          <h1>Get Your CallsTalk Account.</h1>
+          <p className="lead">Trace Every Call, Form and Chat Back to the Campaign That Started It. Request Access, and a Specialist Will Set You Up.</p>
           <ol className="access-page__steps">
             {STEPS.map(([title, text], i) => (
               <li key={title}>

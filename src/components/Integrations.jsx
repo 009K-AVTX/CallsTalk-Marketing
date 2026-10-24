@@ -103,8 +103,8 @@ export default function Integrations() {
     <div className="integrations" id="integrations">
       <div className="integrations__intro">
         <p className="integrations__count"><b>{ALL_INTEGRATIONS.length}</b> integrations</p>
-        <h3>Your attribution, delivered wherever your team works.</h3>
-        <p>Every traced call, form and chat, delivered to the tools your team uses every day.</p>
+        <h3>Your Attribution, Delivered Wherever Your Team Works.</h3>
+        <p>Every Traced Call, Form and Chat, Delivered to the Tools Your Team Uses Every Day.</p>
         <Hub />
       </div>
       <div className="integrations__catalog">

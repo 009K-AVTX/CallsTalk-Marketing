@@ -10,15 +10,15 @@ export default function Hero() {
         <div className="hero__grid">
           <div className="hero__copy">
             <p className="hero__eyebrow"><span />Every Conversation, Traced to Its Campaign</p>
-            <h1 className="hero__title">See exactly what your marketing earns.</h1>
-            <p className="lead">CallsTalk follows every call, form and chat back to the ad that started it, so your budget goes where deals close.</p>
+            <h1 className="hero__title">See Exactly What Your Marketing Earns.</h1>
+            <p className="lead">CallsTalk Follows Every Call, Form and Chat Back to the Ad That Started It, so Your Budget Goes Where Deals Close.</p>
             <div className="actions">
               <ChatButton />
               <a href="#pricing" className="btn btn--quiet">See Pricing</a>
             </div>
             <ul className="assurances">
-              <li>A real person sets you up</li>
-              <li>Live the same day you add one snippet</li>
+              <li>A Real Person Sets You Up</li>
+              <li>Live the Same Day You Add One Snippet</li>
             </ul>
           </div>
           <figure className="hero__film">

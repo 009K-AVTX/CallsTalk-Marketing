@@ -15,7 +15,7 @@ export default function Testimonials() {
   return (
     <section className="section">
       <div className="container">
-        <h2>Trusted by teams that measure with CallsTalk.</h2>
+        <h2>Trusted by Teams That Measure with CallsTalk.</h2>
         <div className="reviews">
           <figure className="review review--featured">
             <blockquote>{featured.quote}</blockquote>
