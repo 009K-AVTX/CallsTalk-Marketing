@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { webFontsReady } from '../lib/fonts.js';
-import { buildIPhone, clipScreen, paintIPhoneChrome } from '../lib/iphone.js';
+import { buildIPhone } from '../lib/iphone.js';
+import { paintCallScreen } from '../lib/callScreen.js';
 
 const TEX_SCALE = 2; // canvases are drawn at 2x for sharp text
 const SCREEN_W = 512;
@@ -58,75 +59,12 @@ function drawMark(ctx, x, y, s) {
   });
 }
 
-// The phone screen: an incoming call, the live conversation, then the attributed result.
-function paintScreen(ctx, phase) {
-  const W = SCREEN_W;
-  const H = SCREEN_H;
-  ctx.setTransform(TEX_SCALE, 0, 0, TEX_SCALE, 0, 0);
+// The phone screen: the same call screen as the hero, drawn at this canvas's size.
+function paintScreen(ctx, phase, secs) {
+  const k = SCREEN_W / 400;
+  ctx.setTransform(TEX_SCALE * k, 0, 0, TEX_SCALE * k, 0, 0);
   ctx.save();
-  clipScreen(ctx, W, H);
-  const bg = ctx.createLinearGradient(0, 0, 0, H);
-  bg.addColorStop(0, '#1c1820');
-  bg.addColorStop(0.55, '#121015');
-  bg.addColorStop(1, '#0b090d');
-  ctx.fillStyle = bg;
-  ctx.fillRect(0, 0, W, H);
-  const glow = ctx.createRadialGradient(W / 2, 382, 30, W / 2, 382, 230);
-  glow.addColorStop(0, 'rgba(199,146,247,.42)');
-  glow.addColorStop(0.5, 'rgba(214,163,255,.12)');
-  glow.addColorStop(1, 'rgba(214,163,255,0)');
-  ctx.fillStyle = glow;
-  ctx.fillRect(0, 0, W, H);
-
-  ctx.textAlign = 'center';
-  ctx.fillStyle = '#ffffff';
-  ctx.font = '600 30px Poppins, sans-serif';
-  ctx.fillText(phase === 'ring' ? 'Incoming call' : phase === 'live' ? 'Connected' : 'Job booked', W / 2, 200);
-
-  if (phase === 'ring') {
-    [150, 112, 74].forEach((r, i) => {
-      ctx.strokeStyle = `rgba(232,201,255,${0.18 + i * 0.2})`;
-      ctx.lineWidth = 3;
-      ctx.beginPath();
-      ctx.arc(W / 2, 380, r, 0, Math.PI * 2);
-      ctx.stroke();
-    });
-  }
-  drawMark(ctx, W / 2 - 52, 330, 104);
-
-  ctx.font = '600 44px Poppins, sans-serif';
-  ctx.fillStyle = '#ffffff';
-  ctx.fillText(phase === 'done' ? '$420' : '(555) 014-2290', W / 2, 580);
-  ctx.font = '400 26px Geist, sans-serif';
-  ctx.fillStyle = '#d4d4d4';
-  ctx.fillText(phase === 'ring' ? 'Ringing' : phase === 'live' ? 'Talking 3:12' : 'Same-day repair', W / 2, 628);
-
-  // Source panel: unknown while ringing, then identified.
-  ctx.textAlign = 'left';
-  roundRect(ctx, 44, 700, W - 88, 170, 26);
-  ctx.fillStyle = 'rgba(255,255,255,.05)';
-  ctx.fill();
-  ctx.strokeStyle = phase === 'ring' ? 'rgba(212,212,212,.25)' : 'rgba(214,163,255,.8)';
-  ctx.lineWidth = 2;
-  ctx.stroke();
-  ctx.font = '400 24px Geist, sans-serif';
-  ctx.fillStyle = '#b3abbd';
-  ctx.fillText(phase === 'done' ? 'Revenue credited to' : 'Source', 76, 752);
-  ctx.font = '600 30px Poppins, sans-serif';
-  ctx.fillStyle = phase === 'ring' ? '#b3abbd' : '#ffffff';
-  ctx.fillText(phase === 'ring' ? 'Identifying...' : 'Paid search', 76, 800);
-  ctx.font = '400 24px Geist, sans-serif';
-  ctx.fillStyle = '#e8c9ff';
-  ctx.fillText(phase === 'ring' ? '' : '"same-day plumbing"', 76, 840);
-
-  ctx.textAlign = 'center';
-  roundRect(ctx, W / 2 - 150, 930, 300, 70, 35);
-  ctx.fillStyle = phase === 'ring' ? '#d6a3ff' : 'rgba(214,163,255,.18)';
-  ctx.fill();
-  ctx.font = '600 26px Poppins, sans-serif';
-  ctx.fillStyle = phase === 'ring' ? '#160f1f' : '#ffffff';
-  ctx.fillText(phase === 'ring' ? 'Answer' : phase === 'live' ? 'Recording' : 'Attributed', W / 2, 975);
-  paintIPhoneChrome(ctx, W, H);
+  paintCallScreen(ctx, 400, SCREEN_H / k, phase, secs, 'Revenue credited to the ad');
   ctx.restore();
 }
 
@@ -359,7 +297,7 @@ async function mount(el, onStep, reducedMotion) {
   const camera = new THREE.PerspectiveCamera(34, 1, 0.1, 100);
   camera.position.set(0, 0.1, 10.5);
 
-  scene.add(new THREE.AmbientLight(0xd4d4d4, 0.6));
+  scene.add(new THREE.AmbientLight(0xffffff, 0.85));
   const key = new THREE.DirectionalLight(0xffffff, 2.4);
   key.position.set(-4, 5, 6);
   scene.add(key);
@@ -391,8 +329,12 @@ async function mount(el, onStep, reducedMotion) {
   // Phone: dark metal body, glowing screen, stacked outlines behind it.
   const phone = new THREE.Group();
   phone.position.set(1.15, -0.15, 0.4);
-  phone.rotation.set(0.14, -0.5, 0.06);
+  phone.rotation.set(0.1, -0.3, 0.04);
   world.add(phone);
+  // The same lilac light the hero phone sits under, so both handsets match.
+  const glow = new THREE.PointLight(0xd6a3ff, 16, 10, 2);
+  glow.position.set(1.9, 2.4, 3);
+  world.add(glow);
   const device = buildIPhone(THREE, RoundedBoxGeometry, 1.7, 3.4);
   phone.add(device.group);
   const maxAniso = renderer.capabilities.getMaxAnisotropy();
@@ -556,9 +498,11 @@ async function mount(el, onStep, reducedMotion) {
   const draw = (t) => {
     const local = t % LOOP;
     const nextPhase = phaseAt(local);
-    if (nextPhase !== phase) {
-      phase = nextPhase;
-      paintScreen(screenCtx, phase);
+    const secs = 180 + Math.floor(Math.max(0, local - CONNECT) * 3);
+    const screenKey = nextPhase === 'live' ? `live${secs}` : nextPhase;
+    if (screenKey !== phase) {
+      phase = screenKey;
+      paintScreen(screenCtx, nextPhase, secs);
       screenTex.needsUpdate = true;
     }
     const isCredited = local >= RETURN_END;
