@@ -227,8 +227,9 @@ export async function emailVisitorMessage(session, message, messageId) {
 }
 
 // A portal setup link for a new login, or a fresh one after a reset. Returns false when SMTP is not set up.
-export function inviteMail({ name, email, link, expiresAt, reset }) {
-  const until = expiresAt.toLocaleDateString('en-US', { timeZone: config.timezone, month: 'long', day: 'numeric' });
+export function inviteMail({ name, email, link, expiresAt, reset, timeZone = config.timezone }) {
+  // "October 31, 11:12 PM EDT", in the customer's own time zone.
+  const until = expiresAt.toLocaleString('en-US', { timeZone, month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZoneName: 'short' });
   const steps = [
     ['Open your setup link', 'It works <b>once</b>, until <b>' + escapeHtml(until) + '</b>.'],
     ['Add CallsTalk to an authenticator app', 'Scan the QR code with <b>Google Authenticator</b>, Microsoft Authenticator or Authy.'],

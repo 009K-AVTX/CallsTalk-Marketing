@@ -100,7 +100,7 @@ export default function Shell({ path, statement, children, nav = NAV, team }) {
                 <div className="p-user__menu" role="menu">
                   <div className="p-user__who">
                     <MyAvatar size="md" fallback={statement?.customer || email} />
-                    <p><b>{statement?.customer || (crew ? crew.menu : 'Your account')}</b><small>{email}</small></p>
+                    <p><b>{statement?.customer || (crew ? crew.menu : 'Your Account')}</b><small>{email}</small></p>
                   </div>
                   <Link to="/settings" role="menuitem" onClick={() => setMenu(false)}><Icon name="settings" />Settings</Link>
                   {!crew && <a role="menuitem" href={`https://t.me/${TELEGRAM_HANDLE}`} target="_blank" rel="noopener noreferrer"><TelegramIcon />Support on Telegram</a>}

@@ -57,12 +57,12 @@ export default function Setup() {
           <span>Calls<b>Talk</b></span>
           <em>Portal</em>
         </a>
-        <h1>Set up your login.</h1>
+        <h1>Set Up Your Login.</h1>
         <p>Your login has two parts: a password you choose, and a 6-digit code from an authenticator app on your phone.</p>
         <ol className="p-setup__steps">
-          <li><b>Add CallsTalk to your app</b>Google Authenticator, Microsoft Authenticator or Authy all work.</li>
-          <li><b>Choose a password</b>At least 8 characters.</li>
-          <li><b>Enter the code</b>The 6 digits the app shows for CallsTalk.</li>
+          <li><b>Add CallsTalk to Your App</b>Google Authenticator, Microsoft Authenticator or Authy all work.</li>
+          <li><b>Choose a Password</b>At least 8 characters.</li>
+          <li><b>Enter the Code</b>The 6 digits the app shows for CallsTalk.</li>
         </ol>
       </div>
 
@@ -72,7 +72,7 @@ export default function Setup() {
             <>
               <h2>Link Not Valid</h2>
               <p className="access-card__error" role="alert">{loadError}</p>
-              <p className="portal-login__help">Already set up? <a href="/login">Log in</a>.</p>
+              <p className="portal-login__help">Already set up? <a href="/login">Log In</a>.</p>
             </>
           ) : <p className="access-card__lead">Opening your setup link…</p>}
         </div>
@@ -90,7 +90,7 @@ export default function Setup() {
                 <code>{invite.secret}</code>
                 <span>{copied ? <><Icon name="check" />Copied</> : 'Copy'}</span>
               </button>
-              <a className="p-setup__open" href={invite.otpauth_url}>On this phone? Open in the app</a>
+              <a className="p-setup__open" href={invite.otpauth_url}>On this phone? Open it in the app</a>
             </div>
           </div>
 

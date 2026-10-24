@@ -83,7 +83,9 @@ export async function sendInvite(user, { createdBy = null, reset = false } = {})
   let emailed = false;
   let emailError = '';
   try {
-    emailed = await emailInvite({ name: user.name, email: user.email, link, expiresAt, reset });
+    // The expiry is written in the customer's own time zone (their billing account's), not the team's.
+    const timeZone = (await getAccount(user.id).catch(() => null))?.timezone || DEFAULT_TZ;
+    emailed = await emailInvite({ name: user.name, email: user.email, link, expiresAt, reset, timeZone });
     if (!emailed) emailError = 'Email is not set up on the server (SMTP), so send the link yourself.';
   } catch (err) {
     console.error(`[portal] could not email the setup link to ${user.email}:`, err.message);

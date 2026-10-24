@@ -62,7 +62,7 @@ export function MyAvatar({ size, fallback, className }) {
 function squarePhoto(file) {
   return new Promise((resolve, reject) => {
     if (!/^image\/(jpeg|png|webp|gif|bmp|avif|heic|heif)$/i.test(file.type)) return reject(new Error('Choose a photo (JPG, PNG or WebP).'));
-    if (file.size > MAX_INPUT_MB * 1024 * 1024) return reject(new Error(`Choose a photo under ${MAX_INPUT_MB} MB.`));
+    if (file.size > MAX_INPUT_MB * 1024 * 1024) return reject(new Error(`Choose a photo smaller than ${MAX_INPUT_MB} MB.`));
     const url = URL.createObjectURL(file);
     const img = new Image();
     img.onload = () => {
@@ -115,7 +115,7 @@ export function AvatarEditor() {
       <MyAvatar size="xl" />
       <div>
         <p className="p-avatar-edit__title">Profile Photo</p>
-        <p className="p-avatar-edit__hint">Shown on your account across the portal. JPG, PNG or WebP; we crop it to a square.</p>
+        <p className="p-avatar-edit__hint">Shown on your account throughout the portal. JPG, PNG or WebP; it will be cropped to a square.</p>
         <div className="p-admin__actions">
           <label className={`btn btn--light btn--sm p-avatar-edit__pick${status === 'sending' ? ' is-busy' : ''}`}>
             <input ref={input} type="file" accept="image/jpeg,image/png,image/webp" onChange={pick} disabled={status === 'sending'} />

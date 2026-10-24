@@ -143,7 +143,7 @@ export const fetchStatement = () => (PREVIEW
   : authed(`/billing/statement?from=${historyFrom()}`));
 
 export const startPayment = (amount) => (PREVIEW
-  ? Promise.reject(new Error(`Preview mode: with a real login, your USDT (TRC-20) address for $${amount} appears here.`))
+  ? Promise.reject(new Error(`Preview mode: with a real login, your USDT (TRC-20) payment address for $${amount} would appear here.`))
   : authed('/billing/statement/pay', { method: 'POST', body: { amount: String(amount) } }));
 
 
@@ -162,7 +162,7 @@ export const profileChanged = () => window.dispatchEvent(new Event('callstalk:pr
 // `dataUrl` is the photo already cropped and resized in the browser (portal/src/avatar.jsx).
 export async function uploadAvatar(dataUrl) {
   if (PREVIEW) {
-    try { localStorage.setItem(PREVIEW_AVATAR, dataUrl); } catch { throw new Error('This browser has no room to keep the photo.'); }
+    try { localStorage.setItem(PREVIEW_AVATAR, dataUrl); } catch { throw new Error('There is not enough browser storage to save this photo.'); }
   } else {
     await authed('/accounts/avatar', { method: 'PUT', body: { content_base64: dataUrl.split(',')[1] || '' } });
   }

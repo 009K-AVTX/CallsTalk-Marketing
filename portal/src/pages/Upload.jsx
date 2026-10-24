@@ -59,7 +59,7 @@ function Gate({ onIn }) {
     return (
       <div className="access-card p-up__gate">
         <h2>Billing Team Sign In</h2>
-        <p className="access-card__lead">This page is for CallsTalk staff and admins. Reports uploaded here appear in the customer's portal straight away.</p>
+        <p className="access-card__lead">This page is for CallsTalk staff and admins. Reports uploaded here appear in the customer's portal immediately.</p>
         <a className="btn btn--light" href={`/login?next=${encodeURIComponent('/upload')}`}>Log In</a>
       </div>
     );
@@ -68,7 +68,7 @@ function Gate({ onIn }) {
   return (
     <form className="access-card p-up__gate" onSubmit={submit}>
       <h2>Billing Team Sign In</h2>
-      <p className="access-card__lead">This page is for the CallsTalk billing team. Reports uploaded here appear in the customer's portal straight away.</p>
+      <p className="access-card__lead">This page is for the CallsTalk billing team. Reports uploaded here appear in the customer's portal immediately.</p>
       <label>Upload Key<input required type="password" value={key} onChange={(e) => setKey(e.target.value)} autoComplete="off" autoFocus />{localKeyHint && <small className="p-up__hint">Testing locally: the key is “{localKeyHint}”.</small>}</label>
       {status === 'error' && <p className="access-card__error" role="alert">{error}</p>}
       <button type="submit" className="btn btn--light" disabled={status === 'sending'}>{status === 'sending' ? 'Checking…' : 'Sign In'}</button>
@@ -187,7 +187,7 @@ export default function Upload() {
   }, [signedIn, load]);
 
   const remove = async (r) => {
-    if (!window.confirm(`Delete "${r.title}" for ${r.customer}? They will no longer see it.`)) return;
+    if (!window.confirm(`Delete "${r.title}" for ${r.customer}? The customer will no longer be able to see it.`)) return;
     try {
       await deleteReport(r.id);
       load();
@@ -213,7 +213,7 @@ export default function Upload() {
       <main className="p-main">
         {!signedIn ? <Gate onIn={() => setSignedIn(true)} /> : (
           <>
-            <div className="p-head"><div><h1>Customer Reports</h1><p>Upload a billing report and the customer sees it in their portal under Reports.</p></div></div>
+            <div className="p-head"><div><h1>Customer Reports</h1><p>Upload a billing report, and it will appear in the customer's portal under Reports.</p></div></div>
             <ErrorNote error={error} onRetry={load} />
             <div className="p-up__grid">
               <UploadForm customers={customers} onDone={load} />
@@ -242,7 +242,7 @@ export default function Upload() {
                       ))}
                     </tbody>
                   </table>
-                  {reports && !shown.length && <p className="p-empty">{reports.length ? 'No reports match that filter.' : 'Nothing uploaded yet.'}</p>}
+                  {reports && !shown.length && <p className="p-empty">{reports.length ? 'No reports match that filter.' : 'No reports have been uploaded yet.'}</p>}
                 </div>
               </section>
             </div>

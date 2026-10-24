@@ -108,7 +108,7 @@ export async function listCustomers() {
 }
 
 export async function uploadReport({ customer, title, note, periodFrom, periodTo, file }) {
-  if (file.size > MAX_MB * 1024 * 1024) throw new Error(`Files up to ${MAX_MB} MB can be uploaded.`);
+  if (file.size > MAX_MB * 1024 * 1024) throw new Error(`Files must be ${MAX_MB} MB or smaller.`);
   const content = await toBase64(file);
   const body = { customer, title, note, period_from: periodFrom, period_to: periodTo, filename: file.name, content_base64: content };
   if (MODE === 'api') return api('/staff/reports', 'POST', body);
@@ -122,7 +122,7 @@ export async function uploadReport({ customer, title, note, periodFrom, periodTo
   try {
     localStorage.setItem(LOCAL_STORE, JSON.stringify([report, ...localAll()]));
   } catch {
-    throw new Error('This browser has no room left for test uploads. Delete some first.');
+    throw new Error('This browser has no space left for test uploads. Please delete some first.');
   }
   return report;
 }

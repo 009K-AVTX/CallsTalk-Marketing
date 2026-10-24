@@ -118,7 +118,7 @@ function Terms({ id, account, onSaved }) {
   });
   return (
     <form className="p-card p-form" onSubmit={(e) => f.run(e, async () => onSaved(await saveTerms(id, f.form)), 'Billing terms saved.')}>
-      <header className="p-card__head"><div><h2>Billing Terms</h2><p>A new price applies to days entered from now on; past days keep theirs.</p></div></header>
+      <header className="p-card__head"><div><h2>Billing Terms</h2><p>A new price applies to days entered from now on; past days keep their original price.</p></div></header>
       <div className="p-form__row">
         <label>Price per Call ($)<input required type="number" min="0" step="0.01" value={f.form.price_per_call} onChange={f.set('price_per_call')} /></label>
         <label><span>Opening Balance ($) <i className="p-optional">on the start date</i></span><input required type="number" step="0.01" value={f.form.opening_balance} onChange={f.set('opening_balance')} /></label>
@@ -163,7 +163,7 @@ function Payment({ id, account, onSaved }) {
   }, 'Payment recorded.');
   return (
     <form className="p-card p-form" onSubmit={submit}>
-      <header className="p-card__head"><div><h2>Record a Payment</h2><p>Completed payments come off what the customer owes on that day.</p></div></header>
+      <header className="p-card__head"><div><h2>Record a Payment</h2><p>Completed payments are deducted from the amount the customer owes on that day.</p></div></header>
       <div className="p-form__row">
         <label>Amount ($)<input required type="number" min="0.01" step="0.01" value={f.form.amount} onChange={f.set('amount')} /></label>
         <label>Day Received<input required type="date" value={f.form.date} min={account.start_date} max={today()} onChange={f.set('date')} /></label>
@@ -193,7 +193,7 @@ function Ledger({ id, statement, onPick, onSaved }) {
   return (
     <>
       <section className="p-card p-card--flush">
-        <header className="p-card__head"><div><h2>Last {statement.days.length} Days</h2><p>As the customer sees them; they see the last five. Click a day to change its calls.</p></div></header>
+        <header className="p-card__head"><div><h2>Last {statement.days.length} Days</h2><p>As the customer sees them (customers see the last five days). Select a day to change its calls.</p></div></header>
         <div className="p-tablewrap">
           <table className="p-table p-table--click">
             <thead><tr><th scope="col">Day</th><th scope="col">Opening</th><th scope="col">Calls</th><th scope="col">Price</th><th scope="col">Charges</th><th scope="col">Paid</th><th scope="col">Balance</th></tr></thead>
@@ -211,7 +211,7 @@ function Ledger({ id, statement, onPick, onSaved }) {
               ))}
             </tbody>
           </table>
-          {!statement.days.length && <p className="p-empty">Billing starts later than today.</p>}
+          {!statement.days.length && <p className="p-empty">Billing starts after today.</p>}
         </div>
       </section>
       <section className="p-card">
@@ -228,7 +228,7 @@ function Ledger({ id, statement, onPick, onSaved }) {
               </li>
             ))}
           </ul>
-        ) : <p className="p-empty">No payments in these days.</p>}
+        ) : <p className="p-empty">No payments on these days.</p>}
       </section>
     </>
   );

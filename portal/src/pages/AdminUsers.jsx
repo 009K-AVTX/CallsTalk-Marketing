@@ -70,7 +70,7 @@ function NewLogin({ onCreated }) {
   return (
     <form className="p-card p-form p-admin__new" onSubmit={submit}>
       <header className="p-card__head">
-        <div><h2>New Login</h2><p>We email them a one-use link to choose a password and add their authenticator app.</p></div>
+        <div><h2>New Login</h2><p>We will email them a single-use link to choose a password and add their authenticator app.</p></div>
         <div className="p-ranges" role="radiogroup" aria-label="Role">
           {['customer', 'staff', 'admin'].map((r) => (
             <button key={r} type="button" role="radio" aria-checked={form.role === r} className={form.role === r ? 'is-on' : ''} onClick={() => setForm({ ...form, role: r })}>
@@ -96,7 +96,7 @@ function NewLogin({ onCreated }) {
           </div>
         </>
       ) : <p className="p-admin__note">{form.role === 'staff'
-        ? 'Staff can only upload and remove customer reports. They see no billing, payments or logins.'
+        ? 'Staff can only upload and remove customer reports; they cannot see billing, payments or logins.'
         : 'Admins can add and turn off logins, enter calls and payments, and upload reports for every customer.'}</p>}
       {status === 'error' && <p className="access-card__error" role="alert">{error}</p>}
       <button type="submit" className="btn btn--light" disabled={status === 'sending'}>{status === 'sending' ? 'Creating…' : 'Create Login and Send Link'}</button>

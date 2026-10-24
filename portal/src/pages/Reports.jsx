@@ -50,7 +50,7 @@ export default function Reports() {
         <section className="p-card p-empty-card">
           <span className="p-insights__icon"><Icon name="reports" /></span>
           <h2>No Reports Yet</h2>
-          <p>When our team sends you a billing report, it appears here straight away.</p>
+          <p>When our team sends you a billing report, it will appear here immediately.</p>
           {showUploadLink() && <a href={UPLOAD_PATH} target="_blank" rel="noopener" className="btn btn--light btn--sm p-empty-card__cta"><Icon name="download" className="p-icon p-icon--up" />Upload a Report</a>}
         </section>
       )}

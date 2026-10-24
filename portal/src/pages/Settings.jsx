@@ -67,7 +67,7 @@ function PasswordForm() {
         <label>Code from the App<input required value={form.code} onChange={set('code')} inputMode="numeric" autoComplete="one-time-code" pattern="[0-9 ]{6,7}" maxLength={7} placeholder="123456" autoFocus /></label>
       )}
       {status === 'error' && <p className="access-card__error" role="alert">{error}</p>}
-      {status === 'done' && <p className="p-ok" role="status"><Icon name="check" />Password changed. Other devices are signed out.</p>}
+      {status === 'done' && <p className="p-ok" role="status"><Icon name="check" />Your password has been changed, and your other devices have been signed out.</p>}
       <div className="p-admin__actions">
         <button type="submit" className="btn btn--light" disabled={status === 'sending'}>
           {status === 'sending' ? 'Checking…' : step === 'code' ? 'Confirm and Change Password' : 'Continue'}
@@ -105,7 +105,7 @@ export default function Settings({ statement, team }) {
         </section>
         {!team && (
           <section className="p-card">
-            <header className="p-card__head"><div><h2>Your Account</h2><p>Set by our team. Ask us if anything should change.</p></div></header>
+            <header className="p-card__head"><div><h2>Your Account</h2><p>Set by our team. Contact us if anything needs to change.</p></div></header>
             <dl className="p-facts">
               <div><dt>Price per Converted Call</dt><dd>{s ? money(s.price_per_call, s.currency) : '—'}</dd></div>
               <div><dt>Currency</dt><dd>{s?.currency || '—'}</dd></div>
@@ -119,7 +119,7 @@ export default function Settings({ statement, team }) {
       {!team && <div className="p-grid">
         <PasswordForm />
         <section className="p-card">
-          <header className="p-card__head"><div><h2>Help</h2><p>Questions about calls, your price or a bill.</p></div></header>
+          <header className="p-card__head"><div><h2>Help</h2><p>Questions about your calls, your price or a bill.</p></div></header>
           <ul className="contact">
             <li><a href={`https://t.me/${TELEGRAM_HANDLE}`} target="_blank" rel="noopener noreferrer"><TelegramIcon /><span><small>Telegram</small>@{TELEGRAM_HANDLE}</span></a></li>
             <li><a href={`mailto:${SUPPORT_EMAIL}`}><svg className="contact__icon contact__icon--mail" viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="5" width="19" height="14" rx="3" /><path d="m3.5 7 8.5 6 8.5-6" /></svg><span><small>Email</small>{SUPPORT_EMAIL}</span></a></li>

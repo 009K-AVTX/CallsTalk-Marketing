@@ -15,7 +15,8 @@ export const dayLabel = (iso) => {
   const [y, m, d] = iso.split('-').map(Number);
   return new Date(y, m - 1, d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 };
-export const clock = (iso) => new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', second: '2-digit' });
+// The viewer's own time, with its zone name so it is never mistaken for another zone's.
+export const clock = (iso) => new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZoneName: 'short' });
 
 // The day's bill: the Telegram picture's four lines, plus the price and what the calls came to.
 export function Statement({ day, currency }) {
@@ -141,9 +142,9 @@ function PayDetails({ details, currency, onBack }) {
         </div>
       </div>
       <ul className="wallet__send-rules">
-        <li>Send <b>USDT</b> on the <b>TRON (TRC-20)</b> network only. Other coins or networks cannot be recovered.</li>
-        <li>This address is yours alone and stays the same, so you can use it for every payment.</li>
-        <li>Your payment shows under Payments once it is confirmed, usually within a few minutes.</li>
+        <li>Send <b>USDT</b> on the <b>TRON (TRC-20)</b> network only. Funds sent in any other coin or on any other network cannot be recovered.</li>
+        <li>This address is unique to your account and does not change, so you can use it for every payment.</li>
+        <li>Your payment will appear under Payments once it has been confirmed, usually within a few minutes.</li>
       </ul>
       <button type="button" className="btn btn--quiet btn--sm" onClick={onBack}>Change Amount</button>
     </div>
