@@ -5,7 +5,7 @@ export default function Onboarding() {
   return (
     <section className="section section--white" id="how">
       <div className="container">
-        <h2>Go live in four steps.</h2>
+        <h2>Go Live in Four Steps.</h2>
         <ol className="flow">
           {steps.map(({ title, text, link, href }, i) => (
             <li key={title} className="flow__step">
