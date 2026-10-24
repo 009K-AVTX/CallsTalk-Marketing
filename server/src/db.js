@@ -6,7 +6,7 @@ import { config } from './config.js';
 // Telegram message and topic ids are BIGINT columns; they stay far below 2^53, so plain numbers are safe.
 pg.types.setTypeParser(pg.types.builtins.INT8, Number);
 
-const pool = new pg.Pool({ ...config.db, max: 10 });
+export const pool = new pg.Pool({ ...config.db, max: 10 });
 pool.on('error', (err) => console.error('[db] idle connection error:', err.message));
 
 export const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
@@ -24,6 +24,9 @@ const SCHEMA = `
   CREATE INDEX IF NOT EXISTS sessions_short_id ON sessions (short_id);
   CREATE INDEX IF NOT EXISTS sessions_thread_id ON sessions (thread_id);
   CREATE INDEX IF NOT EXISTS sessions_open ON sessions (status) WHERE status = 'open';
+  -- Chats started by a signed-in customer in the portal (portal_users.id); null for website visitors.
+  ALTER TABLE sessions ADD COLUMN IF NOT EXISTS portal_user_id uuid;
+  ALTER TABLE sessions ADD COLUMN IF NOT EXISTS company text NOT NULL DEFAULT '';
 
   CREATE TABLE IF NOT EXISTS messages (
     id          serial PRIMARY KEY,
@@ -56,12 +59,12 @@ const one = async (sql, params) => (await pool.query(sql, params)).rows[0];
 const all = async (sql, params) => (await pool.query(sql, params)).rows;
 
 // Returns the id of the visitor's first message.
-export async function createSession({ id, name, email, threadId, message }) {
+export async function createSession({ id, name, email, threadId, message, portalUserId = null, company = '' }) {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    await client.query('INSERT INTO sessions (id, short_id, name, email, thread_id) VALUES ($1, $2, $3, $4, $5)',
-      [id, id.slice(0, 8), name, email, threadId ?? null]);
+    await client.query('INSERT INTO sessions (id, short_id, name, email, thread_id, portal_user_id, company) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+      [id, id.slice(0, 8), name, email, threadId ?? null, portalUserId, company]);
     const { rows } = await client.query(
       "INSERT INTO messages (session_id, sender, sender_name, message) VALUES ($1, 'visitor', $2, $3) RETURNING id",
       [id, name, message]);

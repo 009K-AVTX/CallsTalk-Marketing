@@ -674,6 +674,22 @@ h3 { font-size: 1.5rem; }
 .wallet__method span { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; background: #26a17b; color: #fff; font-weight: 700; font-size: .85rem; }
 .wallet__pay .btn { width: 100%; }
 .wallet__secure { margin: 0; font-size: .8rem; color: var(--slate); text-align: center; }
+.wallet__send { gap: 14px; }
+.wallet__send-title { margin: 0; font-size: 1rem; color: var(--white); }
+.wallet__send-title span { color: var(--slate); font-size: .88rem; }
+.wallet__send-body { display: grid; grid-template-columns: 132px minmax(0, 1fr); gap: 16px; align-items: center; }
+.wallet__send-body img { display: block; width: 132px; height: 132px; padding: 6px; border-radius: 12px; background: #fff; }
+.wallet__send-label { margin: 0 0 6px; font-size: .78rem; color: var(--slate); }
+.wallet__address { display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; padding: 10px 12px; border-radius: 12px; border: 1px dashed rgba(214, 163, 255, .45); background: rgba(214, 163, 255, .05); color: var(--white); font: inherit; text-align: left; cursor: pointer; }
+.wallet__address code { font: 600 .82rem/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; overflow-wrap: anywhere; }
+.wallet__address span { flex: none; font-size: .78rem; color: var(--accent); }
+.wallet__copy-amount { margin-top: 8px; padding: 0; border: 0; background: none; color: var(--accent); font: inherit; font-size: .82rem; cursor: pointer; }
+.wallet__send-rules { display: grid; gap: 6px; margin: 0; padding-left: 18px; font-size: .82rem; color: var(--on-dark-soft); }
+.wallet__send-rules b { color: var(--white); }
+.wallet__send .btn--quiet { width: auto; justify-self: start; }
+@media (max-width: 480px) {
+  .wallet__send-body { grid-template-columns: 1fr; justify-items: center; }
+}
 
 /* A day's bill, after the Telegram statement: dated title bar, Metric / Amount rows, balance last */
 .bill { overflow: hidden; }

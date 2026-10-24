@@ -32,6 +32,8 @@ export const config = {
     threadId: env('TELEGRAM_THREAD_ID') ? Number(env('TELEGRAM_THREAD_ID')) : undefined,
     // Optional: open a separate forum topic for every visitor.
     topicPerChat: env('TELEGRAM_TOPIC_PER_CHAT') === 'true',
+    // false on a local copy, so it does not take the live server's updates from the same bot.
+    polling: env('TELEGRAM_POLLING', 'true') !== 'false',
   },
 
   // Optional: email every visitor message, with a link to answer it from the browser.
@@ -53,8 +55,22 @@ export const config = {
   // Optional: serve the built marketing site and the AI assistant from this server too.
   serveSite: env('SERVE_SITE') === 'true',
   siteDir: path.resolve(root, env('SITE_DIR', '../dist')),
-  // Customer portal that /login, /dashboard and /billing redirect to (same setting as the site build).
-  portalUrl: env('VITE_PORTAL_APP_URL', 'https://callstalk-portal.vercel.app').replace(/\/$/, ''),
+  // Customer portal (portal/ in the site): /login, /dashboard and /billing redirect there, and setup links
+  // in emails open it. In development it is the portal's Vite dev server.
+  portalUrl: (isDev ? env('DEV_PORTAL_URL', 'http://localhost:5180') : env('VITE_PORTAL_APP_URL', 'https://portal.callstalk.com')).replace(/\/$/, ''),
+  // Customer payments in USDT (TRC-20) through Well Wallet. Without a token, Pay tells customers to contact us.
+  payments: {
+    apiUrl: env('WELLWALLET_API_URL', 'https://tag.alfa-bot.com/api/prod/v1').replace(/\/$/, ''),
+    token: env('WELLWALLET_API_TOKEN'),
+    webhookKey: env('WELLWALLET_WEBHOOK_KEY'),
+    walletType: env('WELLWALLET_WALLET_TYPE', 'user'),
+    pollSeconds: Math.max(30, Number(env('WELLWALLET_POLL_SECONDS', '120'))),
+  },
+  portal: {
+    inviteDays: Number(env('PORTAL_INVITE_DAYS', '7')),
+    accessMinutes: 60,
+    refreshDays: Number(env('PORTAL_SESSION_DAYS', '30')),
+  },
 };
 
 export function assertConfig() {

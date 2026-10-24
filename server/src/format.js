@@ -20,13 +20,18 @@ export function formatClock(date = new Date()) {
 }
 
 // [label, value] pairs describing a new visitor, as plain text.
-export function visitorDetails({ name, email, anonymous }) {
+export function visitorDetails({ name, email, anonymous, company, portal }) {
   return [
     ['Name', !anonymous && name],
+    ['Company', company],
     ['Email', email],
+    ['From', portal && 'Customer portal (signed in)'],
     ['Time', formatClock()],
   ].filter(([, value]) => value);
 }
+
+// Signed-in customers' chats are labelled apart from website visitors' (Telegram and email).
+export const chatKind = (chat) => (chat.portal || chat.portal_user_id ? 'customer' : 'website');
 
 // [label, value] pairs from the request-access form, as plain text. Empty optional fields are left out.
 export function accessDetails({ name, company, email, phone, volume }) {

@@ -5,20 +5,24 @@
 import { readFileSync } from 'node:fs';
 import nodemailer from 'nodemailer';
 import { config, emailEnabled } from './config.js';
-import { accessDetails, clip, escapeHtml, formatClock, shortId, transcriptLines, visitorDetails } from './format.js';
+import { accessDetails, chatKind, clip, escapeHtml, formatClock, shortId, transcriptLines, visitorDetails } from './format.js';
 import { replyLink } from './reply.js';
 
 const { to, from, smtp } = config.email;
-const transport = emailEnabled && nodemailer.createTransport({
+const makeTransport = () => nodemailer.createTransport({
   host: smtp.host,
   port: smtp.port,
   secure: smtp.port === 465, // 465 = SSL; 587 upgrades with STARTTLS
   auth: smtp.user ? { user: smtp.user, pass: smtp.pass } : undefined,
 });
+const transport = emailEnabled && makeTransport();
+// Portal setup links go to customers, so they only need SMTP, not EMAIL_TO.
+const customerTransport = transport || (smtp.host && from && makeTransport());
 const domain = (/<([^>]+)>/.exec(from)?.[1] ?? from).split('@').pop();
 
 const html = (s) => escapeHtml(s).replace(/\n/g, '<br>');
-const subject = (session) => `Website chat: ${session.name} (#${shortId(session)})`;
+// Chats from a local copy of the server (NODE_ENV=development) say so, so the team can tell them from real ones.
+const subject = (session) => `${config.isDev ? '[Local test] ' : ''}${chatKind(session) === 'customer' ? 'Customer' : 'Website'} chat: ${session.company || session.name} (#${shortId(session)})`;
 const threadId = (session) => `<chat-${session.id}@${domain}>`;
 
 // Sent as inline (cid:) images, since Gmail shows neither SVG nor images from localhost.
@@ -41,10 +45,11 @@ const BODY = "Geist,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif";
 const wordmark = (talk, ink, size = 24) => `<span style="white-space:nowrap"><img src="cid:logo@callstalk" width="${size}" height="${size}" alt="" style="display:inline-block;vertical-align:middle;border:0">
 <span style="display:inline-block;vertical-align:middle;margin-left:7px;font:600 ${Math.round(size * 0.7)}px/1 ${HEAD};letter-spacing:-.02em;color:${ink}">Calls<span style="color:${talk}">Talk</span></span></span>`;
 
-function layout({ preview, heading, sub, body, link, name, email }) {
-  const answer = email
+// `cta` and `footer` replace the chat's reply button and footer line (portal emails).
+function layout({ preview, heading, sub, body, link, name, email, cta, footer, footnote }) {
+  const answer = footer || (email
     ? `<b style="color:#fff">Reply to this email</b> to write to ${escapeHtml(name)} at <a href="mailto:${escapeHtml(email)}" style="color:${c.accent};text-decoration:none">${escapeHtml(email)}</a>.`
-    : `<b style="color:#fff">No email address given</b>, so answer in the chat.`;
+    : `<b style="color:#fff">No email address given</b>, so answer in the chat.`);
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="color-scheme" content="light"><meta name="supported-color-schemes" content="light">
 <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Poppins:wght@600&display=swap" rel="stylesheet">
@@ -71,7 +76,7 @@ function layout({ preview, heading, sub, body, link, name, email }) {
 <div style="margin:0 0 16px">${wordmark(c.accentDeep, c.ink)}</div>
 <h1 class="h1" style="margin:0 0 4px;font:600 24px/1.2 ${HEAD};letter-spacing:-.02em;color:${c.ink}">${heading}</h1>
 <p style="margin:0 0 16px;font:400 14px/1.5 ${BODY};color:${c.body}">${sub}</p>
-${link ? `<a href="${escapeHtml(link)}" style="display:inline-block;background:${c.accent};color:#0c0a0e;font:600 14px/1 ${BODY};text-decoration:none;padding:12px 22px;border-radius:999px">Reply to ${escapeHtml(name)}</a>` : ''}
+${link || cta ? `<a href="${escapeHtml(cta?.href || link)}" style="display:inline-block;background:${c.accent};color:#0c0a0e;font:600 14px/1 ${BODY};text-decoration:none;padding:12px 22px;border-radius:999px">${escapeHtml(cta?.label || `Reply to ${name}`)}</a>` : ''}
 </div><!--[if mso]></td><td width="140" valign="middle"><![endif]--><div class="col art" style="display:inline-block;vertical-align:middle;width:100%;max-width:140px;text-align:right">
 <img src="cid:hero@callstalk" width="140" height="117" alt="" style="display:inline-block;width:100%;max-width:140px;height:auto;border:0">
 </div>
@@ -85,7 +90,7 @@ ${body}
 <div style="height:1px;line-height:1px;font-size:0;background:${c.plumRule};margin:0 0 12px">&nbsp;</div>
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
 <td class="stack">${wordmark(c.accent, '#fff', 20)}</td>
-<td class="stack" align="right" style="font:400 12px/1.5 ${BODY};color:${c.onPlumSoft}">${link ? `Reply button works for <b style="color:${c.onPlum}">${config.replyLinkDays} days</b>` : ''}</td>
+<td class="stack" align="right" style="font:400 12px/1.5 ${BODY};color:${c.onPlumSoft}">${footnote || (link ? `Reply button works for <b style="color:${c.onPlum}">${config.replyLinkDays} days</b>` : '')}</td>
 </tr></table>
 </td></tr>
 
@@ -133,7 +138,7 @@ function sendMail(session, { subject: subjectLine, text, link, first, ...content
 }
 
 export function newChatMail(chat, link) {
-  const session = { id: chat.id, name: chat.name, email: chat.email };
+  const session = { id: chat.id, name: chat.name, email: chat.email, company: chat.company, portal_user_id: chat.portal ? chat.portalUserId : null };
   const details = visitorDetails(chat);
   const history = transcriptLines(chat.transcript);
 
@@ -154,7 +159,7 @@ ${history.length ? `<tr><td class="px" style="padding:12px 28px 18px">${sectionH
     subject: subject(session),
     preview: clip(chat.message, 110),
     heading: `New chat from ${escapeHtml(chat.name)}`,
-    sub: 'Waiting in the website chat.',
+    sub: chat.portal ? `A signed-in customer${chat.company ? ` at ${escapeHtml(chat.company)}` : ''}, in the portal chat.` : 'Waiting in the website chat.',
     body,
     text,
     link,
@@ -219,6 +224,43 @@ export async function emailVisitorMessage(session, message, messageId) {
   if (!transport) return;
   const { session: _, ...mail } = visitorMessageMail(session, message, replyLink(session.id, messageId));
   await sendMail(session, mail);
+}
+
+// A portal setup link for a new login, or a fresh one after a reset. Returns false when SMTP is not set up.
+export function inviteMail({ name, email, link, expiresAt, reset }) {
+  const until = expiresAt.toLocaleDateString('en-US', { timeZone: config.timezone, month: 'long', day: 'numeric' });
+  const steps = [
+    ['Open your setup link', 'It works <b>once</b>, until <b>' + escapeHtml(until) + '</b>.'],
+    ['Add CallsTalk to an authenticator app', 'Scan the QR code with <b>Google Authenticator</b>, Microsoft Authenticator or Authy.'],
+    ['Choose your password', 'Then enter the <b>6-digit code</b> from the app to finish.'],
+  ];
+  const body = `<tr><td class="px" style="padding:0 28px 22px">${steps.map(([title, text], i) => `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-top:1px solid ${c.rule}"><tr>
+<td width="34" valign="top" style="padding:12px 0"><span style="display:inline-block;width:24px;height:24px;border-radius:12px;background:${c.panel};color:${c.accentDeep};font:600 12px/24px ${BODY};text-align:center">${i + 1}</span></td>
+<td valign="top" style="padding:12px 0"><p style="margin:0;font:600 14px/1.45 ${BODY};color:${c.ink}">${title}</p><p style="margin:2px 0 0;font:400 13px/1.5 ${BODY};color:${c.body}">${text}</p></td>
+</tr></table>`).join('')}</td></tr>`;
+  return {
+    subject: reset ? 'Your new CallsTalk Portal setup link' : 'Set up your CallsTalk Portal login',
+    preview: 'Set your password and add your authenticator app.',
+    heading: reset ? 'Set up your login again' : 'Your CallsTalk login is ready',
+    sub: `${name ? `Hi ${escapeHtml(name)}, ` : ''}your login ID is <b>${escapeHtml(email)}</b>. Set it up in three short steps.`,
+    body,
+    cta: { href: link, label: 'Set Up My Login' },
+    footer: `<b style="color:#fff">Did not expect this?</b> You can ignore it, nothing happens until the link is used.`,
+    footnote: `Link works <b style="color:${c.onPlum}">once</b>`,
+    text: `${reset ? 'Set up your CallsTalk Portal login again' : 'Your CallsTalk Portal login is ready'}\n\nLogin ID: ${email}\n\n`
+      + `1. Open your setup link (it works once, until ${until}):\n${link}\n`
+      + '2. Scan the QR code with an authenticator app (Google Authenticator, Microsoft Authenticator or Authy).\n'
+      + '3. Choose your password and enter the 6-digit code from the app.\n',
+  };
+}
+
+export async function emailInvite(invite) {
+  if (!customerTransport) return false;
+  const { subject: subjectLine, text, ...content } = inviteMail(invite);
+  await customerTransport.sendMail({
+    from, to: invite.email, subject: subjectLine, html: layout(content), text, attachments: images,
+  });
+  return true;
 }
 
 // For previewing the design (layout without sending).

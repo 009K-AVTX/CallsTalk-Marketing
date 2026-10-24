@@ -4,17 +4,17 @@
   "redirects": [
     {
       "source": "/login",
-      "destination": "https://callstalk-portal.vercel.app/login",
+      "destination": "https://portal.callstalk.com/login",
       "permanent": false
     },
     {
       "source": "/dashboard",
-      "destination": "https://callstalk-portal.vercel.app/",
+      "destination": "https://portal.callstalk.com/",
       "permanent": false
     },
     {
       "source": "/billing",
-      "destination": "https://callstalk-portal.vercel.app/",
+      "destination": "https://portal.callstalk.com/",
       "permanent": false
     }
   ]

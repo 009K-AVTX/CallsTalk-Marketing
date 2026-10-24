@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { LogoMark } from '../../../src/components/Logo.jsx';
+import { isAdmin } from '../../../src/lib/portal.js';
+import { Avatar } from '../avatar.jsx';
 import Icon from '../components/Icons.jsx';
 import { ErrorNote } from '../components/Shell.jsx';
 import { addDays, today } from '../format.js';
@@ -36,8 +38,6 @@ async function downloadTemplate() {
 
 function Gate({ onIn }) {
   const [key, setKey] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
   const [status, setStatus] = useState('idle');
   const [error, setError] = useState('');
 
@@ -46,7 +46,7 @@ function Gate({ onIn }) {
     setStatus('sending');
     setError('');
     try {
-      await staffSignIn({ key, email, password });
+      await staffSignIn({ key });
       onIn();
     } catch (err) {
       setError(err.message);
@@ -54,18 +54,22 @@ function Gate({ onIn }) {
     }
   };
 
+  // On our server the billing team uses their portal staff or admin login: password, then the authenticator code.
+  if (staffSignInKind === 'login') {
+    return (
+      <div className="access-card p-up__gate">
+        <h2>Billing Team Sign In</h2>
+        <p className="access-card__lead">This page is for CallsTalk staff and admins. Reports uploaded here appear in the customer's portal straight away.</p>
+        <a className="btn btn--light" href={`/login?next=${encodeURIComponent('/upload')}`}>Log In</a>
+      </div>
+    );
+  }
+
   return (
     <form className="access-card p-up__gate" onSubmit={submit}>
       <h2>Billing Team Sign In</h2>
       <p className="access-card__lead">This page is for the CallsTalk billing team. Reports uploaded here appear in the customer's portal straight away.</p>
-      {staffSignInKind === 'key' ? (
-        <label>Upload Key<input required type="password" value={key} onChange={(e) => setKey(e.target.value)} autoComplete="off" autoFocus />{localKeyHint && <small className="p-up__hint">Testing locally: the key is “{localKeyHint}”.</small>}</label>
-      ) : (
-        <>
-          <label>Staff Email<input required type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="username" autoFocus /></label>
-          <label>Password<input required type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" /></label>
-        </>
-      )}
+      <label>Upload Key<input required type="password" value={key} onChange={(e) => setKey(e.target.value)} autoComplete="off" autoFocus />{localKeyHint && <small className="p-up__hint">Testing locally: the key is “{localKeyHint}”.</small>}</label>
       {status === 'error' && <p className="access-card__error" role="alert">{error}</p>}
       <button type="submit" className="btn btn--light" disabled={status === 'sending'}>{status === 'sending' ? 'Checking…' : 'Sign In'}</button>
     </form>
@@ -101,7 +105,7 @@ function UploadForm({ customers, onDone }) {
         await uploadReport({ ...form, title: files.length === 1 ? form.title : '', file });
       }
       setStatus('done');
-      setMessage(`${files.length} report${files.length === 1 ? '' : 's'} uploaded for ${form.customer.trim().toLowerCase()}. They can see ${files.length === 1 ? 'it' : 'them'} in their portal now.`);
+      setMessage(`${files.length} report${files.length === 1 ? '' : 's'} uploaded for ${customers.find((c) => c.id === form.customer)?.login || form.customer.trim().toLowerCase()}. They can see ${files.length === 1 ? 'it' : 'them'} in their portal now.`);
       setFiles([]);
       setForm({ ...form, title: '', note: '' });
       if (input.current) input.current.value = '';
@@ -199,7 +203,10 @@ export default function Upload() {
       <header className="p-top">
         <div className="p-top__inner">
           <span className="p-brand"><LogoMark className="p-brand__mark" /><span>Calls<b>Talk</b></span><em>Report Upload</em></span>
-          <a href="/reports" className="btn btn--quiet btn--sm p-up__portal">Open Customer Portal</a>
+          {staffSignInKind === 'login'
+            ? (isAdmin() ? <a href="/admin" className="btn btn--quiet btn--sm p-up__portal">Back to Admin</a>
+              : signedIn && <a href="/settings" className="btn btn--quiet btn--sm p-up__portal"><Icon name="settings" />Settings</a>)
+            : <a href="/reports" className="btn btn--quiet btn--sm p-up__portal">Open Customer Portal</a>}
           {signedIn && <button type="button" className="btn btn--quiet btn--sm p-up__out" onClick={() => { staffSignOut(); setSignedIn(false); setReports(null); }}><Icon name="logout" />Sign Out</button>}
         </div>
       </header>
@@ -221,7 +228,12 @@ export default function Upload() {
                     <tbody>
                       {shown.map((r) => (
                         <tr key={r.id}>
-                          <th scope="row">{r.customer}</th>
+                          <th scope="row">
+                            <span className="p-person">
+                              <Avatar userId={r.user_id} version={customers.find((c) => c.id === r.user_id)?.avatar_version} name={r.customer} size="sm" />
+                              {r.customer}
+                            </span>
+                          </th>
                           <td>{r.title}<small className="p-up__file">{r.filename} · {fileSize(r.size)}</small></td>
                           <td>{period(r)}</td>
                           <td>{new Date(r.uploaded_at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}</td>

@@ -40,9 +40,18 @@ export default function Login() {
       }
       navigate(next(), { replace: true });
     } catch (err) {
+      // The password step lasts five minutes; after that, start again from the password.
+      if (mfa && /timed out/.test(err.message)) setMfa(null);
       setError(err.message);
       setStatus('error');
     }
+  };
+
+  const restart = () => {
+    setMfa(null);
+    setCode('');
+    setError('');
+    setStatus('idle');
   };
 
   return (
@@ -58,17 +67,17 @@ export default function Login() {
         <ul className="p-login__points">
           <li>Live balance and daily bills since September</li>
           <li>Billing reports from our team, in Excel</li>
-          <li>Pay online in a few clicks</li>
+          <li>Pay in USDT (TRC-20) to your own address</li>
         </ul>
       </div>
       <form className="access-card p-login__card" onSubmit={submit}>
         {previewMode && <p className="p-demo p-demo--login">Demo: enter any email and password to explore with sample data.</p>}
         <h2>{mfa ? 'Enter Your Code' : 'Log In'}</h2>
         <p className="access-card__lead">
-          {mfa ? 'Open your authenticator app and enter the 6-digit code.' : 'Use the login ID and password our team gave you.'}
+          {mfa ? 'Open your authenticator app and enter the 6-digit code it shows for CallsTalk.' : 'Use your login ID and the password you chose when you set up your login.'}
         </p>
         {mfa ? (
-          <label>Code<input required value={code} onChange={(e) => setCode(e.target.value)} inputMode="numeric" autoComplete="one-time-code" maxLength={8} autoFocus /></label>
+          <label>Code<input required value={code} onChange={(e) => setCode(e.target.value)} inputMode="numeric" autoComplete="one-time-code" maxLength={8} placeholder="123456" autoFocus /></label>
         ) : (
           <>
             <label>Login ID<input required type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="username" maxLength={120} autoFocus /></label>
@@ -79,7 +88,11 @@ export default function Login() {
         <button type="submit" className="btn btn--light" disabled={status === 'sending'}>
           {status === 'sending' ? 'Signing In…' : mfa ? 'Verify' : 'Log In'}
         </button>
-        <p className="portal-login__help">No login yet? <a href={`${SITE}/request-access`}>Request access</a>.</p>
+        {mfa ? (
+          <p className="portal-login__help">Lost your phone? Ask our team to reset your login. <button type="button" className="p-linkbtn" onClick={restart}>Use another login</button></p>
+        ) : (
+          <p className="portal-login__help">No login yet? <a href={`${SITE}/request-access`}>Request access</a>.</p>
+        )}
       </form>
     </main>
   );

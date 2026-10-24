@@ -7,18 +7,33 @@
 //
 // The backend posts each chat to the team's Telegram; their replies come back as `agent` messages.
 
-const BASE = (import.meta.env.VITE_SUPPORT_API_URL || '').replace(/\/$/, '');
-const STORAGE_KEY = 'callstalk.chats';
+let BASE = (import.meta.env.VITE_SUPPORT_API_URL || '').replace(/\/$/, '');
+let STORAGE_KEY = 'callstalk.chats';
 const LEGACY_KEY = 'callstalk.chat'; // one session, before visitors could keep several
+let authToken = () => '';
+let beforeStart = async () => {};
 
-export const liveChatEnabled = Boolean(BASE);
+export let liveChatEnabled = Boolean(BASE);
 // A visitor keeps at most this many chats; starting another drops the oldest.
 export const MAX_CHATS = 3;
 
+// The customer portal uses the same chat as a signed-in customer: its own API address, the login's token
+// (so the team sees who it is) and chats kept per login. `refresh` renews the login before a chat starts.
+export function configureSupportChat({ base, token, storageKey, refresh }) {
+  if (refresh) beforeStart = refresh;
+  if (base !== undefined) {
+    BASE = base.replace(/\/$/, '');
+    liveChatEnabled = Boolean(BASE);
+  }
+  if (token) authToken = token;
+  if (storageKey) STORAGE_KEY = storageKey;
+}
+
 async function request(path, options = {}) {
+  const token = authToken();
   const res = await fetch(`${BASE}/support/chat${path}`, {
     ...options,
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...(token && { Authorization: `Bearer ${token}` }) },
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.detail || `The chat service returned an error (HTTP ${res.status}).`);
@@ -28,6 +43,7 @@ async function request(path, options = {}) {
 // Name and email are optional; without them the team sees the chat as "Visitor".
 export async function startChat({ name, email, message }) {
   const body = { name, email, message };
+  await beforeStart();
   const data = await request('', { method: 'POST', body: JSON.stringify(body) });
   return data.session_id;
 }
@@ -57,6 +73,7 @@ export function loadChats() {
   try {
     const chats = JSON.parse(localStorage.getItem(STORAGE_KEY));
     if (Array.isArray(chats)) return chats;
+    if (STORAGE_KEY !== 'callstalk.chats') return []; // the old single-chat key is the website's only
     const legacy = JSON.parse(localStorage.getItem(LEGACY_KEY));
     localStorage.removeItem(LEGACY_KEY);
     return legacy?.sessionId ? [{ ...legacy, title: '', startedAt: Date.now() }] : [];

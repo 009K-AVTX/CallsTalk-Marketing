@@ -1,5 +1,7 @@
 # Customer billing: what the backend must provide
 
+> **Now served by our own server** (`server/src/accounts.js`, `server/src/portal.js`, data in PostgreSQL, entered by admins in the portal). Every login also has a 6-digit authenticator code, so `/accounts/login` always answers `mfa_required`. See [maintenance.md, section 16](maintenance.md#16-customer-portal-portalcallstalkcom).
+
 **From:** CallsTalk website (frontend, done) · **For:** backend developer
 
 Customers stop receiving their bill in Telegram. They log in to the **CallsTalk Portal** (callstalk-portal.vercel.app, later app.callstalk.io; the website's Log In links there) with the login ID and password we give them, and its **Billing** page shows their wallet balance, today's bill (live, refreshed every 30 s), the last three days' bills, a Billing History of the **last 5 days** (with a total) and their payments from those 5 days, and lets them pay online. Older bills reach customers as the Excel reports our team uploads.
@@ -52,7 +54,7 @@ Rules the page relies on:
 
 ## `POST /billing/statement/pay` (Bearer)
 
-Body `{ "amount": "250.00" }` → `{ "payment_url": "https://capitalist.net/merchant/pay?…" }`. The site redirects the customer there. When the provider confirms, the payment appears in `payments` as completed and the balance moves.
+Body `{ "amount": "250.00" }` → `{ "method": "usdt_trc20", "currency": "USDT", "network": "TRON (TRC-20)", "address": "T…", "amount": "250.00", "qr_svg": "<svg…" }`. The page shows the customer's own TRC-20 address and a QR code; the amount is a guide. Payments go through Well Wallet (server/src/payments.js): every customer has one deposit address, any USDT sent to it is credited 1:1 in USD, shown as `pending` while in progress and `completed` once confirmed. The portal never names the provider. 503 while `WELLWALLET_API_TOKEN` is not set.
 
 ## Trying the page without the backend
 

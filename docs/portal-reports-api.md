@@ -1,5 +1,7 @@
 # CallsTalk Portal: what Avortyx must provide
 
+> **Now served by our own server** (`server/src/accounts.js`, `server/src/portal.js`, data in PostgreSQL, entered by admins in the portal). Every login also has a 6-digit authenticator code, so `/accounts/login` always answers `mfa_required`. See [maintenance.md, section 16](maintenance.md#16-customer-portal-portalcallstalkcom).
+
 **From:** CallsTalk Portal (frontend, done, in `portal/`) · **For:** Avortyx backend developer · **Switch-over:** next week
 
 The portal is a **billing portal**. Customers see their balance and daily bills, pay online, and open the **billing reports** our team uploads as Excel files. They never see caller numbers or call lists.

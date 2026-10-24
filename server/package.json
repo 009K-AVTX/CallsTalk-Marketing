@@ -3,17 +3,19 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "Website chat backend: forwards visitor chats to Telegram and relays the team's replies back.",
+  "description": "CallsTalk server: website chat (Telegram and email relay) and the customer portal API.",
   "engines": {
     "node": ">=22.13"
   },
   "scripts": {
     "start": "node --env-file-if-exists=.env src/index.js",
-    "dev": "node --watch --env-file-if-exists=.env src/index.js"
+    "dev": "node --watch --env-file-if-exists=.env src/index.js",
+    "portal:admin": "node --env-file-if-exists=.env scripts/portal-admin.js"
   },
   "dependencies": {
     "express": "^5.1.0",
     "nodemailer": "^10.2.1",
-    "pg": "^8.23.1"
+    "pg": "^8.23.1",
+    "qrcode": "^1.5.4"
   }
 }

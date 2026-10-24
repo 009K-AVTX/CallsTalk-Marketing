@@ -55,15 +55,17 @@ export function Wallet({ data, onPaid }) {
   const owes = Number(data.balance) < 0;
   const valid = Number(amount) >= 1;
 
+  const [details, setDetails] = useState(null); // where to send it, once Pay is pressed
+
   const pay = async (e) => {
     e.preventDefault();
     if (!valid) return;
     setStatus('sending');
     setError('');
     try {
-      const { payment_url: url } = await startPayment(Number(amount).toFixed(2));
-      if (url) window.location.assign(url);
-      else onPaid();
+      setDetails(await startPayment(Number(amount).toFixed(2)));
+      setStatus('idle');
+      onPaid(); // keep the statement fresh; it also refreshes every 30 seconds
     } catch (err) {
       setError(err.message);
       setStatus('error');
@@ -87,6 +89,7 @@ export function Wallet({ data, onPaid }) {
         <div><dt>Days Counted In</dt><dd>{data.timezone.replace(/_/g, ' ')}</dd></div>
       </dl>
 
+      {details ? <PayDetails details={details} currency={data.currency} onBack={() => setDetails(null)} /> : (
       <form className="wallet__pay" onSubmit={pay}>
         <label htmlFor="pay-amount">Pay for Your Calls</label>
         <div className="wallet__amount">
@@ -99,14 +102,51 @@ export function Wallet({ data, onPaid }) {
             <button key={p} type="button" className={Number(amount) === p ? 'is-on' : ''} onClick={() => setAmount(String(p))}>${p.toLocaleString('en-US')}</button>
           ))}
         </div>
-        <p className="wallet__method"><span aria-hidden="true">₮</span>Capitalist · USDT (TRC-20) and wallets</p>
+        <p className="wallet__method"><span aria-hidden="true">₮</span>USDT on the TRON network (TRC-20)</p>
         {status === 'error' && <p className="access-card__error" role="alert">{error}</p>}
         <button type="submit" className="btn btn--light" disabled={!valid || status === 'sending'}>
-          {status === 'sending' ? 'Opening Checkout…' : valid ? `Pay ${money(amount, data.currency)}` : 'Pay Now'}
+          {status === 'sending' ? 'Getting Your Address…' : valid ? `Pay ${money(amount, data.currency)}` : 'Pay Now'}
         </button>
-        <p className="wallet__secure">You finish the payment on the secure Capitalist page. It shows here as soon as it clears.</p>
+        <p className="wallet__secure">You send USDT from your own wallet. It shows here once it is confirmed on the blockchain.</p>
       </form>
+      )}
     </section>
+  );
+}
+
+// Where to send the payment: the customer's own TRC-20 address, as text and a QR code.
+function PayDetails({ details, currency, onBack }) {
+  const [copied, setCopied] = useState('');
+  const copy = async (what, text) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(what);
+      setTimeout(() => setCopied(''), 2000);
+    } catch { /* clipboard blocked: both are on screen to type */ }
+  };
+  const usdt = Number(details.amount).toFixed(2);
+
+  return (
+    <div className="wallet__pay wallet__send" role="region" aria-label="Payment details">
+      <p className="wallet__send-title">Send <b>{usdt} USDT</b> <span>({money(details.amount, currency)})</span></p>
+      <div className="wallet__send-body">
+        <img src={`data:image/svg+xml;charset=utf-8,${encodeURIComponent(details.qr_svg)}`} alt="QR code of your payment address" width="132" height="132" />
+        <div>
+          <p className="wallet__send-label">Your payment address · {details.network}</p>
+          <button type="button" className="wallet__address" onClick={() => copy('address', details.address)}>
+            <code>{details.address}</code>
+            <span>{copied === 'address' ? 'Copied' : 'Copy'}</span>
+          </button>
+          <button type="button" className="wallet__copy-amount" onClick={() => copy('amount', usdt)}>{copied === 'amount' ? 'Amount copied' : 'Copy amount'}</button>
+        </div>
+      </div>
+      <ul className="wallet__send-rules">
+        <li>Send <b>USDT</b> on the <b>TRON (TRC-20)</b> network only. Other coins or networks cannot be recovered.</li>
+        <li>This address is yours alone and stays the same, so you can use it for every payment.</li>
+        <li>Your payment shows under Payments once it is confirmed, usually within a few minutes.</li>
+      </ul>
+      <button type="button" className="btn btn--quiet btn--sm" onClick={onBack}>Change Amount</button>
+    </div>
   );
 }
 
@@ -240,7 +280,7 @@ export function BillingSections({ data, onPaid }) {
           <ul>
             {data.payments.map((p) => (
               <li key={p.id}>
-                <span>{dayLabel(p.date.slice(0, 10))}<small>{p.note || (p.provider === 'capitalist' ? 'Paid online' : 'Recorded by our team')}</small></span>
+                <span>{dayLabel(p.date.slice(0, 10))}<small>{p.note || (p.provider === 'manual' ? 'Recorded by our team' : 'USDT (TRC-20)')}</small></span>
                 <span className={`billing__status is-${p.status}`}>{p.status}</span>
                 <b className={p.status === 'completed' ? 'is-pos' : ''}>{money(p.amount, p.currency)}</b>
               </li>

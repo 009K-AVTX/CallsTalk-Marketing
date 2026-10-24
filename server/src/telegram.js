@@ -15,7 +15,7 @@ import {
   addMessage, findSessionByShortId, findSessionByTelegramMessage, findSessionByThread,
   getSession, getValue, linkTelegramMessage, setStatus, setValue,
 } from './db.js';
-import { accessDetails, clip, escapeHtml, shortId, TEAM_ENDED_MESSAGE, transcriptLines, visitorDetails } from './format.js';
+import { accessDetails, chatKind, clip, escapeHtml, shortId, TEAM_ENDED_MESSAGE, transcriptLines, visitorDetails } from './format.js';
 
 const { token, chatId, threadId: sharedThreadId, topicPerChat } = config.telegram;
 const MAX_TEXT = 4096;
@@ -78,7 +78,8 @@ export async function notifyNewChat(chat) {
     history = `\n\n<b>Earlier, with the AI assistant</b>\n<blockquote expandable>${escape(clip(transcriptLines(transcript).join('\n\n'), 1800))}</blockquote>`;
   }
 
-  const text = `<b>New website chat</b> ${tag({ id })}\n\n`
+  const text = `<b>New ${chatKind(chat)} chat</b> ${tag({ id })}\n\n`
+    + (config.isDev ? '<b>Local test</b>\n\n' : '')
     + visitorDetails(chat).map(([label, value]) => `<b>${label}:</b> ${escape(value)}`).join('\n')
     + `\n\n<b>Message</b>\n<blockquote>${escape(message)}</blockquote>`
     + history;

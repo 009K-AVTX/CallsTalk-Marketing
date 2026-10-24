@@ -25,7 +25,7 @@ export default function Nav() {
             <a className="nav__tg" href={`https://t.me/${TELEGRAM_HANDLE}`} target="_blank" rel="noopener noreferrer" aria-label="CallsTalk on Telegram">
               <TelegramIcon />
             </a>
-            {/* Customers log in to the portal, the same login as app.callstalk.io. */}
+            {/* Customers log in to the portal at portal.callstalk.com (PORTAL_URL in legal.js). */}
             <a href={PORTAL_LOGIN}>Log In</a>
             <a href="/request-access">Request Access</a>
             <ChatButton className="btn btn--light btn--sm" />

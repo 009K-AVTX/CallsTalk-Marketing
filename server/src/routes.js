@@ -15,10 +15,12 @@ import { emailNewChat, emailVisitorMessage } from './email.js';
 import { rateLimit } from './rate-limit.js';
 import { ANONYMOUS_NAME } from './format.js';
 import { config } from './config.js';
+import { findSessionUser } from './portal-db.js';
+import { hashToken } from './auth-crypto.js';
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
-class HttpError extends Error {
+export class HttpError extends Error {
   constructor(status, detail) {
     super(detail);
     this.status = status;
@@ -48,11 +50,20 @@ function teamUnreachable(err) {
 
 export const router = Router();
 
+// A customer signed in to the portal (its Bearer token), or null for a website visitor.
+async function portalCustomer(req) {
+  const token = /^Bearer (.+)$/.exec(req.get('authorization') || '')?.[1];
+  const user = token && await findSessionUser(hashToken(token));
+  return user?.role === 'customer' ? user : null;
+}
+
 router.post('/chat', rateLimit({ windowMs: 10 * 60_000, max: 5 }), async (req, res) => {
   const body = req.body || {};
+  // Signed-in portal customers are known: their login's details are used, not what the page sends.
+  const customer = await portalCustomer(req);
   // Name and email are optional: a visitor can just type a question into the chat.
-  const givenName = text(body.name, 'name', { max: 100, required: false });
-  const email = text(body.email, 'email', { max: 200, required: false });
+  const givenName = customer ? customer.name || customer.company : text(body.name, 'name', { max: 100, required: false });
+  const email = customer ? customer.email : text(body.email, 'email', { max: 200, required: false });
   if (email && !EMAIL.test(email)) throw new HttpError(400, 'Please enter a valid email address.');
   const name = givenName || ANONYMOUS_NAME;
   const message = text(body.message, 'message', { max: 2000 });
@@ -62,7 +73,10 @@ router.post('/chat', rateLimit({ windowMs: 10 * 60_000, max: 5 }), async (req, r
     .map((m) => ({ from: m.from === 'visitor' ? 'visitor' : 'assistant', text: m.text.trim().slice(0, 2000) }));
 
   const id = randomUUID();
-  const chat = { id, name, email, message, transcript, anonymous: !givenName };
+  const chat = {
+    id, name, email, message, transcript, anonymous: !givenName,
+    ...(customer && { portal: true, portalUserId: customer.id, company: customer.company }),
+  };
   let posted;
   try {
     posted = await notifyNewChat(chat);
@@ -70,7 +84,9 @@ router.post('/chat', rateLimit({ windowMs: 10 * 60_000, max: 5 }), async (req, r
     throw teamUnreachable(err);
   }
 
-  const messageId = await createSession({ id, name, email, threadId: posted.threadId, message });
+  const messageId = await createSession({
+    id, name, email, threadId: posted.threadId, message, portalUserId: customer?.id ?? null, company: customer?.company ?? '',
+  });
   await linkTelegramMessage(config.telegram.chatId, posted.messageId, id);
   emailNewChat(chat, messageId).catch(emailFailed);
   res.status(201).json({ session_id: id, message: 'Thanks. Our team has your message and will reply here shortly.' });

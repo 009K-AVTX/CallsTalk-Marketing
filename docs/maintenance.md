@@ -192,6 +192,7 @@ git log --oneline -1                       # note the current commit, in case yo
 git pull
 npm ci                                     # site dependencies
 npm run build                              # rebuilds dist/
+VITE_PORTAL_API_URL=/api VITE_SITE_URL=https://callstalk.com npm run portal:build   # rebuilds portal/dist (portal.callstalk.com)
 cd server && npm ci --omit=dev             # server dependencies
 pm2 restart callstalk-chat
 ```
@@ -373,6 +374,7 @@ Autovacuum is on by default, and the chat tables need no manual vacuuming.
 | A | `@` | `168.231.112.65` | The site |
 | CNAME | `www` | `callstalk.com` | www follows the site |
 | CNAME | `chat` | `callstalk.com` | Old email links (`chat.callstalk.com/reply/...`) |
+| A | `portal` | `168.231.112.65` | Customer portal (logins, billing, admin) |
 | MX | `@` | `mx1.hostinger.com` (5), `mx2.hostinger.com` (10) | Incoming mail |
 | TXT | `@` | `v=spf1 include:_spf.mail.hostinger.com ~all` | Allows Hostinger to send as callstalk.com |
 | CNAME | `hostingermail-a/b/c._domainkey` | `hostingermail-a/b/c.dkim.mail.hostinger.com` | DKIM email signing |
@@ -631,3 +633,81 @@ server {
     }
 }
 ```
+
+---
+
+## 16. Customer portal (portal.callstalk.com)
+
+Customers log in at **https://portal.callstalk.com** (the website's Log In goes there). Every login has a password
+**and** a 6-digit code from an authenticator app. Admins log in at the same address and get the admin pages.
+
+| Item | Value |
+|---|---|
+| Built portal | `/var/www/Callstalk/portal/dist` (served by nginx) |
+| API | The same Node process, `/api/accounts`, `/api/admin`, `/api/billing`, `/api/portal`, `/api/staff` |
+| nginx site | `/etc/nginx/sites-available/portal.callstalk.com` (from `server/deploy/nginx-portal.conf`) |
+| Data | Tables `portal_*` and `billing_*` in the `callstalk_chat` database, created on startup |
+
+### 16.1 First-time setup
+
+1. DNS: add the `A portal 168.231.112.65` record from [section 8](#8-dns-hpanel--domains--callstalkcom--dns--nameservers).
+2. Deploy the code as in [6.1](#61-normal-update) (it also builds `portal/dist` and installs the new server package).
+3. nginx and HTTPS (**shared**: `nginx -t` before reloading):
+
+   ```bash
+   cp /var/www/Callstalk/server/deploy/nginx-portal.conf /etc/nginx/sites-available/portal.callstalk.com
+   ln -s /etc/nginx/sites-available/portal.callstalk.com /etc/nginx/sites-enabled/
+   nginx -t && systemctl reload nginx
+   certbot --nginx -d portal.callstalk.com
+   ```
+
+4. The first admin (prints a one-use setup link and emails it):
+
+   ```bash
+   cd /var/www/Callstalk/server && npm run portal:admin -- you@callstalk.com "Your Name"
+   ```
+
+   Open the link, scan the QR code with an authenticator app, choose a password and enter the code. Every
+   other login is then made in the portal under **Logins**.
+
+### 16.2 Day to day (in the portal, as an admin)
+
+- **New login:** Logins → New Login. Customers also get their price per call, opening balance and start date.
+  The setup link is emailed to them (it works once, for 7 days); the page also shows it to copy.
+- **Roles:** **Customer** sees their own billing and reports. **Staff** can only upload and remove customer reports
+  (they land on `/upload`; no billing, payments or logins). **Admin** can do everything.
+- **Billing:** open a customer → enter each day's **billable calls** and **payments** received. Customers see
+  their balance and the last five days; older days go to them as Excel reports (Reports → upload).
+- **Lost phone or forgotten password:** open the login → **Reset Login and Send Link**. Their old password and
+  code app stop working at once.
+- **Someone leaves:** **Turn Login Off** signs them out everywhere and blocks logging in.
+
+### 16.3 Customer payments (USDT, TRC-20)
+
+Customers pay in **USDT on the TRON network (TRC-20)** through Well Wallet. The portal never names the provider.
+
+- Pressing **Pay** gives the customer their own TRC-20 address (made once in Well Wallet, then kept). Anything they
+  send to it is theirs: it shows as **pending** while in progress and counts towards the balance once **completed**
+  (1 USDT = $1).
+- The server reads deposits from the Well Wallet API every 2 minutes, and straight away when Well Wallet's webhook
+  arrives. The webhook body is never trusted, only used as a cue to check.
+- Admins can still record other payments by hand (bank transfer and so on).
+
+Setting it up, once:
+
+1. In the Well Wallet bot: Settings → Settings → API → API Keys Management → create a key, and switch on the
+   **Wallets** and **Transactions** APIs for it. Turn on 2FA and the backup email (Settings → Security), as they ask.
+2. Send Well Wallet support (https://t.me/WellWallet_Support) the VPS IP `168.231.112.65` for their whitelist.
+   It takes up to 2 business days.
+3. In `/var/www/Callstalk/server/.env` set `WELLWALLET_API_TOKEN` and a long random `WELLWALLET_WEBHOOK_KEY`
+   (`openssl rand -hex 24`), then `pm2 restart callstalk-chat`. The log shows no "[payments] ... is not set" line.
+4. In the bot: Settings → Settings → API → Webhooks Management → create one with the URL
+   `https://portal.callstalk.com/api/payments/webhook?key=<WELLWALLET_WEBHOOK_KEY>`.
+
+Check: `pm2 logs callstalk-chat --lines 50 --nostream | grep payments` shows each address made and each deposit.
+Without the token, Pay tells customers to contact us and admins record payments by hand.
+
+### 16.4 If an admin is locked out
+
+With no other admin to reset them, run `npm run portal:admin -- their@email.com` in `server/`. It resets that
+login and prints a new setup link.

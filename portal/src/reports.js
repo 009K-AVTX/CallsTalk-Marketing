@@ -1,10 +1,11 @@
 // Billing reports: Excel files the billing team uploads for a customer, shown in that customer's portal.
 //
 // Three backends behind one set of functions:
-//   VITE_PORTAL_API_URL set  -> the platform API (Avortyx), per docs/portal-reports-api.md
+//   VITE_PORTAL_API_URL set  -> our server (server/src/portal.js), per docs/portal-reports-api.md;
+//                               the billing team signs in with a staff or admin login
 //   demo deployment          -> /api/reports, this project's own Vercel Blob store
 //   local development        -> the browser's storage, so upload and view can be tried on one machine
-import { DEMO, loadSession } from '../../src/lib/portal.js';
+import { authed, canUploadReports, DEMO, loadSession, signOut } from '../../src/lib/portal.js';
 
 const BASE = (import.meta.env.VITE_PORTAL_API_URL || import.meta.env.VITE_SUPPORT_API_URL || '').replace(/\/$/, '');
 const MODE = BASE && !DEMO ? 'api' : import.meta.env.DEV ? 'local' : 'demo';
@@ -43,24 +44,23 @@ const toBase64 = (file) => new Promise((resolve, reject) => {
 const read = (store, k) => { try { return JSON.parse(store.getItem(k)); } catch { return null; } };
 const write = (store, k, v) => { try { if (v == null) store.removeItem(k); else store.setItem(k, JSON.stringify(v)); } catch { /* storage unavailable */ } };
 
-export const staffSession = () => (MODE === 'api' ? read(localStorage, STAFF_STORE) : read(sessionStorage, KEY_STORE));
+// API: the portal's own staff or admin login (password and code, on /login). Demo and local: the upload key.
+export const staffSession = () => (MODE === 'api' ? (canUploadReports() ? loadSession() : null) : read(sessionStorage, KEY_STORE));
 
-// Demo and local: the shared upload key. API: a staff login (kept apart from any customer login).
-export async function staffSignIn({ key, email, password }) {
-  if (MODE === 'api') {
-    const data = await send(`${BASE}/accounts/login`, { method: 'POST', body: { email: email.trim(), password } });
-    if (data.mfa_required) throw new Error('Two-step sign-in is not supported on the upload page yet.');
-    write(localStorage, STAFF_STORE, { access: data.access, email: data.email || email.trim() });
-    return;
-  }
+export async function staffSignIn({ key }) {
+  if (MODE === 'api') throw new Error('Log in to the portal with a staff or admin login to upload reports.');
   write(sessionStorage, KEY_STORE, { key: key.trim() });
   await listAll(); // checks the key
 }
 
 export function staffSignOut() {
+  if (MODE === 'api' && canUploadReports()) signOut();
   write(localStorage, STAFF_STORE, null);
   write(sessionStorage, KEY_STORE, null);
 }
+
+// API calls carry the signed-in login and renew it when needed (src/lib/portal.js).
+const api = (path, method = 'GET', body) => authed(path, { method, body });
 
 function staffHeaders() {
   const s = staffSession();
@@ -78,14 +78,14 @@ const LOCAL_KEY = 'local-upload-key';
 // The signed-in customer's reports, newest first.
 export async function listMine() {
   const session = loadSession();
-  if (MODE === 'api') return (await send(`${BASE}/portal/reports`, { headers: { Authorization: `Bearer ${session?.access}` } })).results;
+  if (MODE === 'api') return (await api('/portal/reports')).results;
   const me = (session?.email || '').toLowerCase();
   if (MODE === 'local') return localAll().filter((r) => r.customer === me);
   return (await send(`/api/reports?customer=${encodeURIComponent(me)}`)).results;
 }
 
 export async function listAll() {
-  if (MODE === 'api') return (await send(`${BASE}/staff/reports`, { headers: staffHeaders() })).results;
+  if (MODE === 'api') return (await api('/staff/reports')).results;
   if (MODE === 'local') {
     if (staffSession()?.key !== LOCAL_KEY) {
       write(sessionStorage, KEY_STORE, null);
@@ -103,7 +103,7 @@ export async function listAll() {
 
 // Customers the billing team can upload for. Demo and local: anyone who already has a report.
 export async function listCustomers() {
-  if (MODE === 'api') return (await send(`${BASE}/staff/customers`, { headers: staffHeaders() })).results;
+  if (MODE === 'api') return (await api('/staff/customers')).results;
   return [...new Set((await listAll()).map((r) => r.customer))].map((c) => ({ id: c, name: c, login: c }));
 }
 
@@ -111,7 +111,7 @@ export async function uploadReport({ customer, title, note, periodFrom, periodTo
   if (file.size > MAX_MB * 1024 * 1024) throw new Error(`Files up to ${MAX_MB} MB can be uploaded.`);
   const content = await toBase64(file);
   const body = { customer, title, note, period_from: periodFrom, period_to: periodTo, filename: file.name, content_base64: content };
-  if (MODE === 'api') return send(`${BASE}/staff/reports`, { method: 'POST', headers: staffHeaders(), body });
+  if (MODE === 'api') return api('/staff/reports', 'POST', body);
   if (MODE === 'demo') return send('/api/reports', { method: 'POST', headers: staffHeaders(), body });
   await listAll();
   const report = {
@@ -128,16 +128,25 @@ export async function uploadReport({ customer, title, note, periodFrom, periodTo
 }
 
 export async function deleteReport(id) {
-  if (MODE === 'api') return send(`${BASE}/staff/reports/${encodeURIComponent(id)}`, { method: 'DELETE', headers: staffHeaders() });
+  if (MODE === 'api') return api(`/staff/reports/${encodeURIComponent(id)}`, 'DELETE');
   if (MODE === 'demo') return send(`/api/reports?id=${encodeURIComponent(id)}`, { method: 'DELETE', headers: staffHeaders() });
   write(localStorage, LOCAL_STORE, localAll().filter((r) => r.id !== id));
   return { ok: true };
 }
 
-// The file itself. API downloads need the customer's token; the others are plain URLs.
+// The file itself. API downloads need the signed-in login's token; the others are plain URLs.
 export async function fetchFile(report) {
-  const headers = MODE === 'api' ? { Authorization: `Bearer ${loadSession()?.access || staffSession()?.access}` } : {};
-  const res = await fetch(MODE === 'api' ? `${BASE}/portal/reports/${encodeURIComponent(report.id)}/file` : report.url, { headers });
+  if (MODE !== 'api') {
+    const res = await fetch(report.url);
+    if (!res.ok) throw new Error('The report file could not be opened.');
+    return res.arrayBuffer();
+  }
+  const get = () => fetch(`${BASE}/portal/reports/${encodeURIComponent(report.id)}/file`, { headers: { Authorization: `Bearer ${loadSession()?.access}` } });
+  let res = await get();
+  if (res.status === 401) {
+    await authed('/accounts/me'); // renews an expired access token, then try again
+    res = await get();
+  }
   if (!res.ok) throw new Error('The report file could not be opened.');
   return res.arrayBuffer();
 }

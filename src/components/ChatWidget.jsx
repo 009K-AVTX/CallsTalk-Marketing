@@ -47,7 +47,9 @@ function HandoffForm({ initialMessage, onStart, onCancel }) {
   );
 }
 
-export default function ChatWidget() {
+// `customer` ({ name, email, company }): a signed-in portal customer. The team already knows who they are,
+// so there is no details form, and replies also go to their email. `greeting` and `prompts` change the opening.
+export default function ChatWidget({ customer = null, greeting = GREETING, prompts = suggestions }) {
   const [open, setOpen] = useState(false);
   // Up to MAX_CHATS chats, oldest first. `activeId` null means the "new chat" screen.
   const [chats, setChats] = useState([]);
@@ -132,14 +134,14 @@ export default function ChatWidget() {
   useEffect(() => {
     const openChat = (e) => {
       setOpen(true);
-      if (e.detail?.team && liveChatEnabled) {
+      if (e.detail?.team && liveChatEnabled && !customer) {
         setActiveId(null);
         setHandoff(true);
       }
     };
     window.addEventListener('callstalk:open-chat', openChat);
     return () => window.removeEventListener('callstalk:open-chat', openChat);
-  }, []);
+  }, [customer]);
 
   useEffect(() => {
     if (open && activeId) setUnread((u) => ({ ...u, [activeId]: false }));
@@ -162,8 +164,8 @@ export default function ChatWidget() {
     setSidebarOpen(false);
   };
 
-  // Name and email are optional (empty when the visitor just types a question).
-  const start = async ({ name = '', email = '', message }) => {
+  // Name and email are optional (empty when the visitor just types a question). A customer's come from their login.
+  const start = async ({ name = customer?.name || '', email = customer?.email || '', message }) => {
     const sessionId = await startChat({ name, email, message });
     const chat = { sessionId, name, email, title: message.slice(0, 60), startedAt: Date.now() };
     let next = [...chatsRef.current, chat];
@@ -258,7 +260,7 @@ export default function ChatWidget() {
             <LogoMark />
             <div>
               <b>CallsTalk Support</b>
-              <small>{active?.ended ? 'This chat has ended' : active?.email ? 'Replies here and by email' : 'Replies right here'}</small>
+              <small>{active?.ended ? 'This chat has ended' : active?.email || customer ? 'Replies here and by email' : 'Replies right here'}</small>
             </div>
             <button className="chat__close" aria-label="Close Chat" onClick={() => setOpen(false)} />
           </header>
@@ -293,12 +295,12 @@ export default function ChatWidget() {
                     {active.ended && <p className="chat__note">This chat has ended. Start a new chat any time.</p>}
                   </>
                 ) : (
-                  <p className="bubble bubble--assistant">{GREETING}</p>
+                  <p className="bubble bubble--assistant">{greeting}</p>
                 )}
                 {pending && <p className="bubble bubble--visitor is-pending">{pending}</p>}
                 {showSuggestions && (
                   <div className="chat__suggestions">
-                    {suggestions.map((s) => <button key={s} onClick={() => !busy && submit(s)}>{s}</button>)}
+                    {prompts.map((s) => <button key={s} onClick={() => !busy && submit(s)}>{s}</button>)}
                   </div>
                 )}
                 {confirm && (
@@ -338,7 +340,7 @@ export default function ChatWidget() {
 
               <footer className="chat__foot">
                 {active && <button className="chat__text-btn" onClick={() => selectChat(null)}>Start a New Chat</button>}
-                {!active && !handoff && liveChatEnabled && (
+                {!active && !handoff && liveChatEnabled && !customer && (
                   <button className="chat__text-btn" onClick={() => setHandoff(true)}>Talk to Our Team</button>
                 )}
               </footer>

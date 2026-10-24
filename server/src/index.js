@@ -14,11 +14,17 @@ import { verifyEmail } from './email.js';
 import { startBot } from './telegram.js';
 import { startExpiry } from './expire.js';
 import { initDb } from './db.js';
+import { initPortalDb } from './portal-db.js';
+import { accountsRouter, startSessionCleanup } from './accounts.js';
+import { adminRouter } from './admin.js';
+import { portalRouter } from './portal.js';
+import { paymentsRouter, startPaymentSync } from './payments.js';
 
 assertConfig();
 
 try {
   await initDb();
+  await initPortalDb();
   await initReplyLinks();
 } catch (err) {
   const { host, port, database, user } = config.db;
@@ -36,19 +42,27 @@ app.use((req, res, next) => {
   if (origin && config.corsOrigins.includes(origin)) {
     res.setHeader('Access-Control-Allow-Origin', origin);
     res.setHeader('Vary', 'Origin');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
     res.setHeader('Access-Control-Max-Age', '86400');
   }
   if (req.method === 'OPTIONS') return res.sendStatus(204);
   next();
 });
 
+// Report uploads carry an Excel file (up to 3 MB, base64) and profile photos a small image; everything else stays small.
+app.use('/api/staff/reports', express.json({ limit: '5mb' }));
+app.use('/api/accounts/avatar', express.json({ limit: '1mb' }));
 app.use(express.json({ limit: '64kb' }));
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 app.use('/api/support', router);
 app.use('/api/request-access', accessRouter);
 app.use('/reply', replyRouter);
+// Customer portal (portal.callstalk.com): logins, admin, billing and reports.
+app.use('/api/accounts', accountsRouter);
+app.use('/api/admin', adminRouter);
+app.use('/api/payments', paymentsRouter);
+app.use('/api', portalRouter);
 
 if (config.serveSite) {
   // Same handler Vercel runs, so the AI assistant behaves identically here.
@@ -79,6 +93,9 @@ app.listen(config.port, config.host, () => {
   if (!config.corsOrigins.length && !config.serveSite) console.warn('[server] CORS_ALLOWED_ORIGINS is empty, so browsers on other domains cannot reach the chat API.');
 });
 
-startBot();
+if (config.telegram.polling) startBot();
+else console.log('[telegram] TELEGRAM_POLLING=false: not listening for replies');
 verifyEmail();
 startExpiry();
+startSessionCleanup();
+startPaymentSync();

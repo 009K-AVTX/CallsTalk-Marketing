@@ -8,6 +8,7 @@
     "build": "vite build && vite build --ssr src/entry-server.jsx --outDir dist-ssr && node scripts/prerender.js",
     "preview": "vite preview",
     "portal": "vite --config portal/vite.config.js",
+    "portal:live": "vite --config portal/vite.config.js --mode live",
     "portal:build": "vite build --config portal/vite.config.js",
     "portal:preview": "vite preview --config portal/vite.config.js"
   },
