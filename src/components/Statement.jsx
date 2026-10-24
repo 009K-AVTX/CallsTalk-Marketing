@@ -3,10 +3,10 @@ import ReturnPath, { CHANNEL_COLORS } from './ReturnPath.jsx';
 // Product facts drawn from the rest of the page.
 // The number stays big; the unit sits beside it, smaller, so each figure keeps to one line.
 const facts = [
-  { value: '3', unit: 'Channels', label: 'Calls, forms and chats, tracked side by side' },
-  { value: '1', unit: 'Journey', label: 'Every lead followed from first click to closed deal' },
-  { value: '1', unit: 'Line of Code', label: 'All it takes to start tracking your website' },
-  { value: '24/7', unit: 'Coverage', label: 'Every call captured and traced, day or night' },
+  { value: '3', unit: 'Channels', label: 'Calls, Forms and Chats, Tracked Side by Side' },
+  { value: '1', unit: 'Journey', label: 'Every Lead Followed from First Click to Closed Deal' },
+  { value: '1', unit: 'Line of Code', label: 'All It Takes to Start Tracking Your Website' },
+  { value: '24/7', unit: 'Coverage', label: 'Every Call Captured and Traced, Day or Night' },
 ];
 
 const channels = [
