@@ -5,15 +5,23 @@
 //   POST /accounts/refresh          refresh             -> { access }
 //   GET  /billing/statement?from=  YYYY-MM-DD          -> balance and every day's bill since that date
 //   POST /billing/statement/pay     amount              -> { payment_url } (Capitalist checkout)
+//   GET  /portal/summary            from, to, group     -> totals, series, states, heatmap, call lengths
+//   GET  /portal/calls              from, to, status, q, page, page_size -> { count, results }
+//   GET  /accounts/me                                   -> profile
+//   POST /accounts/change-password  current_password, new_password
 //
 // Customers get their login from us; there is no sign-up.
+
+import { previewCalls, previewProfile, previewStatement, previewSummary } from './preview.js';
 
 const BASE = (import.meta.env.VITE_PORTAL_API_URL || import.meta.env.VITE_SUPPORT_API_URL || '').replace(/\/$/, '');
 const STORAGE_KEY = 'callstalk.session';
 
-// Local development without an API: sign in with any login and see sample figures.
-// Never on in a production build.
-const PREVIEW = !BASE && import.meta.env.DEV;
+// Sample figures instead of the API: in local development without an API, or in a build made with
+// VITE_PORTAL_DEMO=true (the portal's shareable demo). Any login works. Off in every other build.
+export const DEMO = import.meta.env.VITE_PORTAL_DEMO === 'true';
+const PREVIEW = DEMO || (!BASE && import.meta.env.DEV);
+export const previewMode = PREVIEW;
 
 export const portalEnabled = Boolean(BASE) || PREVIEW;
 
@@ -51,7 +59,7 @@ async function call(path, { method = 'GET', body, token } = {}) {
   }
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
-    const err = new Error(data.detail || `The server returned an error (HTTP ${res.status}).`);
+    const err = new Error(data.detail || data.message || `The server returned an error (HTTP ${res.status}).`);
     err.status = res.status;
     throw err;
   }
@@ -106,35 +114,35 @@ async function authed(path, options) {
 // Bills are shown from the start of September 2026: every day since, newest first.
 export const BILLING_FROM = '2026-09-01';
 
-export const fetchStatement = () => (PREVIEW ? previewStatement() : authed(`/billing/statement?from=${BILLING_FROM}`));
+const qs = (params) => new URLSearchParams(Object.entries(params).filter(([, v]) => v !== '' && v != null)).toString();
+
+export const fetchStatement = () => (PREVIEW
+  ? previewGuard(() => previewStatement(BILLING_FROM))
+  : authed(`/billing/statement?from=${BILLING_FROM}`));
 
 export const startPayment = (amount) => (PREVIEW
   ? Promise.reject(new Error(`Preview mode: a real login would now open the checkout for $${amount}.`))
   : authed('/billing/statement/pay', { method: 'POST', body: { amount: String(amount) } }));
 
-// Illustrative figures from 1 September: a steady flow of calls at $35, paid off now and then.
-function previewStatement() {
+// Totals, a time series, states, a weekday x hour grid and call lengths for a date range.
+export const fetchSummary = ({ from, to, group = 'day' }) => (PREVIEW
+  ? previewGuard(() => previewSummary(BILLING_FROM, { from, to, group }))
+  : authed(`/portal/summary?${qs({ from, to, group })}`));
+
+// One page of the customer's calls, newest first.
+export const fetchCalls = ({ from, to, status = '', q = '', page = 1, pageSize = 25 }) => (PREVIEW
+  ? previewGuard(() => previewCalls(BILLING_FROM, { from, to, status, q, page, pageSize }))
+  : authed(`/portal/calls?${qs({ from, to, status, q, page, page_size: pageSize })}`));
+
+export const fetchProfile = () => (PREVIEW
+  ? previewGuard(() => previewProfile(loadSession()?.email))
+  : authed('/accounts/me'));
+
+export const changePassword = (current, next) => (PREVIEW
+  ? Promise.reject(new Error('Preview mode: passwords cannot be changed here.'))
+  : authed('/accounts/change-password', { method: 'POST', body: { current_password: current, new_password: next } }));
+
+function previewGuard(make) {
   if (!loadSession()?.access) return Promise.reject(new SignedOut());
-  const price = 35;
-  const now = new Date();
-  const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-  const m = (v) => v.toFixed(2);
-  const days = [];
-  const payments = [];
-  let balance = 0;
-  const [y, mo, d0] = BILLING_FROM.split('-').map(Number);
-  for (let d = new Date(y, mo - 1, d0), i = 0; iso(d) <= iso(now); d.setDate(d.getDate() + 1), i++) {
-    const date = iso(d);
-    const calls = 18 + ((i * 37 + 11) % 53); // varies day to day, same on every load
-    const received = i % 3 === 2 ? 4500 : 0; // a payment every third day
-    const opening = balance;
-    balance = opening - calls * price + received;
-    days.push({ date, is_today: date === iso(now), opening_balance: m(opening), calls, price_per_call: m(price), charges: m(calls * price), payment_received: m(received), balance: m(balance) });
-    if (received) payments.push({ id: date, amount: m(received), currency: 'USD', status: 'completed', provider: 'manual', reference: '', note: 'Bank transfer', date: `${date}T14:20:00Z` });
-  }
-  return Promise.resolve({
-    customer: 'Preview Customer', currency: 'USD', price_per_call: m(price), timezone: 'America/New_York',
-    as_of: now.toISOString(), balance: m(balance), amount_due: m(Math.max(-balance, 0)),
-    days: days.reverse(), payments: payments.reverse().slice(0, 10),
-  });
+  return new Promise((resolve) => setTimeout(() => resolve(make()), 250));
 }

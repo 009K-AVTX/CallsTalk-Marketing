@@ -5,18 +5,18 @@ import { BILLING_FROM, fetchStatement, loadSession, signOut, SignedOut, startPay
 const REFRESH_MS = 30_000;
 const PRESETS = [500, 1000, 2500];
 
-const money = (v, currency = 'USD') => {
+export const money = (v, currency = 'USD') => {
   const n = Number(v) || 0;
   const s = Math.abs(n).toLocaleString('en-US', { style: 'currency', currency, minimumFractionDigits: 2 });
   return n < 0 ? `-${s}` : s;
 };
-const tone = (v) => (Number(v) < 0 ? 'is-neg' : Number(v) > 0 ? 'is-pos' : '');
+export const tone = (v) => (Number(v) < 0 ? 'is-neg' : Number(v) > 0 ? 'is-pos' : '');
 // "2026-10-23" is the customer's own day; read it as a calendar date, not a UTC instant.
-const dayLabel = (iso) => {
+export const dayLabel = (iso) => {
   const [y, m, d] = iso.split('-').map(Number);
   return new Date(y, m - 1, d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 };
-const clock = (iso) => new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', second: '2-digit' });
+export const clock = (iso) => new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', second: '2-digit' });
 
 // The day's bill: the Telegram picture's four lines, plus the price and what the calls came to.
 export function Statement({ day, currency }) {
@@ -48,7 +48,7 @@ export function Statement({ day, currency }) {
   );
 }
 
-function Wallet({ data, onPaid }) {
+export function Wallet({ data, onPaid }) {
   const due = Number(data.amount_due);
   const [amount, setAmount] = useState(due > 0 ? data.amount_due : '');
   const [status, setStatus] = useState('idle'); // idle | sending | error
@@ -118,7 +118,7 @@ const monthLabel = (key) => {
 const sum = (rows, k) => rows.reduce((t, r) => t + Number(r[k]), 0);
 
 // Every day's bill since BILLING_FROM, one tab per month, newest month first.
-function History({ days, currency }) {
+export function History({ days, currency }) {
   const months = [...new Set(days.map((d) => d.date.slice(0, 7)))];
   const [chosen, setChosen] = useState(null);
   const active = months.includes(chosen) ? chosen : months[0];
@@ -182,13 +182,12 @@ function WalletIcon() {
   );
 }
 
-// The Buyer Dashboard at /dashboard, seen only after logging in: live wallet balance, today's bill, the last three days
-// and every day since September.
-export default function BillingPage() {
+// The live statement, refreshed every 30 seconds while the tab is visible.
+// `onSignedOut` runs when the session has ended (the caller sends them to log in).
+export function useStatement(onSignedOut) {
   const [data, setData] = useState(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
-  const [email, setEmail] = useState('');
   const timer = useRef();
 
   const load = useCallback(async () => {
@@ -197,16 +196,15 @@ export default function BillingPage() {
       setData(await fetchStatement());
       setError('');
     } catch (err) {
-      if (err instanceof SignedOut) return window.location.replace('/login');
+      if (err instanceof SignedOut) return onSignedOut();
       setError(err.message);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [onSignedOut]);
 
   useEffect(() => {
-    if (!loadSession()?.access) return window.location.replace('/login');
-    setEmail(loadSession()?.email || '');
+    if (!loadSession()?.access) return onSignedOut();
     load();
     timer.current = setInterval(() => document.visibilityState === 'visible' && load(), REFRESH_MS);
     const onShow = () => document.visibilityState === 'visible' && load();
@@ -215,15 +213,65 @@ export default function BillingPage() {
       clearInterval(timer.current);
       document.removeEventListener('visibilitychange', onShow);
     };
-  }, [load]);
+  }, [load, onSignedOut]);
+
+  return { data, error, loading, load };
+}
+
+// Wallet and today, the last three days, every day since September, and payments.
+export function BillingSections({ data, onPaid }) {
+  if (!data) {
+    return <div className="billing__top" aria-hidden="true"><div className="wallet is-skeleton" /><div className="bill is-skeleton" /></div>;
+  }
+  const today = data.days.find((d) => d.is_today);
+  const past = data.days.filter((d) => !d.is_today).slice(0, 3);
+  return (
+    <>
+      <div className="billing__top">
+        <Wallet data={data} onPaid={onPaid} />
+        {today && <Statement day={today} currency={data.currency} />}
+      </div>
+
+      <section className="billing__days" aria-labelledby="days-title">
+        <h2 id="days-title">Last {past.length} Days</h2>
+        <div className="billing__grid">
+          {past.map((d) => <Statement key={d.date} day={d} currency={data.currency} />)}
+        </div>
+      </section>
+
+      <History days={data.days} currency={data.currency} />
+
+      <section className="billing__payments" aria-labelledby="payments-title">
+        <h2 id="payments-title">Payments</h2>
+        {data.payments.length ? (
+          <ul>
+            {data.payments.map((p) => (
+              <li key={p.id}>
+                <span>{dayLabel(p.date.slice(0, 10))}<small>{p.note || (p.provider === 'capitalist' ? 'Paid online' : 'Recorded by our team')}</small></span>
+                <span className={`billing__status is-${p.status}`}>{p.status}</span>
+                <b className={p.status === 'completed' ? 'is-pos' : ''}>{money(p.amount, p.currency)}</b>
+              </li>
+            ))}
+          </ul>
+        ) : <p className="billing__empty">No payments yet.</p>}
+      </section>
+    </>
+  );
+}
+
+const toLogin = () => window.location.replace('/login');
+
+// The Buyer Dashboard at /dashboard, seen only after logging in: live wallet balance, today's bill,
+// the last three days and every day since September.
+export default function BillingPage() {
+  const { data, error, loading, load } = useStatement(toLogin);
+  const [email, setEmail] = useState('');
+  useEffect(() => setEmail(loadSession()?.email || ''), []);
 
   const leave = () => {
     signOut();
     window.location.assign('/login');
   };
-
-  const today = data?.days.find((d) => d.is_today);
-  const past = data?.days.filter((d) => !d.is_today).slice(0, 3) || [];
 
   return (
     <main className="billing">
@@ -245,41 +293,7 @@ export default function BillingPage() {
         </div>
 
         {error && <p className="access-card__error billing__error" role="alert">{error}</p>}
-
-        {data ? (
-          <>
-            <div className="billing__top">
-              <Wallet data={data} onPaid={load} />
-              {today && <Statement day={today} currency={data.currency} />}
-            </div>
-
-            <section className="billing__days" aria-labelledby="days-title">
-              <h2 id="days-title">Last {past.length} Days</h2>
-              <div className="billing__grid">
-                {past.map((d) => <Statement key={d.date} day={d} currency={data.currency} />)}
-              </div>
-            </section>
-
-            <History days={data.days} currency={data.currency} />
-
-            <section className="billing__payments" aria-labelledby="payments-title">
-              <h2 id="payments-title">Payments</h2>
-              {data.payments.length ? (
-                <ul>
-                  {data.payments.map((p) => (
-                    <li key={p.id}>
-                      <span>{dayLabel(p.date.slice(0, 10))}<small>{p.note || (p.provider === 'capitalist' ? 'Paid online' : 'Recorded by our team')}</small></span>
-                      <span className={`billing__status is-${p.status}`}>{p.status}</span>
-                      <b className={p.status === 'completed' ? 'is-pos' : ''}>{money(p.amount, p.currency)}</b>
-                    </li>
-                  ))}
-                </ul>
-              ) : <p className="billing__empty">No payments yet.</p>}
-            </section>
-          </>
-        ) : !error && (
-          <div className="billing__top" aria-hidden="true"><div className="wallet is-skeleton" /><div className="bill is-skeleton" /></div>
-        )}
+        {(data || !error) && <BillingSections data={data} onPaid={load} />}
       </div>
     </main>
   );

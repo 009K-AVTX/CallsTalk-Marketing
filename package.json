@@ -6,7 +6,10 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build && vite build --ssr src/entry-server.jsx --outDir dist-ssr && node scripts/prerender.js",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "portal": "vite --config portal/vite.config.js",
+    "portal:build": "vite build --config portal/vite.config.js",
+    "portal:preview": "vite preview --config portal/vite.config.js"
   },
   "dependencies": {
     "react": "^18.3.1",
