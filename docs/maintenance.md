@@ -493,7 +493,6 @@ All of these are edits to `/var/www/Callstalk/server/.env`, followed by `pm2 res
 | `DB_*` | Database connection | See 7.7 |
 | `CORS_ALLOWED_ORIGINS` | Other sites allowed to call the chat API | `https://callstalk.com,https://www.callstalk.com` |
 | `CHAT_TIMEOUT_HOURS` | End chats after this many quiet hours | `0` turns it off |
-| `TIMEZONE` | Times shown in Telegram, emails and the reply page | `EST` (UTC-5 all year). `America/New_York` would switch to EDT in summer |
 | `SERVE_SITE`, `SITE_DIR` | Serve the website from this server | Must stay `true` and `../dist` |
 | `GROQ_API_KEY` | AI assistant | See 11.3 |
 | `PORT`, `HOST` | Where Node listens | If you change `PORT`, update `proxy_pass` in the nginx site too |

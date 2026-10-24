@@ -20,7 +20,9 @@ export const config = {
     user: env('DB_USER', 'callstalk_chat'),
     password: process.env.DB_PASSWORD ?? '',
   },
-  timezone: env('TIMEZONE', 'EST'), // EST is UTC-5 all year (no daylight time)
+  // Times in Telegram, team emails and the reply page: always EST (UTC-5, no daylight time). Fixed here, so an
+  // old TIMEZONE=America/New_York in .env cannot switch them to EDT. Customers' own times use their account's zone.
+  timezone: 'EST',
   // Open chats end by themselves after this many hours without a new message.
   chatTimeoutHours: Number(env('CHAT_TIMEOUT_HOURS', '24')),
   corsOrigins: env('CORS_ALLOWED_ORIGINS').split(',').map((o) => o.trim().replace(/\/$/, '')).filter(Boolean),
