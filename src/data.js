@@ -83,26 +83,55 @@ export const steps = [
   { title: 'Get a Setup Review', text: 'A specialist confirms that everything is configured correctly.', link: 'Speak With Us', href: '/request-access' },
 ];
 
-// Billing defaults from the Avortyx platform (app.avortyx.io): a prepaid balance, a monthly portal fee,
-// and per-minute and per-call charges. Calls bill per minute, rounded up to the whole minute.
-export const BILLING = {
-  portal: 49,
-  perMinute: 0.35,
-  recording: 0.005,
-  number: 15,
-  terms: [
-    { name: 'Platform', value: '$49', unit: 'per month', note: 'Attribution, dashboards and reports' },
-    { name: 'Call Minutes', value: '$0.35', unit: 'per minute', note: 'Rounded up to the nearest minute' },
-    { name: 'Recording', value: '$0.005', unit: 'per minute', note: 'Only on calls you choose to record' },
-    { name: 'Tracking Numbers', value: '$15', unit: 'one-time', note: 'Local or toll-free, yours to keep' },
-  ],
-  extras: [
-    'Spam screening on every call, free',
-    'Blocked calls at $0.01 each',
-    'No setup fees',
-    'Prepaid balance with optional auto top-up',
-  ],
-};
+// Attribution plans shown in the pricing section. Prices are per month in USD.
+export const PLANS = [
+  {
+    name: 'Starter',
+    price: '$49',
+    period: 'per month',
+    fit: 'For one business that wants to see which marketing brings in customers.',
+    features: [
+      'Call, form and chat attribution',
+      '1 website',
+      'Campaign, keyword and page reports',
+      'Real-time lead alerts',
+      'Email and chat support',
+    ],
+    cta: 'Request Access',
+  },
+  {
+    name: 'Growth',
+    price: '$149',
+    period: 'per month',
+    fit: 'For teams that want revenue by channel and leads synced to their tools.',
+    features: [
+      'Everything in Starter',
+      'Up to 5 websites',
+      'Lead scoring and labels',
+      'Revenue by channel and campaign',
+      'CRM and ad platform sync',
+      'Priority support',
+    ],
+    cta: 'Request Access',
+    featured: true,
+  },
+  {
+    name: 'Agency',
+    price: 'Custom',
+    period: 'for many clients',
+    fit: 'For agencies that report on results across many client accounts.',
+    features: [
+      'Everything in Growth',
+      'Unlimited client websites',
+      'Client workspaces and branded reports',
+      'Developer API',
+      'Dedicated account manager',
+    ],
+    cta: 'Talk to Us',
+  },
+];
+
+export const PLAN_NOTES = ['No setup fees', 'A specialist sets you up', 'Change plans anytime'];
 
 export const reviews = ['A', 'B', 'C', 'D', 'E', 'F'].map((initial) => ({
   initial,
