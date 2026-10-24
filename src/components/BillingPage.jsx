@@ -1,0 +1,219 @@
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { fetchStatement, loadSession, signOut, SignedOut, startPayment } from '../lib/portal.js';
+
+const REFRESH_MS = 30_000;
+const PRESETS = [500, 1000, 2500];
+
+const money = (v, currency = 'USD') => {
+  const n = Number(v) || 0;
+  const s = Math.abs(n).toLocaleString('en-US', { style: 'currency', currency, minimumFractionDigits: 2 });
+  return n < 0 ? `-${s}` : s;
+};
+const tone = (v) => (Number(v) < 0 ? 'is-neg' : Number(v) > 0 ? 'is-pos' : '');
+// "2026-10-23" is the customer's own day; read it as a calendar date, not a UTC instant.
+const dayLabel = (iso) => {
+  const [y, m, d] = iso.split('-').map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+};
+const clock = (iso) => new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', second: '2-digit' });
+
+// The day's bill: the Telegram picture's four lines, plus the price and what the calls came to.
+export function Statement({ day, currency }) {
+  const rows = [
+    ['Opening Balance', money(day.opening_balance, currency), tone(day.opening_balance)],
+    ['Total Calls', day.calls.toLocaleString('en-US'), ''],
+    ['Price per Call', money(day.price_per_call, currency), ''],
+    ['Call Charges', day.calls ? `-${money(day.charges, currency)}` : money(0, currency), day.calls ? 'is-neg' : ''],
+    ['Payment Received', Number(day.payment_received) ? `+${money(day.payment_received, currency)}` : money(0, currency), Number(day.payment_received) ? 'is-pos' : ''],
+  ];
+  return (
+    <article className={`bill${day.is_today ? ' bill--today' : ''}`}>
+      <header className="bill__head">
+        <h3>{dayLabel(day.date)} <span>· Financial Overview</span></h3>
+        {day.is_today && <span className="bill__live"><i aria-hidden="true" />Live</span>}
+      </header>
+      <table className="bill__table">
+        <thead><tr><th scope="col">Metric</th><th scope="col">Amount</th></tr></thead>
+        <tbody>
+          {rows.map(([label, value, cls]) => (
+            <tr key={label}><th scope="row">{label}</th><td className={cls}>{value}</td></tr>
+          ))}
+        </tbody>
+        <tfoot>
+          <tr><th scope="row">{day.is_today ? 'Balance Now' : 'Closing Balance'}</th><td className={tone(day.balance)}>{money(day.balance, currency)}</td></tr>
+        </tfoot>
+      </table>
+    </article>
+  );
+}
+
+function Wallet({ data, onPaid }) {
+  const due = Number(data.amount_due);
+  const [amount, setAmount] = useState(due > 0 ? data.amount_due : '');
+  const [status, setStatus] = useState('idle'); // idle | sending | error
+  const [error, setError] = useState('');
+  const owes = Number(data.balance) < 0;
+  const valid = Number(amount) >= 1;
+
+  const pay = async (e) => {
+    e.preventDefault();
+    if (!valid) return;
+    setStatus('sending');
+    setError('');
+    try {
+      const { payment_url: url } = await startPayment(Number(amount).toFixed(2));
+      if (url) window.location.assign(url);
+      else onPaid();
+    } catch (err) {
+      setError(err.message);
+      setStatus('error');
+    }
+  };
+
+  return (
+    <section className="wallet" aria-labelledby="wallet-title">
+      <div className="wallet__top">
+        <p className="wallet__label" id="wallet-title"><WalletIcon />Wallet Balance</p>
+        <span className={`wallet__state ${owes ? 'is-due' : 'is-ok'}`}>{owes ? 'Payment Due' : 'In Credit'}</span>
+      </div>
+      <p className={`wallet__balance ${tone(data.balance)}`}>{money(data.balance, data.currency)}</p>
+      <p className="wallet__note">
+        {owes
+          ? <>Pay <b>{money(data.amount_due, data.currency)}</b> to clear your balance. It goes down by {money(data.price_per_call, data.currency)} with every call.</>
+          : <>Nothing to pay right now. Each call costs {money(data.price_per_call, data.currency)} and comes off this balance.</>}
+      </p>
+      <dl className="wallet__facts">
+        <div><dt>Your Price</dt><dd>{money(data.price_per_call, data.currency)} / call</dd></div>
+        <div><dt>Days Counted In</dt><dd>{data.timezone.replace(/_/g, ' ')}</dd></div>
+      </dl>
+
+      <form className="wallet__pay" onSubmit={pay}>
+        <label htmlFor="pay-amount">Amount to Pay</label>
+        <div className="wallet__amount">
+          <span aria-hidden="true">$</span>
+          <input id="pay-amount" type="number" inputMode="decimal" min="1" step="0.01" placeholder="0.00" value={amount} onChange={(e) => setAmount(e.target.value)} />
+        </div>
+        <div className="wallet__presets">
+          {due > 0 && <button type="button" className={Number(amount) === due ? 'is-on' : ''} onClick={() => setAmount(data.amount_due)}>Full Balance</button>}
+          {PRESETS.map((p) => (
+            <button key={p} type="button" className={Number(amount) === p ? 'is-on' : ''} onClick={() => setAmount(String(p))}>${p.toLocaleString('en-US')}</button>
+          ))}
+        </div>
+        <p className="wallet__method"><span aria-hidden="true">₮</span>Capitalist · USDT (TRC-20) and wallets</p>
+        {status === 'error' && <p className="access-card__error" role="alert">{error}</p>}
+        <button type="submit" className="btn btn--light" disabled={!valid || status === 'sending'}>
+          {status === 'sending' ? 'Opening Checkout…' : valid ? `Pay ${money(amount, data.currency)}` : 'Pay Now'}
+        </button>
+        <p className="wallet__secure">You finish the payment on the secure Capitalist page. It shows here as soon as it clears.</p>
+      </form>
+    </section>
+  );
+}
+
+function WalletIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M4 7.5A2.5 2.5 0 0 1 6.5 5H18v3" /><rect x="4" y="8" width="16" height="11" rx="2.5" /><circle cx="16" cy="13.5" r="1.2" />
+    </svg>
+  );
+}
+
+// The customer billing page at /billing: live wallet balance, today's bill and the last three days.
+export default function BillingPage() {
+  const [data, setData] = useState(null);
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [email, setEmail] = useState('');
+  const timer = useRef();
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      setData(await fetchStatement());
+      setError('');
+    } catch (err) {
+      if (err instanceof SignedOut) return window.location.replace('/login');
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!loadSession()?.access) return window.location.replace('/login');
+    setEmail(loadSession()?.email || '');
+    load();
+    timer.current = setInterval(() => document.visibilityState === 'visible' && load(), REFRESH_MS);
+    const onShow = () => document.visibilityState === 'visible' && load();
+    document.addEventListener('visibilitychange', onShow);
+    return () => {
+      clearInterval(timer.current);
+      document.removeEventListener('visibilitychange', onShow);
+    };
+  }, [load]);
+
+  const leave = () => {
+    signOut();
+    window.location.assign('/login');
+  };
+
+  const today = data?.days.find((d) => d.is_today);
+  const past = data?.days.filter((d) => !d.is_today) || [];
+
+  return (
+    <main className="billing">
+      <div className="container">
+        <div className="billing__head">
+          <div>
+            <p className="legal__crumb"><a href="/">Home</a> / Billing</p>
+            <h1>{data ? data.customer : 'Billing'}</h1>
+            <p className="billing__sub">
+              <span className={`billing__pulse${loading ? ' is-busy' : ''}`} aria-hidden="true" />
+              {data ? <>Live · updated {clock(data.as_of)}</> : 'Loading your bill…'}
+              {email && <span className="billing__who">{email}</span>}
+            </p>
+          </div>
+          <div className="billing__actions">
+            <button type="button" className="btn btn--quiet btn--sm" onClick={load} disabled={loading}>Refresh</button>
+            <button type="button" className="btn btn--quiet btn--sm" onClick={leave}>Log Out</button>
+          </div>
+        </div>
+
+        {error && <p className="access-card__error billing__error" role="alert">{error}</p>}
+
+        {data ? (
+          <>
+            <div className="billing__top">
+              <Wallet data={data} onPaid={load} />
+              {today && <Statement day={today} currency={data.currency} />}
+            </div>
+
+            <section className="billing__days" aria-labelledby="days-title">
+              <h2 id="days-title">Last {past.length} Days</h2>
+              <div className="billing__grid">
+                {past.map((d) => <Statement key={d.date} day={d} currency={data.currency} />)}
+              </div>
+            </section>
+
+            <section className="billing__payments" aria-labelledby="payments-title">
+              <h2 id="payments-title">Payments</h2>
+              {data.payments.length ? (
+                <ul>
+                  {data.payments.map((p) => (
+                    <li key={p.id}>
+                      <span>{dayLabel(p.date.slice(0, 10))}<small>{p.note || (p.provider === 'capitalist' ? 'Paid online' : 'Recorded by our team')}</small></span>
+                      <span className={`billing__status is-${p.status}`}>{p.status}</span>
+                      <b className={p.status === 'completed' ? 'is-pos' : ''}>{money(p.amount, p.currency)}</b>
+                    </li>
+                  ))}
+                </ul>
+              ) : <p className="billing__empty">No payments yet.</p>}
+            </section>
+          </>
+        ) : !error && (
+          <div className="billing__top" aria-hidden="true"><div className="wallet is-skeleton" /><div className="bill is-skeleton" /></div>
+        )}
+      </div>
+    </main>
+  );
+}

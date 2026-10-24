@@ -9,12 +9,12 @@ export default function Hero() {
       <div className="container">
         <div className="hero__grid">
           <div className="hero__copy">
-            <p className="hero__eyebrow"><span />Every conversation, traced to its campaign</p>
+            <p className="hero__eyebrow"><span />Every Conversation, Traced to Its Campaign</p>
             <h1 className="hero__title">See exactly what your marketing earns.</h1>
             <p className="lead">CallsTalk follows every call, form and chat back to the ad that started it, so your budget goes where deals close.</p>
             <div className="actions">
               <ChatButton />
-              <a href="#pricing" className="btn btn--quiet">See Plans</a>
+              <a href="#pricing" className="btn btn--quiet">See Pricing</a>
             </div>
             <ul className="assurances">
               <li>A real person sets you up</li>

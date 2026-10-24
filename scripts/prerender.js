@@ -15,6 +15,8 @@ const sheet = cssLink ? await readFile(resolve(dist, cssLink[1].slice(1)), 'utf8
 const pages = [
   { path: '/', file: 'index.html' },
   { path: '/request-access', file: 'request-access.html', title: 'Request access', description: 'Request a CallsTalk account. Approved requests receive a login link by email.' },
+  { path: '/login', file: 'login.html', title: 'Customer log in', description: 'Log in to see your live CallsTalk bill and pay it online.', noindex: true },
+  { path: '/billing', file: 'billing.html', title: 'Billing', description: 'Your live CallsTalk balance and daily statements.', noindex: true },
   { path: '/legal', file: 'legal.html', title: 'Legal Center', description: 'The agreements and policies that apply when you use CallsTalk.' },
   ...['terms', 'privacy', 'cookies'].map((id) => ({ path: `/${id}`, file: `${id}.html`, title: DOCS[id].title, description: DOCS[id].summary })),
   { path: '/404', file: '404.html', title: 'Page not found', description: 'This page does not exist.', noindex: true },

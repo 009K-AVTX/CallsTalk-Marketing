@@ -7,7 +7,7 @@ import {
 const POLL_OPEN_MS = 3000;
 const POLL_CLOSED_MS = 15000;
 
-const suggestions = ['How does call tracking work?', 'Which plan fits my business?'];
+const suggestions = ['How does call tracking work?', 'How is my price per call set?'];
 
 const greeting = {
   id: 'greeting',
