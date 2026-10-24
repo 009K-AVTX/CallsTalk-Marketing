@@ -3,7 +3,7 @@
 //   POST /accounts/login            email + password    -> { access, refresh } or { mfa_required, temp_token }
 //   POST /accounts/verify-mfa       temp_token + code   -> { access, refresh }
 //   POST /accounts/refresh          refresh             -> { access }
-//   GET  /billing/statement                             -> balance, today and the last three days
+//   GET  /billing/statement?from=  YYYY-MM-DD          -> balance and every day's bill since that date
 //   POST /billing/statement/pay     amount              -> { payment_url } (Capitalist checkout)
 //
 // Customers get their login from us; there is no sign-up.
@@ -103,29 +103,38 @@ async function authed(path, options) {
   }
 }
 
-export const fetchStatement = () => (PREVIEW ? previewStatement() : authed('/billing/statement?days=3'));
+// Bills are shown from the start of September 2026: every day since, newest first.
+export const BILLING_FROM = '2026-09-01';
+
+export const fetchStatement = () => (PREVIEW ? previewStatement() : authed(`/billing/statement?from=${BILLING_FROM}`));
 
 export const startPayment = (amount) => (PREVIEW
   ? Promise.reject(new Error(`Preview mode: a real login would now open the checkout for $${amount}.`))
   : authed('/billing/statement/pay', { method: 'POST', body: { amount: String(amount) } }));
 
-// Illustrative figures: today opens at -$320, 64 calls at $35 and a $2,500 payment leave -$60.
+// Illustrative figures from 1 September: a steady flow of calls at $35, paid off now and then.
 function previewStatement() {
   if (!loadSession()?.access) return Promise.reject(new SignedOut());
   const price = 35;
   const now = new Date();
-  const day = (n) => { const d = new Date(now); d.setDate(d.getDate() - n); return d.toISOString().slice(0, 10); };
-  const plan = [[3, 0, 0], [2, 18, 1500], [1, 52, 0], [0, 64, 2500]]; // [days ago, calls, received]
-  let balance = 630; // so today opens at -$320
-  const days = plan.map(([ago, calls, received]) => {
+  const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const m = (v) => v.toFixed(2);
+  const days = [];
+  const payments = [];
+  let balance = 0;
+  const [y, mo, d0] = BILLING_FROM.split('-').map(Number);
+  for (let d = new Date(y, mo - 1, d0), i = 0; iso(d) <= iso(now); d.setDate(d.getDate() + 1), i++) {
+    const date = iso(d);
+    const calls = 18 + ((i * 37 + 11) % 53); // varies day to day, same on every load
+    const received = i % 3 === 2 ? 4500 : 0; // a payment every third day
     const opening = balance;
     balance = opening - calls * price + received;
-    const m = (v) => v.toFixed(2);
-    return { date: day(ago), is_today: ago === 0, opening_balance: m(opening), calls, price_per_call: m(price), charges: m(calls * price), payment_received: m(received), balance: m(balance) };
-  }).reverse();
+    days.push({ date, is_today: date === iso(now), opening_balance: m(opening), calls, price_per_call: m(price), charges: m(calls * price), payment_received: m(received), balance: m(balance) });
+    if (received) payments.push({ id: date, amount: m(received), currency: 'USD', status: 'completed', provider: 'manual', reference: '', note: 'Bank transfer', date: `${date}T14:20:00Z` });
+  }
   return Promise.resolve({
-    customer: 'Preview Customer', currency: 'USD', price_per_call: '35.00', timezone: 'America/New_York',
-    as_of: now.toISOString(), balance: balance.toFixed(2), amount_due: Math.max(-balance, 0).toFixed(2), days,
-    payments: [{ id: 'p1', amount: '2500.00', currency: 'USD', status: 'completed', provider: 'manual', reference: '', note: 'Bank transfer', date: `${day(0)}T14:20:00Z` }],
+    customer: 'Preview Customer', currency: 'USD', price_per_call: m(price), timezone: 'America/New_York',
+    as_of: now.toISOString(), balance: m(balance), amount_due: m(Math.max(-balance, 0)),
+    days: days.reverse(), payments: payments.reverse().slice(0, 10),
   });
 }

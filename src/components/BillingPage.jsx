@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { fetchStatement, loadSession, signOut, SignedOut, startPayment } from '../lib/portal.js';
+import Tabs from './Tabs.jsx';
+import { BILLING_FROM, fetchStatement, loadSession, signOut, SignedOut, startPayment } from '../lib/portal.js';
 
 const REFRESH_MS = 30_000;
 const PRESETS = [500, 1000, 2500];
@@ -110,6 +111,69 @@ function Wallet({ data, onPaid }) {
   );
 }
 
+const monthLabel = (key) => {
+  const [y, m] = key.split('-').map(Number);
+  return new Date(y, m - 1, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+};
+const sum = (rows, k) => rows.reduce((t, r) => t + Number(r[k]), 0);
+
+// Every day's bill since BILLING_FROM, one tab per month, newest month first.
+function History({ days, currency }) {
+  const months = [...new Set(days.map((d) => d.date.slice(0, 7)))];
+  const [chosen, setChosen] = useState(null);
+  const active = months.includes(chosen) ? chosen : months[0];
+  const rows = days.filter((d) => d.date.startsWith(active));
+  if (!rows.length) return null;
+  const calls = rows.reduce((t, r) => t + r.calls, 0);
+  const paid = sum(rows, 'payment_received');
+
+  return (
+    <section className="billing__history" aria-labelledby="history-title">
+      <div className="billing__history-head">
+        <h2 id="history-title">Billing History</h2>
+        {months.length > 1 && (
+          <Tabs tabs={months.map((id) => ({ id, label: monthLabel(id).split(' ')[0] }))} active={active} onChange={setChosen} />
+        )}
+      </div>
+      <div className="history" role="region" aria-label={`Daily bills for ${monthLabel(active)}`} tabIndex={0}>
+        <table className="history__table">
+          <thead>
+            <tr>
+              <th scope="col">Date</th><th scope="col">Opening Balance</th><th scope="col">Calls</th>
+              <th scope="col">Price</th><th scope="col">Call Charges</th><th scope="col">Payment Received</th><th scope="col">Balance</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((d) => (
+              <tr key={d.date} className={d.is_today ? 'is-today' : ''}>
+                <th scope="row">{dayLabel(d.date)}{d.is_today && <span className="bill__live"><i aria-hidden="true" />Live</span>}</th>
+                <td className={tone(d.opening_balance)}>{money(d.opening_balance, currency)}</td>
+                <td>{d.calls.toLocaleString('en-US')}</td>
+                <td>{money(d.price_per_call, currency)}</td>
+                <td className={d.calls ? 'is-neg' : ''}>{d.calls ? `-${money(d.charges, currency)}` : money(0, currency)}</td>
+                <td className={Number(d.payment_received) ? 'is-pos' : ''}>{Number(d.payment_received) ? `+${money(d.payment_received, currency)}` : money(0, currency)}</td>
+                <td className={tone(d.balance)}><b>{money(d.balance, currency)}</b></td>
+              </tr>
+            ))}
+          </tbody>
+          <tfoot>
+            <tr>
+              <th scope="row">{monthLabel(active)} Total</th>
+              <td />
+              <td>{calls.toLocaleString('en-US')}</td>
+              <td />
+              <td className={calls ? 'is-neg' : ''}>{calls ? `-${money(sum(rows, 'charges'), currency)}` : money(0, currency)}</td>
+              <td className={paid ? 'is-pos' : ''}>{paid ? `+${money(paid, currency)}` : money(0, currency)}</td>
+              <td className={tone(rows[0].balance)}>{money(rows[0].balance, currency)}</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+      <p className="billing__history-note">Daily bills since {dayLabel(BILLING_FROM)}. The month's balance is the balance at the end of its latest day.</p>
+    </section>
+  );
+}
+
 function WalletIcon() {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -118,7 +182,8 @@ function WalletIcon() {
   );
 }
 
-// The customer billing page at /billing: live wallet balance, today's bill and the last three days.
+// The customer billing page at /billing: live wallet balance, today's bill, the last three days
+// and every day since September.
 export default function BillingPage() {
   const [data, setData] = useState(null);
   const [error, setError] = useState('');
@@ -158,7 +223,7 @@ export default function BillingPage() {
   };
 
   const today = data?.days.find((d) => d.is_today);
-  const past = data?.days.filter((d) => !d.is_today) || [];
+  const past = data?.days.filter((d) => !d.is_today).slice(0, 3) || [];
 
   return (
     <main className="billing">
@@ -194,6 +259,8 @@ export default function BillingPage() {
                 {past.map((d) => <Statement key={d.date} day={d} currency={data.currency} />)}
               </div>
             </section>
+
+            <History days={data.days} currency={data.currency} />
 
             <section className="billing__payments" aria-labelledby="payments-title">
               <h2 id="payments-title">Payments</h2>
