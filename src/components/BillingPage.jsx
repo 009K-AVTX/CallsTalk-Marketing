@@ -107,7 +107,7 @@ export function Wallet({ data, onPaid }) {
         <button type="submit" className="btn btn--light" disabled={!valid || status === 'sending'}>
           {status === 'sending' ? 'Getting Your Address…' : valid ? `Pay ${money(amount, data.currency)}` : 'Pay Now'}
         </button>
-        <p className="wallet__secure">You send USDT from your own wallet. It shows here once it is confirmed on the blockchain.</p>
+        <p className="wallet__secure">Your funds will be credited to your account once the transaction has been confirmed on the blockchain.</p>
       </form>
       )}
     </section>
