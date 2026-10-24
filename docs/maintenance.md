@@ -181,6 +181,9 @@ To empty the CallsTalk logs only: `pm2 flush callstalk-chat`.
 
 ## 6. Deploying updates
 
+Pushes to `fullstack-v1` deploy themselves within about a minute ([6.4](#64-automatic-deploys)). The manual steps
+below are what that script runs, and still work any time.
+
 ### 6.1 Normal update
 
 First push the changes to the `fullstack-v1` branch from your PC. Then, on the VPS:
@@ -214,7 +217,8 @@ cd server && npm ci --omit=dev
 pm2 restart callstalk-chat
 ```
 
-The checkout leaves the folder on a detached commit. When the fix is pushed, go back to the branch:
+The checkout leaves the folder on a detached commit, which also pauses automatic deploys. When the fix is pushed,
+go back to the branch:
 
 ```bash
 cd /var/www/Callstalk && git checkout fullstack-v1 && git pull
@@ -226,6 +230,59 @@ and redeploy as in 6.1. Rolling back code never changes the database, and the se
 
 `git status` shows which files were changed on the server. The `.env` files and `dist/` are ignored by git, so
 they are never the cause. Discard other local edits with `git checkout -- <file>`, or `git stash`.
+
+### 6.4 Automatic deploys
+
+`server/deploy/autodeploy.sh` runs from cron every minute. When `fullstack-v1` has a new commit, it pulls it and
+runs only the steps from 6.1 that the changed files need:
+
+| Changed | Steps |
+|---|---|
+| Site or portal files (anything outside `server/` and `docs/`) | Build the site and the portal; `npm ci` first only if `package-lock.json` changed |
+| `server/package.json` or `server/package-lock.json` | `npm ci --omit=dev` in `server/` |
+| Anything outside `docs/` | `pm2 restart callstalk-chat`, then wait up to a minute for `/api/health` |
+
+If a build fails or the server does not answer `/api/health`, the previous commit is put back, rebuilt and
+restarted. The failed commit is not tried again; push a fix and that deploys as usual. To retry the same commit
+(say, after fixing `.env`), run `rm /var/www/Callstalk/.git/autodeploy-failed`.
+
+It does nothing (and logs why, once) when:
+
+- files were changed on the server ([6.3](#63-if-git-pull-refuses-to-run));
+- the branch was force-pushed, so the new commit does not follow the deployed one: deploy that one by hand;
+- `git fetch` fails, for example because GitHub access on the VPS stopped working.
+
+It is paused, without logging, while the folder is on a detached commit after a [roll back](#62-roll-back).
+
+**Log:** `/var/log/callstalk-deploy.log`. Each deploy starts with `deploying <new> over <old>` and ends with
+`deployed <new>`, or `FAILED` and what happened next.
+
+```bash
+tail -50 /var/log/callstalk-deploy.log
+```
+
+**Set up, once.** The first run deploys everything pushed since the last manual pull, from the new script, in
+cron's bare environment, so it also proves cron can find `node`, `npm`, `pm2` and GitHub. It prints nothing if
+there is nothing new, and nothing either if `git status` does not say `On branch fullstack-v1`.
+
+```bash
+cd /var/www/Callstalk
+git fetch origin fullstack-v1
+env -i HOME=/root PATH=/usr/bin:/bin bash <(git show FETCH_HEAD:server/deploy/autodeploy.sh)
+( crontab -l 2>/dev/null; echo "* * * * * /bin/bash /var/www/Callstalk/server/deploy/autodeploy.sh >> /var/log/callstalk-deploy.log 2>&1" ) | crontab -
+crontab -l | grep autodeploy
+cat > /etc/logrotate.d/callstalk-deploy <<'EOF'
+/var/log/callstalk-deploy.log {
+    monthly
+    rotate 6
+    compress
+    missingok
+    notifempty
+}
+EOF
+```
+
+**Turn it off:** `crontab -e` and delete the `autodeploy.sh` line. A deploy that is already running finishes first.
 
 ---
 
