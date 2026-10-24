@@ -32,6 +32,8 @@ const images = ['logo', 'hero', 'waves'].map((name) => ({
   content: readFileSync(new URL(`../assets/email/${name}.png`, import.meta.url)),
   cid: `${name}@callstalk`,
 }));
+// Only the images an email's HTML shows: mail apps list an inline image the HTML never uses as an attachment.
+const send = (via, mail) => via.sendMail({ ...mail, attachments: images.filter((img) => mail.html.includes(`cid:${img.cid}`)) });
 
 // The site's palette (src/index.css) moved onto a light card: lilac accent, plum surfaces.
 const c = {
@@ -125,7 +127,7 @@ function detailGrid(details) {
 }
 
 function sendMail(session, { subject: subjectLine, text, link, first, ...content }) {
-  return transport.sendMail({
+  return send(transport, {
     from,
     to,
     ...(session.email && { replyTo: { name: session.name, address: session.email } }),
@@ -133,7 +135,6 @@ function sendMail(session, { subject: subjectLine, text, link, first, ...content
     ...(first ? { messageId: threadId(session) } : { inReplyTo: threadId(session), references: [threadId(session)] }),
     html: layout({ ...content, link, name: session.name, email: session.email }),
     text: `${text}\n\nReply in the website chat: ${link}\n`,
-    attachments: images,
   });
 }
 
@@ -202,14 +203,13 @@ export function accessRequestMail(request) {
 export async function emailAccessRequest(request) {
   if (!transport) return false;
   const { subject: subjectLine, text, ...content } = accessRequestMail(request);
-  await transport.sendMail({
+  await send(transport, {
     from,
     to,
     replyTo: { name: request.name, address: request.email },
     subject: subjectLine,
     html: layout({ ...content, name: request.name, email: request.email }),
     text,
-    attachments: images,
   });
   return true;
 }
@@ -258,14 +258,13 @@ export function contactsChangedMail({ user, before, after, changed, labels }) {
 export async function emailContactsChanged(change) {
   if (!transport) return false;
   const { subject: subjectLine, text, ...content } = contactsChangedMail(change);
-  await transport.sendMail({
+  await send(transport, {
     from,
     to,
     replyTo: { name: change.user.name || change.user.email, address: change.user.email },
     subject: subjectLine,
     html: layout({ ...content, name: change.user.name || change.user.email, email: change.user.email }),
     text,
-    attachments: images,
   });
   return true;
 }
@@ -302,9 +301,7 @@ export function inviteMail({ name, email, link, expiresAt, reset, timeZone = con
 export async function emailInvite(invite) {
   if (!customerTransport) return false;
   const { subject: subjectLine, text, ...content } = inviteMail(invite);
-  await customerTransport.sendMail({
-    from, to: invite.email, subject: subjectLine, html: layout(content), text, attachments: images,
-  });
+  await send(customerTransport, { from, to: invite.email, subject: subjectLine, html: layout(content), text });
   return true;
 }
 
@@ -394,7 +391,7 @@ export function reportReadyMail({ name, reports, link }) {
 async function sendCustomerMail(to, mail) {
   if (!customerTransport) return false;
   const { subject: subjectLine, text, ...content } = mail;
-  await customerTransport.sendMail({ from, to, subject: subjectLine, html: layout(content), text, attachments: images });
+  await send(customerTransport, { from, to, subject: subjectLine, html: layout(content), text });
   return true;
 }
 export const emailPasswordReset = (reset) => sendCustomerMail(reset.email, passwordResetMail(reset));
