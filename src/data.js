@@ -83,55 +83,21 @@ export const steps = [
   { title: 'Get a Setup Review', text: 'A specialist confirms that everything is configured correctly.', link: 'Speak With Us', href: '/request-access' },
 ];
 
-// Attribution plans shown in the pricing section. Prices are per month in USD.
-export const PLANS = [
-  {
-    name: 'Starter',
-    price: '$49',
-    period: 'per month',
-    fit: 'For one business that wants to see which marketing brings in customers.',
-    features: [
-      'Call, form and chat attribution',
-      '1 website',
-      'Campaign, keyword and page reports',
-      'Real-time lead alerts',
-      'Email and chat support',
-    ],
-    cta: 'Request Access',
-  },
-  {
-    name: 'Growth',
-    price: '$149',
-    period: 'per month',
-    fit: 'For teams that want revenue by channel and leads synced to their tools.',
-    features: [
-      'Everything in Starter',
-      'Up to 5 websites',
-      'Lead scoring and labels',
-      'Revenue by channel and campaign',
-      'CRM and ad platform sync',
-      'Priority support',
-    ],
-    cta: 'Request Access',
-    featured: true,
-  },
-  {
-    name: 'Agency',
-    price: 'Custom',
-    period: 'for many clients',
-    fit: 'For agencies that report on results across many client accounts.',
-    features: [
-      'Everything in Growth',
-      'Unlimited client websites',
-      'Client workspaces and branded reports',
-      'Developer API',
-      'Dedicated account manager',
-    ],
-    cta: 'Talk to Us',
-  },
-];
-
-export const PLAN_NOTES = ['No setup fees', 'A specialist sets you up', 'Change plans anytime'];
+// Plans for the pricing section, one list per tab. Prices are per month in USD.
+export const pricing = {
+  business: [
+    { name: 'Essentials', price: '$29', note: 'Ideal for single-location businesses.', items: [['Monthly leads', '100'], ['Seats', '2'], [null, 'Form and chat attribution']] },
+    { name: 'Standard', price: '$79', note: 'Adds call attribution and lead scoring.', items: [['Monthly leads', '500'], ['Seats', '5'], [null, 'Call attribution and recording']] },
+    { name: 'Premium', price: '$149', note: 'Complete attribution and advanced reporting.', popular: true, items: [['Monthly leads', '2,000'], ['Seats', 'Unlimited'], [null, 'Offline conversion sync']] },
+    { name: 'Enterprise', price: 'Tailored', note: 'High-volume plans with SSO and priority support.', sales: true, items: [['Monthly leads', 'Flexible'], ['SLA', 'Guaranteed'], [null, 'Dedicated account manager']] },
+  ],
+  agency: [
+    { name: 'Agency Starter', price: '$99', note: 'Manage up to 5 client accounts.', items: [['Client accounts', '5'], [null, 'White-label reporting']] },
+    { name: 'Agency Plus', price: '$249', note: 'Manage up to 20 client accounts.', items: [['Client accounts', '20'], [null, 'Dedicated client portals']] },
+    { name: 'Agency Premium', price: '$499', note: 'No limit on client accounts.', popular: true, items: [['Client accounts', 'Unlimited'], [null, 'Branded custom domain']] },
+    { name: 'Agency Enterprise', price: 'Tailored', note: 'Designed around your client portfolio.', sales: true, items: [['Client accounts', 'Flexible'], [null, 'API access and SSO']] },
+  ],
+};
 
 export const reviews = ['A', 'B', 'C', 'D', 'E', 'F'].map((initial) => ({
   initial,
