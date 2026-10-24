@@ -20,7 +20,7 @@ export const config = {
     user: env('DB_USER', 'callstalk_chat'),
     password: process.env.DB_PASSWORD ?? '',
   },
-  timezone: env('TIMEZONE', 'America/New_York'),
+  timezone: env('TIMEZONE', 'EST'), // EST is UTC-5 all year (no daylight time)
   // Open chats end by themselves after this many hours without a new message.
   chatTimeoutHours: Number(env('CHAT_TIMEOUT_HOURS', '24')),
   corsOrigins: env('CORS_ALLOWED_ORIGINS').split(',').map((o) => o.trim().replace(/\/$/, '')).filter(Boolean),
