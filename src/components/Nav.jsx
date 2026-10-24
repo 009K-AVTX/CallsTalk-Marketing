@@ -9,7 +9,7 @@ import { loadSession } from '../lib/portal.js';
 export default function Nav() {
   const [open, setOpen] = useState(false);
   const close = () => setOpen(false);
-  // Signed-in customers get Billing in place of Log In and Request Access.
+  // Signed-in customers get Dashboard in place of Log In and Request Access.
   // Read after hydration: the pre-rendered page has no session.
   const [signedIn, setSignedIn] = useState(false);
   useEffect(() => {
@@ -40,7 +40,7 @@ export default function Nav() {
               <TelegramIcon />
             </a>
             {signedIn ? (
-              <a href="/billing">Billing</a>
+              <a href="/dashboard">Dashboard</a>
             ) : (
               <>
                 <a href="/login">Log In</a>

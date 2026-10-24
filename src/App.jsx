@@ -36,14 +36,14 @@ function Home() {
 }
 
 // One app, several pre-rendered pages: the home page, the Legal Center documents, the customer
-// log-in and billing pages and a 404 page.
+// log-in, the Buyer Dashboard and a 404 page.
 export default function App({ path = '/' }) {
   const page = path.replace(/^\/|\/$/g, '').replace(/\.html$/, '');
   let content = <Home />;
   if (LEGAL_PAGES.includes(page)) content = <Legal page={page} />;
   else if (page === 'request-access') content = <AccessPage />;
   else if (page === 'login') content = <LoginPage />;
-  else if (page === 'billing') content = <BillingPage />;
+  else if (page === 'dashboard') content = <BillingPage />;
   else if (page && page !== 'index') content = <NotFound />;
   return (
     <>

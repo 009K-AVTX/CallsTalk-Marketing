@@ -182,7 +182,7 @@ function WalletIcon() {
   );
 }
 
-// The customer billing page at /billing: live wallet balance, today's bill, the last three days
+// The Buyer Dashboard at /dashboard, seen only after logging in: live wallet balance, today's bill, the last three days
 // and every day since September.
 export default function BillingPage() {
   const [data, setData] = useState(null);
@@ -230,8 +230,8 @@ export default function BillingPage() {
       <div className="container">
         <div className="billing__head">
           <div>
-            <p className="legal__crumb"><a href="/">Home</a> / Billing</p>
-            <h1>{data ? data.customer : 'Billing'}</h1>
+            <p className="legal__crumb"><a href="/">Home</a> / Buyer Dashboard</p>
+            <h1>{data ? data.customer : 'Buyer Dashboard'}</h1>
             <p className="billing__sub">
               <span className={`billing__pulse${loading ? ' is-busy' : ''}`} aria-hidden="true" />
               {data ? <>Live · updated {clock(data.as_of)}</> : 'Loading your bill…'}

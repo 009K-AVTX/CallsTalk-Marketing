@@ -11,7 +11,7 @@ export default function LoginPage() {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    if (loadSession()?.access) window.location.replace('/billing');
+    if (loadSession()?.access) window.location.replace('/dashboard');
   }, []);
 
   const submit = async (e) => {
@@ -29,7 +29,7 @@ export default function LoginPage() {
           return;
         }
       }
-      window.location.assign('/billing');
+      window.location.assign('/dashboard');
     } catch (err) {
       setError(err.message);
       setStatus('error');
