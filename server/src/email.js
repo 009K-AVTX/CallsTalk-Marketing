@@ -186,11 +186,10 @@ export function accessRequestMail(request) {
     subject: `Access request: ${request.company} (${request.name})`,
     preview: `${request.name} from ${request.company} asked for access.`,
     heading: `Access request from ${escapeHtml(request.name)}`,
-    sub: 'Approve it to send a CallsTalk.io login link.',
+    sub: 'Sent from the Request Access form on the website.',
     body,
     text: `New access request\n\n${details.map(([l, v]) => `${l}: ${v}`).join('\n')}`
-      + (request.message ? `\n\nMessage:\n${request.message}` : '')
-      + '\n\nApprove it to send a CallsTalk.io login link.\n',
+      + (request.message ? `\n\nMessage:\n${request.message}` : '') + '\n',
   };
 }
 

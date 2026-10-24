@@ -91,8 +91,7 @@ export async function notifyNewChat(chat) {
 export async function notifyAccessRequest(request) {
   const text = '<b>New access request</b>\n\n'
     + accessDetails(request).map(([label, value]) => `<b>${label}:</b> ${escape(value)}`).join('\n')
-    + (request.message ? `\n\n<b>Message</b>\n<blockquote>${escape(request.message)}</blockquote>` : '')
-    + '\n\n<b>Approve</b> to send a CallsTalk.io login link.';
+    + (request.message ? `\n\n<b>Message</b>\n<blockquote>${escape(request.message)}</blockquote>` : '');
   await send(text);
 }
 

@@ -66,7 +66,6 @@ async function sendTelegram(data) {
     data.phone && `<b>Phone:</b> ${escape(data.phone)}`,
     data.volume && `<b>Calls per month:</b> ${escape(data.volume)}`,
     data.message && `\n<b>Message</b>\n<blockquote>${escape(data.message)}</blockquote>`,
-    '\n<b>Approve</b> to send a CallsTalk.io login link.',
   ].filter(Boolean);
   const thread = process.env.TELEGRAM_THREAD_ID?.trim();
   try {
@@ -92,7 +91,7 @@ async function sendEmail(data) {
     .filter(([, v]) => v)
     .map(([k, v]) => `<tr><td style="padding:8px 16px 8px 0;color:#666;vertical-align:top;white-space:nowrap">${k}</td><td style="padding:8px 0;white-space:pre-wrap">${escape(v)}</td></tr>`)
     .join('');
-  const html = `<div style="font-family:system-ui,sans-serif;font-size:15px;color:#111"><h2 style="margin:0 0 4px">New access request</h2><p style="margin:0 0 16px;color:#666">Review this request. If approved, send ${escape(data.name)} a CallsTalk.io login link. Replying to this email reaches them directly.</p><table style="border-collapse:collapse">${rows}</table></div>`;
+  const html = `<div style="font-family:system-ui,sans-serif;font-size:15px;color:#111"><h2 style="margin:0 0 4px">New access request</h2><p style="margin:0 0 16px;color:#666">Replying to this email reaches them directly.</p><table style="border-collapse:collapse">${rows}</table></div>`;
   const text = [`New access request`, '', `Name: ${data.name}`, `Company: ${data.company}`, `Email: ${data.email}`, data.phone && `Phone: ${data.phone}`, data.volume && `Calls per month: ${data.volume}`, data.message && `Message: ${data.message}`].filter(Boolean).join('\n');
   try {
     const r = await fetch('https://api.resend.com/emails', {
