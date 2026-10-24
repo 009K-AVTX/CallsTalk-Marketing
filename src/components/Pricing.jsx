@@ -1,11 +1,12 @@
 import ContactLinks from './ContactLinks.jsx';
+import { PORTAL_LOGIN } from '../legal.js';
 
-// Account figures (balances, bills, payments) live in the Buyer Dashboard behind the log in, never here.
+// Account figures (balances, bills, payments) live in the portal behind the log in, never here.
 const STEPS = [
   ['Your Own Price', 'We agree a price per call with you. There are no plans or monthly tiers; every customer has their own rate.'],
   ['Pay Per Call', 'You pay only for the calls you receive, at the price agreed with you.'],
   ['Your Buyer Dashboard', 'Once you log in, your dashboard keeps your account up to date as your calls arrive.'],
-  ['Pay Online', 'Settle your account from your dashboard whenever you are ready, in a few clicks.'],
+  ['Pay Inside Your Login', 'Pay for your calls from your dashboard whenever you like, just like recharging a balance.'],
 ];
 
 export default function Pricing() {
@@ -33,7 +34,7 @@ export default function Pricing() {
           </div>
           <div className="actions">
             <a href="/request-access" className="btn btn--light">Request Access</a>
-            <a href="/login" className="btn btn--quiet">Log In</a>
+            <a href={PORTAL_LOGIN} className="btn btn--quiet">Log In</a>
           </div>
         </div>
         <div className="pricing__contact">

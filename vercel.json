@@ -3,9 +3,19 @@
   "trailingSlash": false,
   "redirects": [
     {
+      "source": "/login",
+      "destination": "https://callstalk-portal.vercel.app/login",
+      "permanent": false
+    },
+    {
+      "source": "/dashboard",
+      "destination": "https://callstalk-portal.vercel.app/",
+      "permanent": false
+    },
+    {
       "source": "/billing",
-      "destination": "/dashboard",
-      "permanent": true
+      "destination": "https://callstalk-portal.vercel.app/",
+      "permanent": false
     }
   ]
 }

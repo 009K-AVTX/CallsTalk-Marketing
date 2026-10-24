@@ -341,3 +341,12 @@ html { font-size: 15px; }
 .p-empty-card__cta { margin-top: 10px; }
 .p-up__portal { margin-left: auto; }
 .p-up__portal + .p-up__out { margin-left: 0; }
+.p-paynow { padding: 7px 16px; }
+@media (max-width: 640px) { .p-paynow { padding: 6px 12px; font-size: .78rem; } }
+@media (max-width: 1000px) {
+  .p-top__inner { height: auto; padding-bottom: 0; }
+}
+@media (max-width: 640px) {
+  .p-top .p-balance { display: none; }
+  .p-top__inner { gap: 0 10px; }
+}

@@ -2,6 +2,9 @@
 // Contact addresses live here so they can be changed in one place.
 export const SUPPORT_EMAIL = 'support@callstalk.com';
 export const TELEGRAM_HANDLE = 'callstalk';
+// The customer portal (billing, reports, payments). Becomes https://app.callstalk.io once the domain is set up.
+export const PORTAL_URL = (import.meta.env.VITE_PORTAL_APP_URL || 'https://callstalk-portal.vercel.app').replace(/\/$/, '');
+export const PORTAL_LOGIN = `${PORTAL_URL}/login`;
 export const LEGAL_EMAIL = 'legal@callstalk.com';
 const EFFECTIVE = 'October 23, 2026';
 

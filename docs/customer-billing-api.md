@@ -2,7 +2,7 @@
 
 **From:** CallsTalk website (frontend, done) · **For:** backend developer
 
-Customers stop receiving their bill in Telegram. They log in at **/login** with the login ID and password we give them, and the **Buyer Dashboard** at **/dashboard** (only after logging in) shows their wallet balance, today's bill (live, refreshed every 30 s), the last three days' bills, a Billing History of every day since **1 September 2026** (one tab per month, with monthly totals) and their payments, and lets them pay online.
+Customers stop receiving their bill in Telegram. They log in to the **CallsTalk Portal** (callstalk-portal.vercel.app, later app.callstalk.io; the website's Log In links there) with the login ID and password we give them, and its **Billing** page shows their wallet balance, today's bill (live, refreshed every 30 s), the last three days' bills, a Billing History of every day since **1 September 2026** (one tab per month, with monthly totals) and their payments, and lets them pay online.
 
 The site calls `VITE_PORTAL_API_URL` (falls back to `VITE_SUPPORT_API_URL`), e.g. `https://api.example.com/api`. Add the CallsTalk site origin to `CORS_ALLOWED_ORIGINS`, with the `Authorization` header allowed.
 

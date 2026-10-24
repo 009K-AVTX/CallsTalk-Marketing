@@ -10,8 +10,6 @@ import Answers from './components/Answers.jsx';
 import Legal from './components/Legal.jsx';
 import NotFound from './components/NotFound.jsx';
 import AccessPage from './components/AccessPage.jsx';
-import LoginPage from './components/LoginPage.jsx';
-import BillingPage from './components/BillingPage.jsx';
 import Updates from './components/Updates.jsx';
 import Cta from './components/Cta.jsx';
 import Footer from './components/Footer.jsx';
@@ -35,15 +33,13 @@ function Home() {
   );
 }
 
-// One app, several pre-rendered pages: the home page, the Legal Center documents, the customer
-// log-in, the Buyer Dashboard and a 404 page.
+// One app, several pre-rendered pages: the home page, the Legal Center documents and a 404 page.
+// Customers log in on the portal (PORTAL_URL); /login and /dashboard here redirect there (vercel.json).
 export default function App({ path = '/' }) {
   const page = path.replace(/^\/|\/$/g, '').replace(/\.html$/, '');
   let content = <Home />;
   if (LEGAL_PAGES.includes(page)) content = <Legal page={page} />;
   else if (page === 'request-access') content = <AccessPage />;
-  else if (page === 'login') content = <LoginPage />;
-  else if (page === 'dashboard') content = <BillingPage />;
   else if (page && page !== 'index') content = <NotFound />;
   return (
     <>

@@ -13,6 +13,16 @@ export const NAV = [
   { to: '/settings', label: 'Settings', icon: 'settings' },
 ];
 
+// Billing page, payment form in view and the amount ready to type.
+export function goToPay() {
+  navigate('/');
+  setTimeout(() => {
+    const field = document.getElementById('pay-amount');
+    field?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    field?.focus({ preventScroll: true });
+  }, 350);
+}
+
 export function logOut() {
   signOut();
   navigate('/login', { replace: true });
@@ -56,6 +66,7 @@ export default function Shell({ path, statement, children }) {
                 <b>{money(owes ? statement.amount_due : statement.balance, statement.currency)}</b>
               </Link>
             )}
+            <button type="button" className="btn btn--light btn--sm p-paynow" onClick={goToPay}>Pay Now</button>
             <div className="p-user">
               <button type="button" className="p-user__btn" aria-expanded={menu} aria-haspopup="menu" onClick={() => setMenu(!menu)}>
                 <span aria-hidden="true">{(statement?.customer || email || '?').slice(0, 1).toUpperCase()}</span>

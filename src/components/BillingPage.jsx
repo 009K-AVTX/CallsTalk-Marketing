@@ -89,7 +89,7 @@ export function Wallet({ data, onPaid }) {
       </dl>
 
       <form className="wallet__pay" onSubmit={pay}>
-        <label htmlFor="pay-amount">Amount to Pay</label>
+        <label htmlFor="pay-amount">Pay for Your Calls</label>
         <div className="wallet__amount">
           <span aria-hidden="true">$</span>
           <input id="pay-amount" type="number" inputMode="decimal" min="1" step="0.01" placeholder="0.00" value={amount} onChange={(e) => setAmount(e.target.value)} />
