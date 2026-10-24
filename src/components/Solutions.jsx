@@ -15,7 +15,7 @@ export default function Solutions() {
     <section className="section" id="solutions">
       <div className="container">
         <div className="section__head">
-          <h2>Built for whoever answers the phone.</h2>
+          <h2>Built for Whoever Answers the Phone.</h2>
           <Tabs tabs={tabs} active={active} onChange={setActive} />
         </div>
         <ul className="index">

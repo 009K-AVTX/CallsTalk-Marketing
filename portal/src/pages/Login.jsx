@@ -62,12 +62,12 @@ export default function Login() {
           <span>Calls<b>Talk</b></span>
           <em>Portal</em>
         </a>
-        <h1>Your CallsTalk bill, always up to date.</h1>
-        <p>See your balance and daily bills, open the billing reports our team sends you, and settle your account online.</p>
+        <h1>Your CallsTalk Bill, Always Up to Date.</h1>
+        <p>See Your Balance and Daily Bills, Open the Billing Reports Our Team Sends You, and Settle Your Account Online.</p>
         <ul className="p-login__points">
-          <li>Live balance and daily bills since September</li>
-          <li>Billing reports from our team, in Excel</li>
-          <li>Pay in USDT (TRC-20) to your own address</li>
+          <li>Live Balance and Your Last 5 Days of Bills</li>
+          <li>Billing Reports from Our Team, in Excel</li>
+          <li>Pay in USDT (TRC-20) to Your Own Address</li>
         </ul>
       </div>
       <form className="access-card p-login__card" onSubmit={submit}>
@@ -89,9 +89,9 @@ export default function Login() {
           {status === 'sending' ? 'Signing In…' : mfa ? 'Verify' : 'Log In'}
         </button>
         {mfa ? (
-          <p className="portal-login__help">Lost your phone? Ask our team to reset your login. <button type="button" className="p-linkbtn" onClick={restart}>Use another login</button></p>
+          <p className="portal-login__help">Lost your phone? Ask our team to reset your login. <button type="button" className="p-linkbtn" onClick={restart}>Use Another Login</button></p>
         ) : (
-          <p className="portal-login__help">No login yet? <a href={`${SITE}/request-access`}>Request access</a>.</p>
+          <p className="portal-login__help">No login yet? <a href={`${SITE}/request-access`}>Request Access</a>.</p>
         )}
       </form>
     </main>

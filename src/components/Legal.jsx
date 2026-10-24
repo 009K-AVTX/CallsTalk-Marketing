@@ -18,7 +18,7 @@ function LegalCenter() {
       <header className="legal__head">
         <p className="legal__crumb">Legal</p>
         <h1>Legal Center</h1>
-        <p className="lead">The agreements and policies that apply when you use CallsTalk.</p>
+        <p className="lead">The Agreements and Policies That Apply When You Use CallsTalk.</p>
       </header>
       {LEGAL_GROUPS.map((group) => (
         <section key={group.title} className="legal__group">

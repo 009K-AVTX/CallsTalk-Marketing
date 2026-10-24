@@ -15,7 +15,7 @@ export default function Pricing() {
       <div className="container">
         <div className="section__head">
           <h2>Per-Call Pricing, Tailored to Your Business.</h2>
-          <p className="lead">No plans to choose from. You get your own price per call, agreed with our team.</p>
+          <p className="lead">No Plans to Choose From. You Get Your Own Price per Call, Agreed with Our Team.</p>
         </div>
 
         <ol className="pricing__steps">
@@ -29,7 +29,7 @@ export default function Pricing() {
 
         <div className="pricing__talk">
           <div>
-            <h3>Want your price?</h3>
+            <h3>Want Your Price?</h3>
             <p>Request access and we will agree your price per call. Existing customers can log in to their Buyer Dashboard.</p>
           </div>
           <div className="actions">
@@ -38,7 +38,7 @@ export default function Pricing() {
           </div>
         </div>
         <div className="pricing__contact">
-          <p>Questions about your price?</p>
+          <p>Questions About Your Price?</p>
           <ContactLinks />
         </div>
         <p className="fine">Prices in USD, before taxes.</p>

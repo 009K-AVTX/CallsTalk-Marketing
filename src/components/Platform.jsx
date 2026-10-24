@@ -112,8 +112,8 @@ export default function Platform() {
     <section className="section section--white" id="features">
       <div className="container">
         <div className="platform__intro">
-          <h2>Hear it. Score it. Prove it.</h2>
-          <p className="lead">Three jobs behind every lead, handled in one CallsTalk workspace.</p>
+          <h2>Hear It. Score It. Prove It.</h2>
+          <p className="lead">Three Jobs Behind Every Lead, Handled in One CallsTalk Workspace.</p>
         </div>
 
         <div className="pillars" role="tablist" aria-label="Platform capabilities" onKeyDown={onKeyDown}>
