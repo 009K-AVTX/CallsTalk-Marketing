@@ -51,7 +51,7 @@ For `POST`:
 
 ## This week: the demo deployment
 
-Until Avortyx has these endpoints, the demo at **callstalk-portal.vercel.app** keeps reports in its own Vercel Blob store through `portal/api/reports.js`.
+Until Avortyx has these endpoints, the demo at **callstalk-portal.vercel.app** keeps reports in its own Vercel Blob store through `portal/api/reports.mjs`.
 - **Customers** are matched by their login email.
 - **The upload page** uses a shared upload key (Vercel env `UPLOAD_KEY`) instead of a staff login.
 - **Not secure enough for real customers:** anyone who knows a customer's email can list that customer's reports.
