@@ -9,6 +9,7 @@ import { Router } from 'express';
 import { notifyAccessRequest } from './telegram.js';
 import { emailAccessRequest } from './email.js';
 import { rateLimit } from './rate-limit.js';
+import { clientIp } from './format.js';
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 const LIMITS = { name: 80, email: 120, company: 120, phone: 40, volume: 40, message: 1000 };
@@ -28,6 +29,7 @@ accessRouter.post('/', rateLimit({ windowMs: 10 * 60_000, max: 5 }), async (req,
   }
   if (!EMAIL.test(request.email)) return res.status(400).json({ detail: 'Please enter a valid email address.' });
   if (request.volume && !VOLUMES.includes(request.volume)) request.volume = '';
+  request.ip = clientIp(req); // for the team in Telegram
 
   const [telegram, email] = await Promise.allSettled([notifyAccessRequest(request), emailAccessRequest(request)]);
   if (telegram.status === 'rejected') console.error('[access] could not reach Telegram:', telegram.reason.message);

@@ -5,7 +5,7 @@
 //                               the billing team signs in with a staff or admin login
 //   demo deployment          -> /api/reports, this project's own Vercel Blob store
 //   local development        -> the browser's storage, so upload and view can be tried on one machine
-import { authed, canUploadReports, DEMO, loadSession, signOut } from '../../src/lib/portal.js';
+import { authed, canUploadReports, DEMO, loadSession, renewSession, SESSION_HEADERS, signOut } from '../../src/lib/portal.js';
 
 const BASE = (import.meta.env.VITE_PORTAL_API_URL || import.meta.env.VITE_SUPPORT_API_URL || '').replace(/\/$/, '');
 const MODE = BASE && !DEMO ? 'api' : import.meta.env.DEV ? 'local' : 'demo';
@@ -21,7 +21,7 @@ async function send(url, { method = 'GET', body, headers = {} } = {}) {
   try {
     res = await fetch(url, { method, headers: { 'Content-Type': 'application/json', ...headers }, body: body ? JSON.stringify(body) : undefined });
   } catch {
-    throw new Error('We could not reach the server. Check your connection and try again.');
+    throw new Error('Unable to connect to the server. Please check your internet connection and try again.');
   }
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
@@ -65,7 +65,7 @@ const api = (path, method = 'GET', body) => authed(path, { method, body });
 function staffHeaders() {
   const s = staffSession();
   if (!s) throw new Error('Sign in to upload reports.');
-  return MODE === 'api' ? { Authorization: `Bearer ${s.access}` } : { 'x-upload-key': s.key };
+  return MODE === 'api' ? SESSION_HEADERS : { 'x-upload-key': s.key }; // api: the session cookie goes by itself
 }
 
 // ── local development store ──────────────────────────────────────────────────
@@ -127,6 +127,14 @@ export async function uploadReport({ customer, title, note, periodFrom, periodTo
   return report;
 }
 
+// One email to the customer's login ID about the reports just uploaded: { emailed, email } or { emailed: false, reason }.
+// Only on our server; the demo and local stores have no email.
+export const canNotify = MODE === 'api';
+export async function notifyReports(customer, reportIds) {
+  if (MODE !== 'api') return { emailed: false, reason: 'email is not available in this demo' };
+  return api('/staff/reports/notify', 'POST', { customer, reports: reportIds });
+}
+
 export async function deleteReport(id) {
   if (MODE === 'api') return api(`/staff/reports/${encodeURIComponent(id)}`, 'DELETE');
   if (MODE === 'demo') return send(`/api/reports?id=${encodeURIComponent(id)}`, { method: 'DELETE', headers: staffHeaders() });
@@ -141,10 +149,10 @@ export async function fetchFile(report) {
     if (!res.ok) throw new Error('The report file could not be opened.');
     return res.arrayBuffer();
   }
-  const get = () => fetch(`${BASE}/portal/reports/${encodeURIComponent(report.id)}/file`, { headers: { Authorization: `Bearer ${loadSession()?.access}` } });
+  const get = () => fetch(`${BASE}/portal/reports/${encodeURIComponent(report.id)}/file`, { credentials: 'same-origin', headers: SESSION_HEADERS });
   let res = await get();
   if (res.status === 401) {
-    await authed('/accounts/me'); // renews an expired access token, then try again
+    await renewSession().catch(() => {}); // an expired session cookie: renew it, then try again
     res = await get();
   }
   if (!res.ok) throw new Error('The report file could not be opened.');

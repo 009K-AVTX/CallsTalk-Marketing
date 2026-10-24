@@ -11,6 +11,7 @@ let BASE = (import.meta.env.VITE_SUPPORT_API_URL || '').replace(/\/$/, '');
 let STORAGE_KEY = 'callstalk.chats';
 const LEGACY_KEY = 'callstalk.chat'; // one session, before visitors could keep several
 let authToken = () => '';
+let extraHeaders = {};
 let beforeStart = async () => {};
 
 export let liveChatEnabled = Boolean(BASE);
@@ -19,7 +20,8 @@ export const MAX_CHATS = 3;
 
 // The customer portal uses the same chat as a signed-in customer: its own API address, the login's token
 // (so the team sees who it is) and chats kept per login. `refresh` renews the login before a chat starts.
-export function configureSupportChat({ base, token, storageKey, refresh }) {
+export function configureSupportChat({ base, token, headers, storageKey, refresh }) {
+  if (headers) extraHeaders = headers;
   if (refresh) beforeStart = refresh;
   if (base !== undefined) {
     BASE = base.replace(/\/$/, '');
@@ -33,7 +35,8 @@ async function request(path, options = {}) {
   const token = authToken();
   const res = await fetch(`${BASE}/support/chat${path}`, {
     ...options,
-    headers: { 'Content-Type': 'application/json', ...(token && { Authorization: `Bearer ${token}` }) },
+    credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json', ...extraHeaders, ...(token && { Authorization: `Bearer ${token}` }) },
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.detail || `The chat service returned an error (HTTP ${res.status}).`);

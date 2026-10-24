@@ -2,10 +2,13 @@
 // authenticator app; both are set on the one-use setup link our team sends.
 //
 //   POST /api/accounts/login            email + password    -> { mfa_required, temp_token }
-//   POST /api/accounts/verify-mfa       temp_token + token  -> { access, refresh, email, role }
-//   POST /api/accounts/refresh          refresh             -> { access }
-//   POST /api/accounts/logout           (Bearer)            -> { ok }
-//   GET  /api/accounts/me               (Bearer)            -> profile
+//   POST /api/accounts/verify-mfa       temp_token + token  -> { email, name, role } and the session cookies
+//   POST /api/accounts/refresh          (refresh cookie)    -> { ok } and a new session cookie
+//   POST /api/accounts/logout           (session)           -> { ok }, cookies cleared
+//   GET  /api/accounts/me               (session)           -> profile
+//
+// "(session)" is the HttpOnly session cookie (security.js); an Authorization: Bearer header also works, for
+// scripts. Tokens are never put in a reply body, so the portal's scripts never see them.
 //   POST /api/accounts/change-password  (Bearer) current_password, new_password -> { code_required }
 //                                        ... and again with code (authenticator) -> { ok }
 //   PUT  /api/accounts/avatar           (Bearer) content_base64 (JPG, PNG or WebP) -> { avatar_version }
@@ -13,6 +16,9 @@
 //   GET  /api/accounts/avatar/:userId   (Bearer)            -> the photo (own; staff: customers'; admin: all)
 //   GET  /api/accounts/invite/:token                        -> who it is for, QR code and key
 //   POST /api/accounts/invite/:token    password + code     -> signed in, as verify-mfa
+//   POST /api/accounts/forgot           email               -> { ok } (always the same; emails a reset link if the login exists)
+//   GET  /api/accounts/reset/:token                         -> { email, expires_at } for the reset page
+//   POST /api/accounts/reset/:token     password + code     -> signed in, as verify-mfa; other sessions signed out
 //
 // Errors are returned as { detail }, which the portal shows as written.
 
@@ -23,19 +29,23 @@ import {
   burnPasswordCheck, checkPassword, checkTotp, groupKey, hashPassword, hashToken, newToken, otpauthUrl,
 } from './auth-crypto.js';
 import {
-  completeInvite, createSession, deleteAvatar, deleteExpiredSessions, deleteSession, deleteUserSessions, findInvite,
+  completeInvite, createPasswordReset, createSession, deleteAvatar, deleteExpiredSessions, deleteSession, deleteUserSessions, findInvite,
+  findPasswordReset, forgetOldPasswordResets, usePasswordReset,
   findSessionUser, findUserByEmail, getAvatar, getUser, renewAccess, saveAvatar, setPassword, setTotpStep, touchLogin,
 } from './portal-db.js';
 import { UUID } from './db.js';
 import { rateLimit } from './rate-limit.js';
 import { HttpError } from './routes.js';
+import { recordAudit } from './audit.js';
+import { emailPasswordChanged, emailPasswordReset } from './email.js';
+import { checkCsrf, clearSessionCookies, refreshToken, sessionToken, setSessionCookies } from './security.js';
 
 const CHALLENGE_MS = 5 * 60_000;
 const CODE_TRIES = 5;
 const MIN_PASSWORD = 8;
-const WRONG_LOGIN = 'The login ID or password is not correct.';
-const WRONG_CODE = 'That code is not correct. Check that the time on your phone is right and try again.';
-const LINK_GONE = 'This setup link has already been used or has expired. Ask our team for a new one.';
+const WRONG_LOGIN = 'The login ID or password is incorrect.';
+const WRONG_CODE = 'The verification code is incorrect. Please ensure the time on your device is set correctly and try again.';
+const LINK_GONE = 'This setup link has already been used or has expired. Please contact our support team to request a new one.';
 const tooMany = (what) => rateLimit({ windowMs: 10 * 60_000, max: 10, detail: `Too many ${what} in a short time. Please wait a few minutes and try again.` });
 
 // Password accepted, code still to come. Kept in memory: a restart only means typing the password again.
@@ -53,7 +63,8 @@ export function checkNewPassword(password) {
   return password;
 }
 
-async function signIn(user) {
+// Starts a session: its tokens go into HttpOnly cookies, and the reply says only who signed in.
+async function signIn(res, user) {
   const access = newToken();
   const refresh = newToken();
   const now = Date.now();
@@ -65,17 +76,22 @@ async function signIn(user) {
     refreshExpires: new Date(now + config.portal.refreshDays * 86_400_000),
   });
   await touchLogin(user.id);
-  return { access, refresh, email: user.email, name: user.name, role: user.role };
+  setSessionCookies(res, { access, refresh });
+  return { email: user.email, name: user.name, role: user.role };
 }
 
-const bearer = (req) => /^Bearer (.+)$/.exec(req.get('authorization') || '')?.[1];
-
 // Puts the signed-in user on req.user. With roles given, only those roles get through.
+// Already done for this request (an upload checked before its body was read): only the role is checked again.
 export const requireUser = (...roles) => async (req, res, next) => {
-  const token = bearer(req);
+  if (req.user) {
+    if (roles.length && !roles.includes(req.user.role)) throw new HttpError(403, 'You do not have permission to access this page.');
+    return next();
+  }
+  const { token, viaCookie } = sessionToken(req);
   const user = token && await findSessionUser(hashToken(token));
-  if (!user) throw new HttpError(401, 'Please log in again.');
-  if (roles.length && !roles.includes(user.role)) throw new HttpError(403, 'This login cannot open that page.');
+  if (!user) throw new HttpError(401, 'Your session has expired. Please log in again.');
+  if (roles.length && !roles.includes(user.role)) throw new HttpError(403, 'You do not have permission to access this page.');
+  checkCsrf(req, viaCookie);
   req.user = user;
   res.setHeader('Cache-Control', 'no-store');
   next();
@@ -102,8 +118,16 @@ accountsRouter.post('/login', tooMany('log in attempts'), async (req, res) => {
 
   const user = await findUserByEmail(email);
   const ok = user?.password_hash ? await checkPassword(password, user.password_hash) : await burnPasswordCheck(password);
-  if (!ok) throw new HttpError(401, WRONG_LOGIN);
-  if (user.status === 'disabled') throw new HttpError(403, 'This login is turned off. Contact us if you need it back.');
+  // Failed sign-ins go in the audit trail, under the login tried (known or not).
+  const failed = (reason, status) => recordAudit('auth.login_failed', { req, user, email, details: { reason }, status });
+  if (!ok) {
+    await failed('password', 401);
+    throw new HttpError(401, WRONG_LOGIN);
+  }
+  if (user.status === 'disabled') {
+    await failed('turned off', 403);
+    throw new HttpError(403, 'This account has been deactivated. Please contact our support team for assistance.');
+  }
 
   const temp = newToken();
   challenges.set(hashToken(temp), { userId: user.id, expires: Date.now() + CHALLENGE_MS, tries: 0 });
@@ -115,7 +139,7 @@ accountsRouter.post('/verify-mfa', tooMany('codes'), async (req, res) => {
   const challenge = challenges.get(key);
   if (!challenge || challenge.expires < Date.now()) {
     challenges.delete(key);
-    throw new HttpError(401, 'Your sign-in timed out. Please enter your password again.');
+    throw new HttpError(401, 'Your sign-in session has expired. Please enter your password again.');
   }
   const user = await getUser(challenge.userId);
   if (!user || user.status !== 'active') throw new HttpError(401, WRONG_LOGIN);
@@ -123,23 +147,33 @@ accountsRouter.post('/verify-mfa', tooMany('codes'), async (req, res) => {
   const step = checkTotp(user.totp_secret, req.body?.token, Number(user.totp_last_step));
   if (!step) {
     if (++challenge.tries >= CODE_TRIES) challenges.delete(key);
+    await recordAudit('auth.login_failed', { req, user, details: { reason: 'code' }, status: 401 });
     throw new HttpError(401, WRONG_CODE);
   }
   challenges.delete(key);
   await setTotpStep(user.id, step);
-  res.json(await signIn(user));
+  const session = await signIn(res, user);
+  await recordAudit('auth.login', { req, user, status: 200 });
+  res.json(session);
 });
 
-accountsRouter.post('/refresh', async (req, res) => {
+// A new session cookie from the refresh cookie (sent only to this address). The refresh token itself stays.
+accountsRouter.post('/refresh', rateLimit({ windowMs: 10 * 60_000, max: 60, detail: 'Too many session renewals. Please wait a few minutes and log in again.' }), async (req, res) => {
   const access = newToken();
-  const renewed = await renewAccess(hashToken(str(req.body?.refresh)), hashToken(access),
+  const refresh = refreshToken(req);
+  const renewed = refresh && await renewAccess(hashToken(refresh), hashToken(access),
     new Date(Date.now() + config.portal.accessMinutes * 60_000));
-  if (!renewed) throw new HttpError(401, 'Please log in again.');
-  res.json({ access });
+  if (!renewed) {
+    clearSessionCookies(res);
+    throw new HttpError(401, 'Please log in again.');
+  }
+  setSessionCookies(res, { access });
+  res.json({ ok: true });
 });
 
 accountsRouter.post('/logout', requireUser(), async (req, res) => {
   await deleteSession(req.user.session_id);
+  clearSessionCookies(res);
   res.json({ ok: true });
 });
 
@@ -150,14 +184,95 @@ accountsRouter.get('/me', requireUser(), (req, res) => res.json(profile(req.user
 accountsRouter.post('/change-password', requireUser(), tooMany('password changes'), async (req, res) => {
   const current = typeof req.body?.current_password === 'string' ? req.body.current_password : '';
   const next = checkNewPassword(req.body?.new_password);
-  if (!await checkPassword(current, req.user.password_hash)) throw new HttpError(400, 'Your current password is not correct.');
+  if (!await checkPassword(current, req.user.password_hash)) throw new HttpError(400, 'Your current password is incorrect.');
   if (req.body?.code === undefined || req.body.code === '') return res.json({ code_required: true });
   const step = checkTotp(req.user.totp_secret, req.body.code, Number(req.user.totp_last_step));
   if (!step) throw new HttpError(400, WRONG_CODE);
   await setTotpStep(req.user.id, step);
   await setPassword(req.user.id, await hashPassword(next));
   await deleteUserSessions(req.user.id, req.user.session_id); // other devices sign in again
+  noticePasswordChanged(req.user, 'changed');
   res.json({ ok: true });
+});
+
+// The owner hears about every password change, in case it was not them. A failed email never undoes it.
+function noticePasswordChanged(user, how) {
+  emailPasswordChanged({ name: user.name, email: user.email, when: new Date(), how })
+    .catch((err) => console.error(`[email] could not send the password-change notice to ${user.email}:`, err.message));
+}
+
+// ── forgotten passwords ──────────────────────────────────────────────────────
+
+const RESET_GONE = 'This reset link has already been used or has expired. Please request a new one from the login page.';
+const RESET_SENT = 'If an account exists for this login ID, we have sent an email with a link to reset the password. The link is valid for a limited time.';
+const RESETS_PER_HOUR = 3; // per login ID, on top of the per-IP limit, so nobody can flood an inbox
+const resetsFor = new Map();
+setInterval(() => {
+  const hourAgo = Date.now() - 3_600_000;
+  for (const [email, times] of resetsFor) if (!times.some((t) => t > hourAgo)) resetsFor.delete(email);
+  forgetOldPasswordResets().catch(() => {});
+}, 600_000).unref();
+
+// Always answers the same, so the form cannot be used to find out which emails have a login.
+accountsRouter.post('/forgot', rateLimit({ windowMs: 10 * 60_000, max: 5, detail: 'Too many reset requests in a short period. Please wait a few minutes and try again.' }), async (req, res) => {
+  const email = str(req.body?.email, 200).toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) throw new HttpError(400, 'Please enter a valid login ID (your email address).');
+  res.json({ ok: true, message: RESET_SENT });
+
+  const recent = (resetsFor.get(email) || []).filter((t) => t > Date.now() - 3_600_000);
+  if (recent.length >= RESETS_PER_HOUR) return;
+  resetsFor.set(email, [...recent, Date.now()]);
+
+  const user = await findUserByEmail(email);
+  // Only logins in use get a link: not ones still waiting for their setup link, nor deactivated ones.
+  if (!user || user.status !== 'active' || !user.password_hash) {
+    await recordAudit('auth.reset_requested', { req, user, email, details: { sent: false }, status: 200 });
+    return;
+  }
+  const token = newToken();
+  const expiresAt = new Date(Date.now() + config.portal.resetMinutes * 60_000);
+  await createPasswordReset(user.id, { tokenHash: hashToken(token), expiresAt });
+  const link = `${config.portalUrl}/reset?token=${encodeURIComponent(token)}`;
+  let sent = false;
+  try {
+    sent = await emailPasswordReset({ name: user.name, email: user.email, link, expiresAt });
+  } catch (err) {
+    console.error(`[email] could not send the reset link to ${user.email}:`, err.message);
+  }
+  await recordAudit('auth.reset_requested', { req, user, details: { sent }, status: 200 });
+});
+
+async function openReset(token) {
+  const reset = await findPasswordReset(hashToken(token));
+  if (!reset || reset.used_at || reset.expires_at < new Date() || reset.status !== 'active' || !reset.set_up) throw new HttpError(410, RESET_GONE);
+  return reset;
+}
+
+accountsRouter.get('/reset/:token', tooMany('requests'), async (req, res) => {
+  const reset = await openReset(req.params.token);
+  res.setHeader('Cache-Control', 'no-store');
+  res.json({ email: reset.email, name: reset.name, expires_at: reset.expires_at });
+});
+
+accountsRouter.post('/reset/:token', tooMany('attempts'), async (req, res) => {
+  const reset = await openReset(req.params.token);
+  const password = checkNewPassword(req.body?.password);
+  const user = await getUser(reset.user_id);
+  // The authenticator code is still needed: a link from a mailbox alone cannot take over the login.
+  const step = checkTotp(user.totp_secret, req.body?.code, Number(user.totp_last_step));
+  if (!step) {
+    await recordAudit('auth.reset_failed', { req, user, details: { reason: 'code' }, status: 400 });
+    throw new HttpError(400, WRONG_CODE);
+  }
+  if (!await usePasswordReset(hashToken(req.params.token))) throw new HttpError(410, RESET_GONE);
+
+  await setTotpStep(user.id, step);
+  await setPassword(user.id, await hashPassword(password));
+  await deleteUserSessions(user.id); // every device signs in again with the new password
+  const session = await signIn(res, user);
+  await recordAudit('auth.password_reset', { req, user, status: 200 });
+  noticePasswordChanged(user, 'reset');
+  res.json(session);
 });
 
 // ── profile photos ───────────────────────────────────────────────────────────
@@ -174,10 +289,10 @@ function imageType(buf) {
 
 accountsRouter.put('/avatar', requireUser(), tooMany('photo changes'), async (req, res) => {
   const content = Buffer.from(typeof req.body?.content_base64 === 'string' ? req.body.content_base64 : '', 'base64');
-  if (!content.length) throw new HttpError(400, 'Choose a photo to upload.');
-  if (content.length > MAX_AVATAR_BYTES) throw new HttpError(413, 'That photo is too large. Try a smaller one.');
+  if (!content.length) throw new HttpError(400, 'Please select an image to upload.');
+  if (content.length > MAX_AVATAR_BYTES) throw new HttpError(413, 'This image is too large. Please select a smaller file.');
   const type = imageType(content);
-  if (!type) throw new HttpError(400, 'Use a JPG, PNG or WebP photo.');
+  if (!type) throw new HttpError(400, 'Please upload a JPG, PNG or WebP image.');
   const saved = await saveAvatar(req.user.id, type, content);
   res.json({ avatar_version: saved.avatar_version });
 });
@@ -231,9 +346,12 @@ accountsRouter.post('/invite/:token', tooMany('attempts'), async (req, res) => {
   const invite = await openInvite(req.params.token);
   const password = checkNewPassword(req.body?.password);
   const step = checkTotp(invite.totp_secret, req.body?.code);
-  if (!step) throw new HttpError(400, 'That code is not correct. Scan the QR code again, or check that the time on your phone is right.');
+  if (!step) throw new HttpError(400, 'The verification code is incorrect. Please rescan the QR code or ensure the time on your device is set correctly.');
 
   const userId = await completeInvite(tokenHash, { passwordHash: await hashPassword(password), step });
   if (!userId) throw new HttpError(410, LINK_GONE);
-  res.json(await signIn(await getUser(userId)));
+  const user = await getUser(userId);
+  const session = await signIn(res, user);
+  await recordAudit('auth.setup', { req, user, status: 200 });
+  res.json(session);
 });

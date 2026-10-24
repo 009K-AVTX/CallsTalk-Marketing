@@ -11,12 +11,14 @@
 import { Router } from 'express';
 import QRCode from 'qrcode';
 import { config } from './config.js';
-import { findWalletOwners, getWallet, saveProviderPayment, saveWallet } from './portal-db.js';
+import { findWalletOwners, getUser, getWallet, saveProviderPayment, saveWallet } from './portal-db.js';
+import { recordAudit } from './audit.js';
 
 const PROVIDER = 'wellwallet';
 const NETWORK = 'trx';
 const CURRENCY = 'USDT';
-const STATUS = { in_progress: 'pending', completed: 'completed', error: 'failed' };
+// The transaction list says "completed"; webhooks say "confirmed".
+const STATUS = { in_progress: 'pending', pending: 'pending', completed: 'completed', confirmed: 'completed', error: 'failed', failed: 'failed' };
 // Webhooks only come from these addresses (docs.wellwallet.io/webhook).
 const WEBHOOK_IPS = ['54.171.15.37', '108.128.68.222', '63.33.226.230'];
 
@@ -32,10 +34,23 @@ async function api(method, path, { query, body } = {}) {
     body: body ? JSON.stringify(body) : undefined,
     signal: AbortSignal.timeout(20_000),
   });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok || data.error_code) {
-    const why = data.error_message || data.message || `HTTP ${res.status}`;
-    throw new Error(`${method} ${path}: ${Array.isArray(why) ? why.join(', ') : why}`);
+  const raw = await res.text();
+  let data;
+  try {
+    data = raw ? JSON.parse(raw) : {};
+  } catch {
+    data = null;
+  }
+  // A bare body (e.g. "403") comes from Well Wallet's edge: this server's IP is not on their allowlist.
+  if (!res.ok && (!data || typeof data !== 'object')) {
+    throw new Error(`${method} ${path}: blocked (HTTP ${res.status}), is this server's IP on Well Wallet's allowlist?`);
+  }
+  // The live API answers errors in camelCase (errorMessage/errorCode), the docs in snake_case: read both.
+  const code = data.errorCode ?? data.error_code;
+  if (!res.ok || code) {
+    const why = data.errorMessage || data.error_message || data.message || `HTTP ${res.status}`;
+    const hint = method === 'POST' && path === '/wallets' && res.status === 404 ? ' (the account may be at its 500-wallet limit)' : '';
+    throw new Error(`${method} ${path}: ${Array.isArray(why) ? why.join(', ') : why}${hint}`);
   }
   return data.data;
 }
@@ -94,7 +109,8 @@ export async function syncDeposits({ search } = {}) {
       sort_by: 'created_at', sort_direction: 'desc', limit: 300,
     },
   });
-  const deposits = (data?.transactions || []).filter((t) => t.direction === 'in' && t.currency === CURRENCY && t.hash && Number(t.amount) > 0);
+  const list = Array.isArray(data) ? data : data?.transactions ?? data?.items ?? [];
+  const deposits = list.filter((t) => t.direction === 'in' && t.currency === CURRENCY && t.hash && Number(t.amount) > 0);
   if (!deposits.length) return 0;
 
   const owners = await findWalletOwners(deposits.map((t) => t.recipient_wallet));
@@ -114,6 +130,12 @@ export async function syncDeposits({ search } = {}) {
     if (changed) {
       saved++;
       console.log(`[payments] ${t.amount} USDT ${STATUS[t.status] || t.status} for customer ${userId} (${t.hash.slice(0, 12)}…)`);
+      // In the audit trail as the system's doing: no one in the team entered it.
+      const owner = await getUser(userId);
+      await recordAudit('payment.deposit', {
+        target: { id: userId, label: owner?.company || owner?.name || owner?.email || '' },
+        details: { amount: Number(t.amount).toFixed(2), status: STATUS[t.status] || 'pending', reference: t.hash, method: 'USDT (TRC-20)' },
+      });
     }
   }
   return saved;
@@ -134,9 +156,10 @@ paymentsRouter.post('/webhook', async (req, res) => {
     console.warn(`[payments] webhook refused from ${req.ip}`);
     return res.status(403).json({ detail: 'Forbidden.' });
   }
-  res.json({ ok: true }); // answer at once; the check below reads the transaction from the API
-  const hash = typeof req.body?.hash === 'string' && /^[0-9a-fA-F]{16,128}$/.test(req.body.hash) ? req.body.hash : undefined;
-  if (req.body?.direction === 'in' || !req.body?.direction) {
+  res.json({ result: 'success' }); // answer at once (Well Wallet retries otherwise); the check below reads the API
+  const tx = req.body?.data ?? req.body; // sent as { data: {...} } in practice, unwrapped in the docs
+  const hash = typeof tx?.hash === 'string' && /^[0-9a-fA-F]{16,128}$/.test(tx.hash) ? tx.hash : undefined;
+  if (tx?.direction === 'in' || !tx?.direction) {
     syncDeposits({ search: hash }).catch((err) => console.error('[payments] webhook check failed:', err.message));
   }
 });

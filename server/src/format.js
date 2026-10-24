@@ -7,8 +7,11 @@ export const clip = (s, n) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
 // Name used when a visitor starts chatting without leaving their details.
 export const ANONYMOUS_NAME = 'Visitor';
 
+// The visitor's address. Behind nginx it is the real one (trust proxy in index.js), not the server's.
+export const clientIp = (req) => (req.ip || '').replace(/^::ffff:/, '');
+
 // Shown to the visitor when the team ends a chat without writing their own goodbye.
-export const TEAM_ENDED_MESSAGE = 'Our team has ended this chat. Thanks for reaching out, and start a new chat any time.';
+export const TEAM_ENDED_MESSAGE = 'This conversation has been closed by our team. Thank you for contacting CallsTalk; you are welcome to start a new chat at any time.';
 
 export const shortId =(session) => session.short_id ?? session.id.slice(0, 8);
 

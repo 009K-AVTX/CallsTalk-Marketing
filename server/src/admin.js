@@ -1,28 +1,35 @@
 // Admin side of the portal: logins for customers and admins, and each customer's billing.
 // Admin logins only (Bearer token from /api/accounts).
 //
-//   GET    /api/admin/users                      everyone, with setup-link state and price
+//   GET    /api/admin/users                      a page of logins (?q, ?role, ?limit, ?offset), with setup-link state and price
+//   GET    /api/admin/users/options              everyone, briefly, for filters
+//   GET    /api/admin/users/:id                  one login
 //   POST   /api/admin/users                      new login (+ billing terms for a customer); emails the setup link
 //   PATCH  /api/admin/users/:id                  name, company, role, status (active | disabled)
 //   POST   /api/admin/users/:id/invite           new setup link; for a login in use this resets password and code app
 //   DELETE /api/admin/users/:id                  removes the login and everything stored for it
-//   GET    /api/admin/users/:id/billing          terms and the last 31 days' statement
+//   GET    /api/admin/users/:id/billing          terms, the last 31 days' statement and their contact methods
 //   PUT    /api/admin/users/:id/billing          terms: price per call, opening balance, start date, time zone
-//   PUT    /api/admin/users/:id/days/:date       billable calls on a day (price defaults to the current one)
+//   PUT    /api/admin/users/:id/days/:date       a day's calls and replacements (not charged); price defaults to the current one
 //   DELETE /api/admin/users/:id/days/:date
 //   POST   /api/admin/users/:id/payments         a payment received (bank transfer, USDT...)
 //   DELETE /api/admin/users/:id/payments/:paymentId
+//   GET    /api/admin/audit...                   the audit trail (audit.js)
+//   GET    /api/admin/finance                    billed, collected and owed across customers (finance.js)
 
 import { Router } from 'express';
+import { auditRouter } from './audit.js';
+import { financeRouter } from './finance.js';
 import { config } from './config.js';
 import { hashToken, newToken, newTotpSecret } from './auth-crypto.js';
 import { requireUser } from './accounts.js';
 import { addDays, localDate, statement, validTimeZone } from './billing.js';
 import { UUID } from './db.js';
 import { emailInvite } from './email.js';
+import { contactsOf } from './contacts.js';
 import {
-  addPayment, countAdmins, createInvite, createUser, deleteDay, deletePayment, deleteUser, deleteUserSessions,
-  findUserByEmail, getAccount, getUser, listDays, listPayments, listUsers, saveAccount, saveDay, updateUser,
+  addPayment, createInvite, createUser, deleteDay, deletePayment, deleteUser, deleteUserSessions, getDay,
+  findUserByEmail, getAccount, getUser, listDays, listPayments, getUserRow, listUserOptions, listUsersPage, saveAccount, saveDay, updateUser, withAdminLock,
 } from './portal-db.js';
 import { HttpError } from './routes.js';
 
@@ -34,6 +41,11 @@ const CURRENCIES = ['USD'];
 const DEFAULT_TZ = 'America/New_York';
 
 const str = (v, max) => (typeof v === 'string' ? v.trim().slice(0, max) : '');
+
+// Concurrency control: a change carries the `version` it was made from (portal-db.js). Left out, the change
+// applies to whatever is there, as before.
+const versionOf = (body) => (Number.isInteger(body?.version) && body.version >= 0 ? body.version : null);
+const outOfDate = () => new HttpError(409, 'Someone else saved a change here a moment ago, so yours was not saved. The page now shows the latest: check it, then save again.');
 
 function amount(v, label, { min = -1e9, required = true } = {}) {
   if ((v === undefined || v === null || v === '') && !required) return undefined;
@@ -72,7 +84,8 @@ function onDay(date, timeZone) {
   return t;
 }
 
-const setupLink = (token) => `${config.portalUrl}/setup?token=${encodeURIComponent(token)}`;
+// The token rides in the #fragment, which browsers never send to a server: it stays out of access logs and Referer headers.
+const setupLink = (token) => `${config.portalUrl}/setup#token=${encodeURIComponent(token)}`;
 
 // Makes a setup link, emails it and returns it, so the admin can also pass it on another way.
 export async function sendInvite(user, { createdBy = null, reset = false } = {}) {
@@ -108,20 +121,44 @@ async function loadCustomer(req) {
 
 async function billingView(user) {
   const account = await getAccount(user.id);
-  if (!account) return { account: null, statement: null };
+  const contacts = await contactsOf(user.id);
+  if (!account) return { account: null, statement: null, contacts };
   const today = localDate(new Date(), account.timezone);
   const from = [addDays(today, -30), account.start_date].sort().pop();
-  const result = statement({ user, account, days: await listDays(user.id, today), payments: await listPayments(user.id), from });
-  return { account, statement: result };
+  const days = await listDays(user.id, today);
+  const result = statement({ user, account, days, payments: await listPayments(user.id), from });
+  // Each shown day's version, sent back with a change to it (concurrency control).
+  const dayVersions = Object.fromEntries(days.filter((d) => d.date >= from).map((d) => [d.date, d.version]));
+  return { account, statement: result, contacts, day_versions: dayVersions };
 }
 
 const userView = ({ password_hash: _p, totp_secret: _t, totp_last_step: _s, session_id: _i, ...u }) => u;
 
 export const adminRouter = Router();
 adminRouter.use(requireUser('admin'));
+adminRouter.use('/audit', auditRouter);
+adminRouter.use('/finance', financeRouter);
 
+// A page of logins: ?q= (name, email or company), ?role=, ?limit= (50, at most 200), ?offset=.
+// -> { results, total, counts: { customer, staff, admin }, waiting, limit, offset }
 adminRouter.get('/users', async (req, res) => {
-  res.json({ results: await listUsers() });
+  const limit = Math.min(Math.max(Number.parseInt(req.query.limit, 10) || 50, 1), 200);
+  const offset = Math.min(Math.max(Number.parseInt(req.query.offset, 10) || 0, 0), 100_000);
+  const role = ROLES.includes(req.query.role) ? req.query.role : null;
+  const q = str(req.query.q, 100);
+  res.json({ ...await listUsersPage({ q, role, limit, offset }), limit, offset });
+});
+
+// Everyone, briefly (id, name, company, email, role): for the person and customer filters.
+adminRouter.get('/users/options', async (req, res) => {
+  res.json({ results: await listUserOptions() });
+});
+
+// One login, as in the list.
+adminRouter.get('/users/:id', async (req, res) => {
+  const user = UUID.test(req.params.id) && await getUserRow(req.params.id);
+  if (!user) throw new HttpError(404, 'That login no longer exists.');
+  res.json({ user });
 });
 
 adminRouter.post('/users', async (req, res) => {
@@ -155,14 +192,19 @@ adminRouter.patch('/users/:id', async (req, res) => {
   }
   if (body.status !== undefined && body.status !== user.status) {
     if (!['active', 'disabled'].includes(body.status)) throw new HttpError(400, 'Unknown status.');
-    if (self) throw new HttpError(400, 'You cannot turn off your own login.');
+    if (self) throw new HttpError(400, 'You cannot deactivate your own login.');
     // Turning a login back on: it is active again if it was set up, otherwise it waits for its link.
     change.status = body.status === 'active' && !user.password_hash ? 'invited' : body.status;
   }
-  if (user.role === 'admin' && ((change.role && change.role !== 'admin') || change.status === 'disabled') && await countAdmins() <= 1) {
-    throw new HttpError(400, 'Keep at least one admin login.');
-  }
-  const updated = await updateUser(user.id, change);
+  // Checked against the login as it is inside the lock, not as it was read above.
+  const updated = await withAdminLock(user.id, async (db, admins, now) => {
+    if (!now) throw new HttpError(404, 'That login no longer exists.');
+    const removesAdmin = now.role === 'admin' && now.status !== 'disabled' && ((change.role && change.role !== 'admin') || change.status === 'disabled');
+    if (removesAdmin && admins <= 1) throw new HttpError(400, 'Keep at least one admin login.');
+    const row = await updateUser(user.id, change, versionOf(body), db);
+    if (!row) throw outOfDate();
+    return row;
+  });
   if (change.status === 'disabled' || change.role) await deleteUserSessions(user.id);
   res.json({ user: updated });
 });
@@ -170,7 +212,7 @@ adminRouter.patch('/users/:id', async (req, res) => {
 adminRouter.post('/users/:id/invite', async (req, res) => {
   const user = await loadUser(req);
   if (user.id === req.user.id) throw new HttpError(400, 'Ask another admin to reset your own login.');
-  if (user.status === 'disabled') throw new HttpError(400, 'Turn this login back on first.');
+  if (user.status === 'disabled') throw new HttpError(400, 'Reactivate this login first.');
   const reset = Boolean(user.password_hash);
   res.json({ reset, ...await sendInvite(user, { createdBy: req.user.id, reset }) });
 });
@@ -178,8 +220,10 @@ adminRouter.post('/users/:id/invite', async (req, res) => {
 adminRouter.delete('/users/:id', async (req, res) => {
   const user = await loadUser(req);
   if (user.id === req.user.id) throw new HttpError(400, 'You cannot delete your own login.');
-  if (user.role === 'admin' && user.status !== 'disabled' && await countAdmins() <= 1) throw new HttpError(400, 'Keep at least one admin login.');
-  await deleteUser(user.id);
+  await withAdminLock(user.id, async (db, admins, now) => {
+    if (now?.role === 'admin' && now.status !== 'disabled' && admins <= 1) throw new HttpError(400, 'Keep at least one admin login.');
+    if (now) await deleteUser(user.id, db);
+  });
   res.json({ ok: true });
 });
 
@@ -190,7 +234,8 @@ adminRouter.get('/users/:id/billing', async (req, res) => {
 
 adminRouter.put('/users/:id/billing', async (req, res) => {
   const user = await loadCustomer(req);
-  await saveAccount(user.id, terms(req.body || {}, await getAccount(user.id) || {}));
+  const saved = await saveAccount(user.id, terms(req.body || {}, await getAccount(user.id) || {}), versionOf(req.body));
+  if (!saved) throw outOfDate();
   res.json({ user: userView(user), ...await billingView(user) });
 });
 
@@ -203,14 +248,20 @@ adminRouter.put('/users/:id/days/:date', async (req, res) => {
   if (date > localDate(new Date(), account.timezone)) throw new HttpError(400, 'Calls can only be entered for today or earlier.');
   const calls = Number(req.body?.calls);
   if (!Number.isInteger(calls) || calls < 0 || calls > 1_000_000) throw new HttpError(400, 'Please enter the number of calls as a whole number.');
-  const price = amount(req.body?.price_per_call, 'price per call', { min: 0, required: false }) ?? account.price_per_call;
-  await saveDay(user.id, { date, calls, price_per_call: price });
+  // Replacements left out keep what the day already has.
+  const existing = await getDay(user.id, date);
+  const replacements = req.body?.replacements === undefined || req.body.replacements === '' ? existing?.replacements ?? 0 : Number(req.body.replacements);
+  if (!Number.isInteger(replacements) || replacements < 0) throw new HttpError(400, 'Please enter replacements as a whole number (0 for none).');
+  if (replacements > calls) throw new HttpError(400, `Replacements (${replacements}) cannot be more than the day's calls (${calls}).`);
+  const price = amount(req.body?.price_per_call, 'price per call', { min: 0, required: false }) ?? existing?.price_per_call ?? account.price_per_call;
+  if (!await saveDay(user.id, { date, calls, replacements, price_per_call: price }, versionOf(req.body))) throw outOfDate();
   res.json({ user: userView(user), ...await billingView(user) });
 });
 
 adminRouter.delete('/users/:id/days/:date', async (req, res) => {
   const user = await loadCustomer(req);
-  await deleteDay(user.id, day(req.params.date));
+  const expected = /^\d{1,9}$/.test(req.query.version || '') ? Number(req.query.version) : null;
+  if (!await deleteDay(user.id, day(req.params.date), expected)) throw outOfDate();
   res.json({ user: userView(user), ...await billingView(user) });
 });
 

@@ -34,12 +34,12 @@ Every day from `from` up to and including today (today counted so far), **newest
   "amount_due": "60.00",
   "days": [
     { "date": "2026-10-24", "is_today": true,
-      "opening_balance": "-320.00", "calls": 64, "price_per_call": "35.00",
+      "opening_balance": "-320.00", "calls": 64, "replacements": 0, "billable_calls": 64, "price_per_call": "35.00",
       "charges": "2240.00", "payment_received": "2500.00", "balance": "-60.00" }
   ],
   "payments": [
     { "id": "…", "amount": "2500.00", "currency": "USD", "status": "completed",
-      "provider": "manual", "reference": "", "note": "Bank transfer", "date": "2026-10-24T14:20:00Z" }
+      "method": "manual", "reference": "", "note": "Bank transfer", "date": "2026-10-24T14:20:00Z" }
   ]
 }
 ```
@@ -47,7 +47,8 @@ Every day from `from` up to and including today (today counted so far), **newest
 Rules the page relies on:
 - Money values are strings with 2 decimals. Negative balance = the customer owes us.
 - `balance` (per day) = `opening_balance − charges + payment_received`; the next day's `opening_balance` is the previous day's `balance`.
-- `charges` = `calls × price_per_call`. Each customer has their own price.
+- `charges` = `(calls − replacements) × price_per_call`. Each customer has their own price.
+- `replacements`: calls from that day that are replaced and **not charged**; shown as "125 − 2" (125 calls, 2 replaced, 123 charged). Our team often adds them after the day, and the corrected balance carries into every later day. `billable_calls` = `calls − replacements`.
 - `amount_due` = `max(−balance, 0)`.
 - `payments.status`: `pending` | `completed` | `failed`. Only completed payments count towards the balance.
 - 403 for a login that is not a customer, 404 when their billing is not set up; the `detail` is shown on the page.

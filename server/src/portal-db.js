@@ -31,12 +31,34 @@ const SCHEMA = `
   );
   CREATE INDEX IF NOT EXISTS portal_invites_user ON portal_invites (user_id);
 
+  -- "Forgot password" links: one use, short-lived, only their hash stored. The authenticator code is still
+  -- needed to set the new password, so the link alone cannot take over a login.
+  CREATE TABLE IF NOT EXISTS portal_password_resets (
+    token_hash   text PRIMARY KEY,
+    user_id      uuid NOT NULL REFERENCES portal_users (id) ON DELETE CASCADE,
+    created_at   timestamptz NOT NULL DEFAULT now(),
+    expires_at   timestamptz NOT NULL,
+    used_at      timestamptz
+  );
+  CREATE INDEX IF NOT EXISTS portal_password_resets_user ON portal_password_resets (user_id);
+
   -- Profile photos: a small square image (resized in the browser), checked by its bytes on upload.
   CREATE TABLE IF NOT EXISTS portal_avatars (
     user_id       uuid PRIMARY KEY REFERENCES portal_users (id) ON DELETE CASCADE,
     content_type  text NOT NULL,
     content       bytea NOT NULL,
     updated_at    timestamptz NOT NULL DEFAULT now()
+  );
+
+  -- Other ways a customer can be reached, filled in by them in Settings. Empty text = not given.
+  CREATE TABLE IF NOT EXISTS customer_contacts (
+    user_id     uuid PRIMARY KEY REFERENCES portal_users (id) ON DELETE CASCADE,
+    telegram    text NOT NULL DEFAULT '',
+    element     text NOT NULL DEFAULT '',
+    zangi       text NOT NULL DEFAULT '',
+    signal      text NOT NULL DEFAULT '',
+    email       text NOT NULL DEFAULT '',
+    updated_at  timestamptz NOT NULL DEFAULT now()
   );
 
   CREATE TABLE IF NOT EXISTS portal_sessions (
@@ -69,6 +91,14 @@ const SCHEMA = `
     updated_at      timestamptz NOT NULL DEFAULT now(),
     PRIMARY KEY (user_id, date)
   );
+  -- Replacements: calls from that day that are not charged (shown as "125 - 2"). Often added after the day.
+  ALTER TABLE billing_days ADD COLUMN IF NOT EXISTS replacements integer NOT NULL DEFAULT 0;
+
+  -- Versions for concurrency control: each save adds one, and a save made from an older version is refused
+  -- (409), so two admins editing the same thing cannot silently overwrite each other.
+  ALTER TABLE portal_users ADD COLUMN IF NOT EXISTS version integer NOT NULL DEFAULT 1;
+  ALTER TABLE billing_accounts ADD COLUMN IF NOT EXISTS version integer NOT NULL DEFAULT 1;
+  ALTER TABLE billing_days ADD COLUMN IF NOT EXISTS version integer NOT NULL DEFAULT 1;
 
   CREATE TABLE IF NOT EXISTS billing_payments (
     id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -109,6 +139,30 @@ const SCHEMA = `
     uploaded_at   timestamptz NOT NULL DEFAULT now()
   );
   CREATE INDEX IF NOT EXISTS portal_reports_user ON portal_reports (user_id, uploaded_at);
+
+  -- Audit trail (audit.js): who did what, and when. One row per signed-in change, plus sign-ins, failed
+  -- sign-ins and deposits. The person's email and role, and the target's name, are copied in when the row is
+  -- written, so the trail still reads properly after a login is deleted. Never pruned.
+  CREATE TABLE IF NOT EXISTS audit_log (
+    id            bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    user_id       uuid REFERENCES portal_users (id) ON DELETE SET NULL,  -- null: the system, or an unknown login
+    user_email    text NOT NULL DEFAULT '',
+    user_role     text NOT NULL DEFAULT '',
+    action        text NOT NULL,                       -- 'payment.create', 'auth.login_failed', ...
+    target_id     text,                                -- the login, report or payment it was about
+    target_label  text NOT NULL DEFAULT '',
+    details       jsonb,                               -- what was sent, without secrets; before/after for changes
+    status_code   integer,
+    method        text,
+    path          text,
+    ip            text,
+    user_agent    text,
+    created_at    timestamptz NOT NULL DEFAULT now()
+  );
+  CREATE INDEX IF NOT EXISTS audit_log_created ON audit_log (created_at DESC);
+  CREATE INDEX IF NOT EXISTS audit_log_user ON audit_log (user_id);
+  CREATE INDEX IF NOT EXISTS audit_log_target ON audit_log (target_id);
+  CREATE INDEX IF NOT EXISTS audit_log_action ON audit_log (action);
 `;
 
 export const initPortalDb = () => pool.query(SCHEMA);
@@ -119,7 +173,7 @@ const all = async (sql, params) => (await pool.query(sql, params)).rows;
 
 // ── users ────────────────────────────────────────────────────────────────────
 
-const USER_FIELDS = 'id, email, name, company, role, status, created_at, activated_at, last_login_at';
+const USER_FIELDS = 'id, email, name, company, role, status, created_at, activated_at, last_login_at, version';
 
 export const findUserByEmail = (email) => one('SELECT * FROM portal_users WHERE email = $1', [email.toLowerCase()]);
 export const getUser = (id) => one('SELECT * FROM portal_users WHERE id = $1', [id]);
@@ -129,23 +183,69 @@ export const createUser = ({ email, name, company, role }) => one(
   `INSERT INTO portal_users (email, name, company, role) VALUES ($1, $2, $3, $4) RETURNING ${USER_FIELDS}`,
   [email.toLowerCase(), name, company, role]);
 
-export const updateUser = (id, { name, company, role, status }) => one(
+// `expected`: the version the change was made from (null: whatever is there). Returns nothing when it was out of
+// date. `db` is a transaction's client, for withAdminLock.
+export const updateUser = async (id, { name, company, role, status }, expected = null, db = pool) => (await db.query(
   `UPDATE portal_users SET name = coalesce($2, name), company = coalesce($3, company), role = coalesce($4, role),
-     status = coalesce($5, status) WHERE id = $1 RETURNING ${USER_FIELDS}`,
-  [id, name ?? null, company ?? null, role ?? null, status ?? null]);
+     status = coalesce($5, status), version = version + 1 WHERE id = $1 AND ($6::int IS NULL OR version = $6) RETURNING ${USER_FIELDS}`,
+  [id, name ?? null, company ?? null, role ?? null, status ?? null, expected])).rows[0];
 
-export const deleteUser = (id) => pool.query('DELETE FROM portal_users WHERE id = $1', [id]);
+// Changes that could leave no admin run one at a time (a transaction lock), each seeing the count as it is then:
+// two admins demoting each other at the same moment cannot both pass "keep at least one admin".
+// fn(db, admins, row): db is the transaction's client, admins the active admins, row the login as it is now.
+export async function withAdminLock(userId, fn) {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query('SELECT pg_advisory_xact_lock(731400)');
+    const admins = Number((await client.query("SELECT count(*) FROM portal_users WHERE role = 'admin' AND status <> 'disabled'")).rows[0].count);
+    const row = (await client.query('SELECT * FROM portal_users WHERE id = $1 FOR UPDATE', [userId])).rows[0];
+    const result = await fn(client, admins, row);
+    await client.query('COMMIT');
+    return result;
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+export const deleteUser = (id, db = pool) => db.query('DELETE FROM portal_users WHERE id = $1', [id]);
 
 // When the profile photo last changed (ms), or null: the portal uses it to fetch and cache the image.
 const AVATAR_VERSION = '(SELECT (extract(epoch FROM v.updated_at) * 1000)::bigint FROM portal_avatars v WHERE v.user_id = u.id) AS avatar_version';
 
-// Everyone, with the latest unused setup link and the customer's billing terms.
-export const listUsers = () => all(`
+// A login as the admin pages show it: with the latest unused setup link and the customer's billing terms.
+const USER_ROW = `
   SELECT ${USER_FIELDS.split(', ').map((f) => `u.${f}`).join(', ')},
     (SELECT max(i.expires_at) FROM portal_invites i WHERE i.user_id = u.id AND i.used_at IS NULL AND i.expires_at > now()) AS invite_expires_at,
     a.price_per_call, a.currency, a.start_date::text AS start_date, ${AVATAR_VERSION}
-  FROM portal_users u LEFT JOIN billing_accounts a ON a.user_id = u.id
-  ORDER BY u.role = 'admin' DESC, u.role = 'staff' DESC, lower(coalesce(nullif(u.company, ''), u.name, u.email))`);
+  FROM portal_users u LEFT JOIN billing_accounts a ON a.user_id = u.id`;
+const USER_ORDER = "ORDER BY u.role = 'admin' DESC, u.role = 'staff' DESC, lower(coalesce(nullif(u.company, ''), u.name, u.email)), u.id";
+
+// Everyone (the server's own uses: staff's customer list).
+export const listUsers = () => all(`${USER_ROW} ${USER_ORDER}`);
+export const getUserRow = (id) => one(`${USER_ROW} WHERE u.id = $1`, [id]);
+
+// A page of logins for the admin's list: optionally one role, and matching `q` in name, email or company.
+export async function listUsersPage({ q = '', role = null, limit, offset }) {
+  const like = q ? `%${q.replace(/[\\%_]/g, '\\$&')}%` : null;
+  const where = `WHERE ($1::text IS NULL OR u.role = $1)
+    AND ($2::text IS NULL OR u.name ILIKE $2 OR u.email ILIKE $2 OR u.company ILIKE $2)`;
+  const [rows, counts] = await Promise.all([
+    all(`${USER_ROW} ${where} ${USER_ORDER} LIMIT $3 OFFSET $4`, [role, like, limit, offset]),
+    // Per role for the filter tabs (with the search, without the role), and how many are still to set up.
+    all(`SELECT u.role, count(*)::int AS n, count(*) FILTER (WHERE u.status = 'invited')::int AS waiting
+      FROM portal_users u WHERE ($1::text IS NULL OR u.name ILIKE $1 OR u.email ILIKE $1 OR u.company ILIKE $1) GROUP BY u.role`, [like]),
+  ]);
+  const byRole = Object.fromEntries(counts.map((c) => [c.role, c.n]));
+  const total = role ? byRole[role] || 0 : counts.reduce((a, c) => a + c.n, 0);
+  return { results: rows, total, counts: byRole, waiting: counts.reduce((a, c) => a + c.waiting, 0) };
+}
+
+// Just enough to choose someone in a filter: id, name, company, email and role.
+export const listUserOptions = () => all(`SELECT u.id, u.name, u.company, u.email, u.role FROM portal_users u ${USER_ORDER} LIMIT 5000`);
 
 export const setTotpStep = (id, step) => pool.query('UPDATE portal_users SET totp_last_step = $2 WHERE id = $1 AND totp_last_step < $2', [id, step]);
 export const setPassword = (id, hash) => pool.query('UPDATE portal_users SET password_hash = $2 WHERE id = $1', [id, hash]);
@@ -171,6 +271,28 @@ export async function createInvite(userId, { tokenHash, secret, createdBy, expir
     client.release();
   }
 }
+
+// ── forgotten passwords ──────────────────────────────────────────────────────
+
+// A new reset link replaces any unused one for the same login.
+export async function createPasswordReset(userId, { tokenHash, expiresAt }) {
+  await pool.query('DELETE FROM portal_password_resets WHERE user_id = $1 AND used_at IS NULL', [userId]);
+  await pool.query('INSERT INTO portal_password_resets (token_hash, user_id, expires_at) VALUES ($1, $2, $3)', [tokenHash, userId, expiresAt]);
+}
+
+export const findPasswordReset = (tokenHash) => one(`
+  SELECT r.*, u.email, u.name, u.status, u.password_hash IS NOT NULL AS set_up FROM portal_password_resets r
+  JOIN portal_users u ON u.id = r.user_id WHERE r.token_hash = $1`, [tokenHash]);
+
+// Uses the link up: only one request can win. Returns the login's id, or null if it was already used or expired.
+export async function usePasswordReset(tokenHash) {
+  const row = await one(`UPDATE portal_password_resets SET used_at = now()
+    WHERE token_hash = $1 AND used_at IS NULL AND expires_at > now() RETURNING user_id`, [tokenHash]);
+  if (row) await pool.query('DELETE FROM portal_password_resets WHERE user_id = $1 AND token_hash <> $2', [row.user_id, tokenHash]);
+  return row?.user_id ?? null;
+}
+
+export const forgetOldPasswordResets = () => pool.query("DELETE FROM portal_password_resets WHERE expires_at < now() - interval '7 days'");
 
 export const findInvite = (tokenHash) => one(`
   SELECT i.*, u.email, u.name, u.company, u.role, u.status FROM portal_invites i JOIN portal_users u ON u.id = i.user_id
@@ -212,6 +334,16 @@ export const findSessionUser = (accessHash) => one(`
   SELECT u.*, s.id AS session_id, ${AVATAR_VERSION} FROM portal_sessions s JOIN portal_users u ON u.id = s.user_id
   WHERE s.access_hash = $1 AND s.access_expires > now() AND u.status = 'active'`, [accessHash]);
 
+// ── contact methods ──────────────────────────────────────────────────────────
+
+const CONTACT_FIELDS = 'telegram, element, zangi, signal, email, updated_at';
+export const getContacts = (userId) => one(`SELECT ${CONTACT_FIELDS} FROM customer_contacts WHERE user_id = $1`, [userId]);
+export const saveContacts = (userId, c) => one(`
+  INSERT INTO customer_contacts (user_id, telegram, element, zangi, signal, email) VALUES ($1, $2, $3, $4, $5, $6)
+  ON CONFLICT (user_id) DO UPDATE SET telegram = excluded.telegram, element = excluded.element, zangi = excluded.zangi,
+    signal = excluded.signal, email = excluded.email, updated_at = now()
+  RETURNING ${CONTACT_FIELDS}`, [userId, c.telegram, c.element, c.zangi, c.signal, c.email]);
+
 // ── profile photos ───────────────────────────────────────────────────────────
 
 export const getAvatar = (userId) => one('SELECT content_type, content, updated_at FROM portal_avatars WHERE user_id = $1', [userId]);
@@ -233,25 +365,38 @@ export const deleteExpiredSessions = () => pool.query('DELETE FROM portal_sessio
 
 // ── billing ──────────────────────────────────────────────────────────────────
 
-const ACCOUNT_FIELDS = 'currency, price_per_call, opening_balance, start_date::text AS start_date, timezone';
+const ACCOUNT_FIELDS = 'currency, price_per_call, opening_balance, start_date::text AS start_date, timezone, version';
 export const getAccount = (userId) => one(`SELECT ${ACCOUNT_FIELDS} FROM billing_accounts WHERE user_id = $1`, [userId]);
 
-export const saveAccount = (userId, { currency, price_per_call, opening_balance, start_date, timezone }) => one(`
+// `expected` as for updateUser; 0 means "not set up yet". Returns nothing when out of date.
+export const saveAccount = (userId, { currency, price_per_call, opening_balance, start_date, timezone }, expected = null) => one(`
   INSERT INTO billing_accounts (user_id, currency, price_per_call, opening_balance, start_date, timezone)
   VALUES ($1, $2, $3, $4, $5, $6)
   ON CONFLICT (user_id) DO UPDATE SET currency = excluded.currency, price_per_call = excluded.price_per_call,
-    opening_balance = excluded.opening_balance, start_date = excluded.start_date, timezone = excluded.timezone
-  RETURNING ${ACCOUNT_FIELDS}`, [userId, currency, price_per_call, opening_balance, start_date, timezone]);
+    opening_balance = excluded.opening_balance, start_date = excluded.start_date, timezone = excluded.timezone,
+    version = billing_accounts.version + 1
+  WHERE $7::int IS NULL OR billing_accounts.version = $7
+  RETURNING ${ACCOUNT_FIELDS}`, [userId, currency, price_per_call, opening_balance, start_date, timezone, expected]);
+
+const DAY_FIELDS = 'date::text AS date, calls, replacements, price_per_call, version';
 
 export const listDays = (userId, upTo) =>
-  all('SELECT date::text AS date, calls, price_per_call FROM billing_days WHERE user_id = $1 AND date <= $2 ORDER BY date', [userId, upTo]);
+  all(`SELECT ${DAY_FIELDS} FROM billing_days WHERE user_id = $1 AND date <= $2 ORDER BY date`, [userId, upTo]);
 
-export const saveDay = (userId, { date, calls, price_per_call }) => one(`
-  INSERT INTO billing_days (user_id, date, calls, price_per_call) VALUES ($1, $2, $3, $4)
-  ON CONFLICT (user_id, date) DO UPDATE SET calls = excluded.calls, price_per_call = excluded.price_per_call, updated_at = now()
-  RETURNING date::text AS date, calls, price_per_call`, [userId, date, calls, price_per_call]);
+export const getDay = (userId, date) => one(`SELECT ${DAY_FIELDS} FROM billing_days WHERE user_id = $1 AND date = $2`, [userId, date]);
 
-export const deleteDay = (userId, date) => pool.query('DELETE FROM billing_days WHERE user_id = $1 AND date = $2', [userId, date]);
+// `expected` as for updateUser; 0 means "no calls entered for that day yet". Returns nothing when out of date.
+export const saveDay = (userId, { date, calls, replacements, price_per_call }, expected = null) => one(`
+  INSERT INTO billing_days (user_id, date, calls, replacements, price_per_call) VALUES ($1, $2, $3, $4, $5)
+  ON CONFLICT (user_id, date) DO UPDATE SET calls = excluded.calls, replacements = excluded.replacements,
+    price_per_call = excluded.price_per_call, updated_at = now(), version = billing_days.version + 1
+  WHERE $6::int IS NULL OR billing_days.version = $6
+  RETURNING ${DAY_FIELDS}`, [userId, date, calls, replacements, price_per_call, expected]);
+
+// Returns false when `expected` was given and the day had changed since.
+export const deleteDay = async (userId, date, expected = null) => (await pool.query(
+  'DELETE FROM billing_days WHERE user_id = $1 AND date = $2 AND ($3::int IS NULL OR version = $3)', [userId, date, expected])).rowCount > 0
+  || expected === null || !(await getDay(userId, date));
 
 export const listPayments = (userId) =>
   all('SELECT * FROM billing_payments WHERE user_id = $1 ORDER BY paid_at', [userId]);
@@ -259,6 +404,17 @@ export const listPayments = (userId) =>
 export const addPayment = (userId, { amount, currency, status, reference, note, paid_at }) => one(`
   INSERT INTO billing_payments (user_id, amount, currency, status, reference, note, paid_at)
   VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`, [userId, amount, currency, status, reference, note, paid_at]);
+
+// For reports across customers: three queries in all, however many customers there are.
+export const listBillingCustomers = (userId = null) => all(`
+  SELECT u.id, u.email, u.name, u.company, u.status, a.currency, a.price_per_call, a.opening_balance,
+    a.start_date::text AS start_date, a.timezone
+  FROM portal_users u JOIN billing_accounts a ON a.user_id = u.id
+  WHERE u.role = 'customer' AND ($1::uuid IS NULL OR u.id = $1)`, [userId]);
+export const listDaysOf = (userIds, upTo) =>
+  all(`SELECT user_id, ${DAY_FIELDS} FROM billing_days WHERE user_id = ANY($1) AND date <= $2 ORDER BY date`, [userIds, upTo]);
+export const listPaymentsOf = (userIds) =>
+  all('SELECT * FROM billing_payments WHERE user_id = ANY($1) ORDER BY paid_at', [userIds]);
 
 export const deletePayment = (userId, id) => pool.query('DELETE FROM billing_payments WHERE user_id = $1 AND id = $2', [userId, id]);
 
@@ -301,3 +457,76 @@ export const addReport = (r) => one(`
   [r.userId, r.title, r.note, r.periodFrom, r.periodTo, r.filename, r.contentType, r.content.length, r.content]);
 
 export const deleteReport = (id) => pool.query('DELETE FROM portal_reports WHERE id = $1', [id]);
+
+export const getReportInfo = (id) => one(`SELECT ${REPORT_FIELDS} FROM portal_reports r JOIN portal_users u ON u.id = r.user_id WHERE r.id = $1`, [id]);
+export const getPayment = (userId, id) =>
+  one('SELECT id, amount, status, reference, note, paid_at FROM billing_payments WHERE user_id = $1 AND id = $2', [userId, id]);
+
+// ── audit trail ──────────────────────────────────────────────────────────────
+
+export const addAuditEntry = (e) => pool.query(`
+  INSERT INTO audit_log (user_id, user_email, user_role, action, target_id, target_label, details, status_code, method, path, ip, user_agent)
+  VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+[e.userId ?? null, e.userEmail || '', e.userRole || '', e.action, e.targetId ?? null, e.targetLabel || '',
+  e.details && Object.keys(e.details).length ? JSON.stringify(e.details) : null, e.status ?? null, e.method ?? null, e.path ?? null,
+  e.ip ?? null, e.userAgent ?? null]);
+
+// The WHERE clause for the audit filters. Days are calendar days in `tz` (the admin's own time zone).
+// $1 is always the time zone, so the summary can group by day with it.
+function auditWhere({ from, to, tz, action, kind, user, target, about, outcome, q }) {
+  const where = [];
+  const params = [tz];
+  const add = (sql, value) => {
+    params.push(value);
+    where.push(sql.replaceAll('?', `$${params.length}`));
+  };
+  if (from) add('created_at >= (?::date)::timestamp AT TIME ZONE $1', from);
+  if (to) add('created_at < (?::date + 1)::timestamp AT TIME ZONE $1', to);
+  if (action) add('action = ?', action);
+  if (kind) add("split_part(action, '.', 1) = ANY(?)", kind);
+  if (user) add('user_id = ?', user);
+  if (target) add('target_id = ?', target);
+  if (about) add('(target_id = ? OR user_id::text = ?)', about);
+  if (outcome === 'failed') where.push("(status_code >= 400 OR action LIKE '%failed')");
+  if (q) add("(user_email ILIKE ? OR action ILIKE ? OR target_label ILIKE ? OR coalesce(ip, '') ILIKE ?)", `%${q.replace(/[\\%_]/g, '\\$&')}%`);
+  return { sql: where.length ? `WHERE ${where.join(' AND ')}` : '', params };
+}
+
+const AUDIT_FIELDS = `id, user_id, user_email, user_role, action, target_id, target_label, details, status_code, method, path, ip,
+  user_agent, created_at`;
+
+// Every statement uses $1 (the time zone): PostgreSQL wants each numbered parameter to appear in the query.
+const TZ_USED = '$1::text IS NOT NULL';
+
+// Newest first, a page at a time by id (rows are numbered in the order written): `before` is the last id of the
+// previous page. Unlike OFFSET, a page deep in the log costs the same as the first. The total is only counted when
+// asked (the first page), as counting is the slow part on a large log.
+export async function listAudit(filters, { limit, before = null, count = true }) {
+  const { sql, params } = auditWhere(filters);
+  const and = sql ? `${sql} AND ${TZ_USED}` : `WHERE ${TZ_USED}`;
+  const total = count ? (await one(`SELECT count(*)::int AS count FROM audit_log ${and}`, params)).count : null;
+  const page = await all(`SELECT ${AUDIT_FIELDS} FROM audit_log ${and} AND ($${params.length + 1}::bigint IS NULL OR id < $${params.length + 1})
+    ORDER BY id DESC LIMIT $${params.length + 2}`, [...params, before, limit + 1]);
+  const rows = page.slice(0, limit);
+  return { rows, total, next: page.length > limit ? rows[rows.length - 1].id : null };
+}
+
+// Counts for the activity chart and the figures above it, under the same filters as the list.
+export async function auditSummary(filters) {
+  const { sql, params } = auditWhere(filters);
+  const and = sql ? `${sql} AND` : 'WHERE';
+  const [perDay, totals, people] = await Promise.all([
+    all(`SELECT (created_at AT TIME ZONE $1)::date::text AS day, split_part(action, '.', 1) AS kind, count(*)::int AS count
+      FROM audit_log ${sql} GROUP BY 1, 2 ORDER BY 1`, params),
+    one(`SELECT count(*)::int AS events, count(DISTINCT user_id)::int AS people,
+        count(*) FILTER (WHERE action = 'auth.login')::int AS sign_ins,
+        count(*) FILTER (WHERE action = 'auth.login_failed')::int AS failed_sign_ins,
+        count(*) FILTER (WHERE status_code >= 400 AND action <> 'auth.login_failed')::int AS refused
+      FROM audit_log ${and} ${TZ_USED}`, params),
+    all(`SELECT user_id, max(user_email) AS email, max(user_role) AS role, count(*)::int AS count
+      FROM audit_log ${and} user_id IS NOT NULL AND ${TZ_USED} GROUP BY user_id ORDER BY count DESC LIMIT 6`, params),
+  ]);
+  return { per_day: perDay, totals, people };
+}
+
+export const auditActions = async () => (await all('SELECT DISTINCT action FROM audit_log ORDER BY action')).map((r) => r.action);

@@ -9,7 +9,7 @@ const POLL_CLOSED_MS = 15000;
 
 const suggestions = ['How does call tracking work?', 'How is my price per call set?'];
 
-const GREETING = 'Hello. Ask us anything about CallsTalk and our team will reply right here.';
+const GREETING = 'Hello, how can we help you today? Ask us anything about CallsTalk and our team will respond here.';
 
 const startedAt = (time) => new Date(time).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 
@@ -34,7 +34,7 @@ function HandoffForm({ initialMessage, onStart, onCancel }) {
 
   return (
     <form className="handoff" onSubmit={submit}>
-      <p>Leave your details and our team will reply in this chat and by email.</p>
+      <p>Please share your details and our team will respond in this chat and by email.</p>
       <label>Name<input value={name} onChange={(e) => setName(e.target.value)} required autoComplete="name" /></label>
       <label>Email<input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="email" /></label>
       <label>Message<textarea rows="3" value={message} onChange={(e) => setMessage(e.target.value)} required /></label>
@@ -260,7 +260,7 @@ export default function ChatWidget({ customer = null, greeting = GREETING, promp
             <LogoMark />
             <div>
               <b>CallsTalk Support</b>
-              <small>{active?.ended ? 'This chat has ended' : active?.email || customer ? 'Replies here and by email' : 'Replies right here'}</small>
+              <small>{active?.ended ? 'This chat has ended' : active?.email || customer ? 'We respond here and by email' : 'We respond here'}</small>
             </div>
             <button className="chat__close" aria-label="Close Chat" onClick={() => setOpen(false)} />
           </header>
@@ -292,7 +292,7 @@ export default function ChatWidget({ customer = null, greeting = GREETING, promp
                   <>
                     <p className="chat__note">You are chatting with the CallsTalk team{active.name ? ` as ${active.name}` : ''}.</p>
                     {thread.map((m) => <p key={m.id} className={`bubble bubble--${m.from}`}>{m.text}</p>)}
-                    {active.ended && <p className="chat__note">This chat has ended. Start a new chat any time.</p>}
+                    {active.ended && <p className="chat__note">This chat has been closed. You are welcome to start a new chat at any time.</p>}
                   </>
                 ) : (
                   <p className="bubble bubble--assistant">{greeting}</p>

@@ -18,13 +18,21 @@ export const dayLabel = (iso) => {
 // The viewer's own time, with its zone name so it is never mistaken for another zone's.
 export const clock = (iso) => new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZoneName: 'short' });
 
+// Calls charged on a day: replaced calls are not charged.
+export const billable = (day) => day.billable_calls ?? day.calls - (day.replacements || 0);
+// "125" or, with replacements, "125 − 2" as on the daily bill sheets.
+export const callsLabel = (day) => (day.replacements
+  ? `${day.calls.toLocaleString('en-US')} − ${day.replacements.toLocaleString('en-US')}`
+  : day.calls.toLocaleString('en-US'));
+
 // The day's bill: the Telegram picture's four lines, plus the price and what the calls came to.
 export function Statement({ day, currency }) {
+  const charged = billable(day);
   const rows = [
     ['Opening Balance', money(day.opening_balance, currency), tone(day.opening_balance)],
-    ['Total Calls', day.calls.toLocaleString('en-US'), ''],
+    ['Total Calls', callsLabel(day), ''],
     ['Price per Call', money(day.price_per_call, currency), ''],
-    ['Call Charges', day.calls ? `-${money(day.charges, currency)}` : money(0, currency), day.calls ? 'is-neg' : ''],
+    ['Call Charges', charged ? `-${money(day.charges, currency)}` : money(0, currency), charged ? 'is-neg' : ''],
     ['Payment Received', Number(day.payment_received) ? `+${money(day.payment_received, currency)}` : money(0, currency), Number(day.payment_received) ? 'is-pos' : ''],
   ];
   return (
@@ -34,6 +42,9 @@ export function Statement({ day, currency }) {
         {day.is_today && <span className="bill__live"><i aria-hidden="true" />Live</span>}
       </header>
       <table className="bill__table">
+        {day.replacements > 0 && (
+          <caption className="bill__note">{day.replacements} {day.replacements === 1 ? 'call was' : 'calls were'} replaced and {day.replacements === 1 ? 'has' : 'have'} not been charged ({charged.toLocaleString('en-US')} billable × {money(day.price_per_call, currency)}).</caption>
+        )}
         <thead><tr><th scope="col">Metric</th><th scope="col">Amount</th></tr></thead>
         <tbody>
           {rows.map(([label, value, cls]) => (
@@ -82,8 +93,8 @@ export function Wallet({ data, onPaid }) {
       <p className={`wallet__balance ${tone(data.balance)}`}>{money(data.balance, data.currency)}</p>
       <p className="wallet__note">
         {owes
-          ? <>Pay <b>{money(data.amount_due, data.currency)}</b> to clear your balance. It goes down by {money(data.price_per_call, data.currency)} with every call.</>
-          : <>Nothing to pay right now. Each call costs {money(data.price_per_call, data.currency)} and comes off this balance.</>}
+          ? <>A payment of <b>{money(data.amount_due, data.currency)}</b> will settle your outstanding balance. Each billable call is charged at {money(data.price_per_call, data.currency)}.</>
+          : <>No payment is due at this time. Each billable call is charged at {money(data.price_per_call, data.currency)} against this balance.</>}
       </p>
       <dl className="wallet__facts">
         <div><dt>Your Price</dt><dd>{money(data.price_per_call, data.currency)} / call</dd></div>
@@ -92,7 +103,7 @@ export function Wallet({ data, onPaid }) {
 
       {details ? <PayDetails details={details} currency={data.currency} onBack={() => setDetails(null)} /> : (
       <form className="wallet__pay" onSubmit={pay}>
-        <label htmlFor="pay-amount">Pay for Your Calls</label>
+        <label htmlFor="pay-amount">Make a Payment</label>
         <div className="wallet__amount">
           <span aria-hidden="true">$</span>
           <input id="pay-amount" type="number" inputMode="decimal" min="1" step="0.01" placeholder="0.00" value={amount} onChange={(e) => setAmount(e.target.value)} />
@@ -106,7 +117,7 @@ export function Wallet({ data, onPaid }) {
         <p className="wallet__method"><span aria-hidden="true">₮</span>USDT on the TRON network (TRC-20)</p>
         {status === 'error' && <p className="access-card__error" role="alert">{error}</p>}
         <button type="submit" className="btn btn--light" disabled={!valid || status === 'sending'}>
-          {status === 'sending' ? 'Getting Your Address…' : valid ? `Pay ${money(amount, data.currency)}` : 'Pay Now'}
+          {status === 'sending' ? 'Preparing Your Deposit Address…' : valid ? `Pay ${money(amount, data.currency)}` : 'Pay Now'}
         </button>
         <p className="wallet__secure">Your funds will be credited to your account once the transaction has been confirmed on the blockchain.</p>
       </form>
@@ -129,22 +140,22 @@ function PayDetails({ details, currency, onBack }) {
 
   return (
     <div className="wallet__pay wallet__send" role="region" aria-label="Payment details">
-      <p className="wallet__send-title">Send <b>{usdt} USDT</b> <span>({money(details.amount, currency)})</span></p>
+      <p className="wallet__send-title">Amount to transfer: <b>{Number(usdt).toLocaleString('en-US', { minimumFractionDigits: 2 })} USDT</b> <span>({money(details.amount, currency)})</span></p>
       <div className="wallet__send-body">
         <img src={`data:image/svg+xml;charset=utf-8,${encodeURIComponent(details.qr_svg)}`} alt="QR code of your payment address" width="132" height="132" />
         <div>
-          <p className="wallet__send-label">Your payment address · {details.network}</p>
+          <p className="wallet__send-label">Your Deposit Address · {details.network}</p>
           <button type="button" className="wallet__address" onClick={() => copy('address', details.address)}>
             <code>{details.address}</code>
-            <span>{copied === 'address' ? 'Copied' : 'Copy'}</span>
+            <span>{copied === 'address' ? 'Copied' : 'Copy Address'}</span>
           </button>
-          <button type="button" className="wallet__copy-amount" onClick={() => copy('amount', usdt)}>{copied === 'amount' ? 'Amount copied' : 'Copy amount'}</button>
+          <button type="button" className="wallet__copy-amount" onClick={() => copy('amount', usdt)}>{copied === 'amount' ? 'Amount Copied' : 'Copy Amount'}</button>
         </div>
       </div>
       <ul className="wallet__send-rules">
-        <li>Send <b>USDT</b> on the <b>TRON (TRC-20)</b> network only. Funds sent in any other coin or on any other network cannot be recovered.</li>
-        <li>This address is unique to your account and does not change, so you can use it for every payment.</li>
-        <li>Your payment will appear under Payments once it has been confirmed, usually within a few minutes.</li>
+        <li>Send only <b>USDT</b> on the <b>TRON (TRC-20)</b> network. Funds sent in any other currency or on any other network cannot be recovered.</li>
+        <li>This deposit address is assigned exclusively to your account and may be used for all future payments.</li>
+        <li>Your funds will be credited to your account once the transaction has been confirmed on the blockchain, typically within a few minutes.</li>
       </ul>
       <button type="button" className="btn btn--quiet btn--sm" onClick={onBack}>Change Amount</button>
     </div>
@@ -157,7 +168,9 @@ const sum = (rows, k) => rows.reduce((t, r) => t + Number(r[k]), 0);
 export function History({ days, currency }) {
   const rows = days;
   if (!rows.length) return null;
-  const calls = rows.reduce((t, r) => t + r.calls, 0);
+  // The total row reads like a day: all calls, minus those replaced.
+  const total = { calls: rows.reduce((t, r) => t + r.calls, 0), replacements: rows.reduce((t, r) => t + (r.replacements || 0), 0) };
+  const charged = billable(total);
   const paid = sum(rows, 'payment_received');
 
   return (
@@ -179,9 +192,9 @@ export function History({ days, currency }) {
               <tr key={d.date} className={d.is_today ? 'is-today' : ''}>
                 <th scope="row">{dayLabel(d.date)}{d.is_today && <span className="bill__live"><i aria-hidden="true" />Live</span>}</th>
                 <td className={tone(d.opening_balance)}>{money(d.opening_balance, currency)}</td>
-                <td>{d.calls.toLocaleString('en-US')}</td>
+                <td title={d.replacements ? `${d.replacements} replaced, not charged` : undefined}>{callsLabel(d)}</td>
                 <td>{money(d.price_per_call, currency)}</td>
-                <td className={d.calls ? 'is-neg' : ''}>{d.calls ? `-${money(d.charges, currency)}` : money(0, currency)}</td>
+                <td className={billable(d) ? 'is-neg' : ''}>{billable(d) ? `-${money(d.charges, currency)}` : money(0, currency)}</td>
                 <td className={Number(d.payment_received) ? 'is-pos' : ''}>{Number(d.payment_received) ? `+${money(d.payment_received, currency)}` : money(0, currency)}</td>
                 <td className={tone(d.balance)}><b>{money(d.balance, currency)}</b></td>
               </tr>
@@ -191,16 +204,16 @@ export function History({ days, currency }) {
             <tr>
               <th scope="row">{rows.length}-Day Total</th>
               <td />
-              <td>{calls.toLocaleString('en-US')}</td>
+              <td>{callsLabel(total)}</td>
               <td />
-              <td className={calls ? 'is-neg' : ''}>{calls ? `-${money(sum(rows, 'charges'), currency)}` : money(0, currency)}</td>
+              <td className={charged ? 'is-neg' : ''}>{charged ? `-${money(sum(rows, 'charges'), currency)}` : money(0, currency)}</td>
               <td className={paid ? 'is-pos' : ''}>{paid ? `+${money(paid, currency)}` : money(0, currency)}</td>
               <td className={tone(rows[0].balance)}>{money(rows[0].balance, currency)}</td>
             </tr>
           </tfoot>
         </table>
       </div>
-      <p className="billing__history-note">Your bills for the last {HISTORY_DAYS} days. For earlier days, see the billing reports from our team under Reports.</p>
+      <p className="billing__history-note">Statements for the last {HISTORY_DAYS} days. An entry such as “125 − 2” indicates 2 replaced calls, which are not charged. Statements for earlier dates are available as billing reports under Reports.</p>
     </section>
   );
 }
@@ -281,7 +294,7 @@ export function BillingSections({ data, onPaid }) {
           <ul>
             {data.payments.map((p) => (
               <li key={p.id}>
-                <span>{dayLabel(p.date.slice(0, 10))}<small>{p.note || (p.provider === 'manual' ? 'Recorded by our team' : 'USDT (TRC-20)')}</small></span>
+                <span>{dayLabel(p.date.slice(0, 10))}<small>{p.note || (p.method === 'manual' ? 'Recorded by CallsTalk' : 'USDT (TRC-20)')}</small></span>
                 <span className={`billing__status is-${p.status}`}>{p.status}</span>
                 <b className={p.status === 'completed' ? 'is-pos' : ''}>{money(p.amount, p.currency)}</b>
               </li>

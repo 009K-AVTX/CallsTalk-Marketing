@@ -5,29 +5,33 @@ import { Avatar } from '../avatar.jsx';
 import Icon from '../components/Icons.jsx';
 import { ErrorNote } from '../components/Shell.jsx';
 import { addDays, today } from '../format.js';
-import { deleteReport, listAll, listCustomers, localKeyHint, MAX_MB, staffSession, staffSignIn, staffSignOut, staffSignInKind, uploadReport } from '../reports.js';
+import {
+  canNotify, deleteReport, listAll, listCustomers, localKeyHint, MAX_MB, notifyReports, staffSession, staffSignIn, staffSignOut, staffSignInKind, uploadReport,
+} from '../reports.js';
 import { fileSize, period } from './Reports.jsx';
 
 const ACCEPT = '.xlsx,.xls,.csv';
 
 // A blank billing report in the format customers know from the old Telegram bill. The sums are formulas:
-// Call Charges = Calls x Price, Balance = Opening - Charges + Payment, and each day opens on the last balance.
+// Call Charges = (Total Calls - Replacements) x Price, Balance = Opening - Charges + Payment, and each day
+// opens on the last balance. Replaced calls are not charged ("125 - 2" bills 123).
 async function downloadTemplate() {
   const XLSX = await import('xlsx');
-  const head = ['Date', 'Opening Balance ($)', 'Total Calls', 'Price per Call ($)', 'Call Charges ($)', 'Payment Received ($)', 'Balance ($)'];
+  const head = ['Date', 'Opening Balance ($)', 'Total Calls', 'Replacements', 'Price per Call ($)', 'Call Charges ($)', 'Payment Received ($)', 'Balance ($)'];
   const rows = [head];
-  for (let i = 7; i >= 1; i--) rows.push([addDays(today(), -i), null, null, null, null, null, null]);
+  for (let i = 7; i >= 1; i--) rows.push([addDays(today(), -i), null, null, null, null, null, null, null]);
   const ws = XLSX.utils.aoa_to_sheet(rows);
   for (let r = 2; r <= 8; r++) {
-    ws[`B${r}`] = r === 2 ? { t: 'n', v: 0 } : { t: 'n', f: `G${r - 1}` };
+    ws[`B${r}`] = r === 2 ? { t: 'n', v: 0 } : { t: 'n', f: `H${r - 1}` };
     ws[`C${r}`] = { t: 'n', v: 0 };
     ws[`D${r}`] = { t: 'n', v: 0 };
-    ws[`E${r}`] = { t: 'n', f: `C${r}*D${r}` };
-    ws[`F${r}`] = { t: 'n', v: 0 };
-    ws[`G${r}`] = { t: 'n', f: `B${r}-E${r}+F${r}` };
-    for (const c of 'BDEFG') ws[`${c}${r}`].z = '$#,##0.00;[Red]-$#,##0.00';
+    ws[`E${r}`] = { t: 'n', v: 0 };
+    ws[`F${r}`] = { t: 'n', f: `(C${r}-D${r})*E${r}` };
+    ws[`G${r}`] = { t: 'n', v: 0 };
+    ws[`H${r}`] = { t: 'n', f: `B${r}-F${r}+G${r}` };
+    for (const c of 'BEFGH') ws[`${c}${r}`].z = '$#,##0.00;[Red]-$#,##0.00';
   }
-  ws['!cols'] = [{ wch: 12 }, { wch: 20 }, { wch: 12 }, { wch: 17 }, { wch: 17 }, { wch: 20 }, { wch: 15 }];
+  ws['!cols'] = [{ wch: 12 }, { wch: 20 }, { wch: 12 }, { wch: 14 }, { wch: 17 }, { wch: 17 }, { wch: 20 }, { wch: 15 }];
   const pay = XLSX.utils.aoa_to_sheet([['Payment Date', 'Amount ($)', 'Method', 'Reference']]);
   pay['!cols'] = [{ wch: 14 }, { wch: 12 }, { wch: 18 }, { wch: 20 }];
   const wb = XLSX.utils.book_new();
@@ -59,7 +63,7 @@ function Gate({ onIn }) {
     return (
       <div className="access-card p-up__gate">
         <h2>Billing Team Sign In</h2>
-        <p className="access-card__lead">This page is for CallsTalk staff and admins. Reports uploaded here appear in the customer's portal immediately.</p>
+        <p className="access-card__lead">This page is for CallsTalk staff and admins. Reports uploaded here are available in the customer's portal immediately.</p>
         <a className="btn btn--light" href={`/login?next=${encodeURIComponent('/upload')}`}>Log In</a>
       </div>
     );
@@ -68,7 +72,7 @@ function Gate({ onIn }) {
   return (
     <form className="access-card p-up__gate" onSubmit={submit}>
       <h2>Billing Team Sign In</h2>
-      <p className="access-card__lead">This page is for the CallsTalk billing team. Reports uploaded here appear in the customer's portal immediately.</p>
+      <p className="access-card__lead">This page is for the CallsTalk billing team. Reports uploaded here are available in the customer's portal immediately.</p>
       <label>Upload Key<input required type="password" value={key} onChange={(e) => setKey(e.target.value)} autoComplete="off" autoFocus />{localKeyHint && <small className="p-up__hint">Testing locally: the key is “{localKeyHint}”.</small>}</label>
       {status === 'error' && <p className="access-card__error" role="alert">{error}</p>}
       <button type="submit" className="btn btn--light" disabled={status === 'sending'}>{status === 'sending' ? 'Checking…' : 'Sign In'}</button>
@@ -79,6 +83,8 @@ function Gate({ onIn }) {
 function UploadForm({ customers, onDone }) {
   const yesterday = addDays(today(), -1);
   const [form, setForm] = useState({ customer: '', title: '', note: '', periodFrom: yesterday, periodTo: yesterday });
+  // Email the customer about the upload (on by default; untick e.g. when re-uploading a corrected file).
+  const [notify, setNotify] = useState(true);
   const [files, setFiles] = useState([]);
   const [drag, setDrag] = useState(false);
   const [status, setStatus] = useState('idle'); // idle | sending | done | error
@@ -100,12 +106,20 @@ function UploadForm({ customers, onDone }) {
     setStatus('sending');
     setMessage('');
     try {
+      const uploaded = [];
       for (const file of files) {
         // With several files, each takes its own name as the title unless one title was given for a single file.
-        await uploadReport({ ...form, title: files.length === 1 ? form.title : '', file });
+        uploaded.push(await uploadReport({ ...form, title: files.length === 1 ? form.title : '', file }));
+      }
+      const who = customers.find((c) => c.id === form.customer)?.login || form.customer.trim().toLowerCase();
+      let emailNote = '';
+      if (notify && canNotify) {
+        // One email for the whole upload. A failed email never undoes the upload.
+        const sent = await notifyReports(form.customer, uploaded.map((r) => r.id)).catch((err) => ({ emailed: false, reason: err.message }));
+        emailNote = sent.emailed ? ` An email has been sent to ${sent.email}.` : ` The customer was not emailed: ${sent.reason}.`;
       }
       setStatus('done');
-      setMessage(`${files.length} report${files.length === 1 ? '' : 's'} uploaded for ${customers.find((c) => c.id === form.customer)?.login || form.customer.trim().toLowerCase()}. They can see ${files.length === 1 ? 'it' : 'them'} in their portal now.`);
+      setMessage(`${files.length} report${files.length === 1 ? '' : 's'} uploaded for ${who}. They can see ${files.length === 1 ? 'it' : 'them'} in their portal now.${emailNote}`);
       setFiles([]);
       setForm({ ...form, title: '', note: '' });
       if (input.current) input.current.value = '';
@@ -155,15 +169,21 @@ function UploadForm({ customers, onDone }) {
           <span><b>Drop Excel files here</b> or click to choose</span>
         )}
       </label>
-      {message && <p className={status === 'done' ? 'p-ok' : 'access-card__error'} role={status === 'done' ? 'status' : 'alert'}>{status === 'done' && <Icon name="check" />}{message}</p>}
+      {canNotify && (
+        <label className="p-check">
+          <input type="checkbox" checked={notify} onChange={(e) => setNotify(e.target.checked)} />
+          <span><b>Email the customer</b><small>One email to their login ID saying the report is ready. The file itself is not attached.</small></span>
+        </label>
+      )}
+      {message &&<p className={status === 'done' ? 'p-ok' : 'access-card__error'} role={status === 'done' ? 'status' : 'alert'}>{status === 'done' && <Icon name="check" />}{message}</p>}
       <button type="submit" className="btn btn--light" disabled={status === 'sending'}>{status === 'sending' ? 'Uploading…' : `Upload${files.length > 1 ? ` ${files.length} Reports` : ''}`}</button>
     </form>
   );
 }
 
-// The billing team's upload link: /upload. Not part of the customer portal's navigation.
-export default function Upload() {
-  const [signedIn, setSignedIn] = useState(Boolean(staffSession()));
+// Customer reports: upload, list and remove. Shown inside the admin and staff portal (Reports in the top bar),
+// and on the standalone /upload page (demo and local key sign-in). `onSignedOut` runs when the session ends.
+export function ReportManager({ onSignedOut }) {
   const [reports, setReports] = useState(null);
   const [customers, setCustomers] = useState([]);
   const [error, setError] = useState('');
@@ -176,15 +196,12 @@ export default function Upload() {
       setCustomers(people);
       setError('');
     } catch (err) {
-      if (!staffSession()) setSignedIn(false);
+      if (!staffSession()) onSignedOut?.();
       setError(err.message);
     }
-  }, []);
+  }, [onSignedOut]);
 
-  useEffect(() => {
-    document.title = 'Upload Reports | CallsTalk';
-    if (signedIn) load();
-  }, [signedIn, load]);
+  useEffect(() => { load(); }, [load]);
 
   const remove = async (r) => {
     if (!window.confirm(`Delete "${r.title}" for ${r.customer}? The customer will no longer be able to see it.`)) return;
@@ -199,6 +216,55 @@ export default function Upload() {
   const shown = (reports || []).filter((r) => !filter || r.customer.includes(filter.trim().toLowerCase()) || r.title.toLowerCase().includes(filter.trim().toLowerCase()));
 
   return (
+    <>
+      <div className="p-head"><div><h1>Customer Reports</h1><p>Upload a billing report, and it will appear in the customer's portal under Reports.</p></div></div>
+      <ErrorNote error={error} onRetry={load} />
+      <div className="p-up__grid">
+        <UploadForm customers={customers} onDone={load} />
+        <section className="p-card p-card--flush">
+          <header className="p-card__head">
+            <div><h2>Uploaded</h2><p>{reports ? `${reports.length} report${reports.length === 1 ? '' : 's'}` : 'Loading…'}</p></div>
+            <label className="p-search"><span className="sr-only">Filter</span><input type="search" placeholder="Filter by customer or title" value={filter} onChange={(e) => setFilter(e.target.value)} /></label>
+          </header>
+          <div className="p-tablewrap">
+            <table className="p-table">
+              <thead><tr><th scope="col">Customer</th><th scope="col">Report</th><th scope="col">Period</th><th scope="col">Added</th><th scope="col"><span className="sr-only">Delete</span></th></tr></thead>
+              <tbody>
+                {shown.map((r) => (
+                  <tr key={r.id}>
+                    <th scope="row">
+                      <span className="p-person">
+                        <Avatar userId={r.user_id} version={customers.find((c) => c.id === r.user_id)?.avatar_version} name={r.customer} size="sm" />
+                        {r.customer}
+                      </span>
+                    </th>
+                    <td>{r.title}<small className="p-up__file">{r.filename} · {fileSize(r.size)}</small></td>
+                    <td>{period(r)}</td>
+                    <td>{new Date(r.uploaded_at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}</td>
+                    <td><button type="button" className="p-iconbtn" aria-label={`Delete ${r.title}`} onClick={() => remove(r)}><Icon name="close" /></button></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {reports && !shown.length && <p className="p-empty">{reports.length ? 'No reports match that filter.' : 'No reports have been uploaded yet.'}</p>}
+          </div>
+        </section>
+      </div>
+    </>
+  );
+}
+
+// The standalone upload page, /upload: for the demo and local testing (shared upload key). Signed-in admins and
+// staff get the same reports inside their portal instead (App.jsx), with the usual top bar.
+export default function Upload() {
+  const [signedIn, setSignedIn] = useState(Boolean(staffSession()));
+  const signedOut = useCallback(() => setSignedIn(false), []);
+
+  useEffect(() => {
+    document.title = 'Upload Reports | CallsTalk';
+  }, []);
+
+  return (
     <div className="p-app p-up">
       <header className="p-top">
         <div className="p-top__inner">
@@ -207,47 +273,11 @@ export default function Upload() {
             ? (isAdmin() ? <a href="/admin" className="btn btn--quiet btn--sm p-up__portal">Back to Admin</a>
               : signedIn && <a href="/settings" className="btn btn--quiet btn--sm p-up__portal"><Icon name="settings" />Settings</a>)
             : <a href="/reports" className="btn btn--quiet btn--sm p-up__portal">Open Customer Portal</a>}
-          {signedIn && <button type="button" className="btn btn--quiet btn--sm p-up__out" onClick={() => { staffSignOut(); setSignedIn(false); setReports(null); }}><Icon name="logout" />Sign Out</button>}
+          {signedIn && <button type="button" className="btn btn--quiet btn--sm p-up__out" onClick={() => { staffSignOut(); setSignedIn(false); }}><Icon name="logout" />Sign Out</button>}
         </div>
       </header>
       <main className="p-main">
-        {!signedIn ? <Gate onIn={() => setSignedIn(true)} /> : (
-          <>
-            <div className="p-head"><div><h1>Customer Reports</h1><p>Upload a billing report, and it will appear in the customer's portal under Reports.</p></div></div>
-            <ErrorNote error={error} onRetry={load} />
-            <div className="p-up__grid">
-              <UploadForm customers={customers} onDone={load} />
-              <section className="p-card p-card--flush">
-                <header className="p-card__head">
-                  <div><h2>Uploaded</h2><p>{reports ? `${reports.length} report${reports.length === 1 ? '' : 's'}` : 'Loading…'}</p></div>
-                  <label className="p-search"><span className="sr-only">Filter</span><input type="search" placeholder="Filter by customer or title" value={filter} onChange={(e) => setFilter(e.target.value)} /></label>
-                </header>
-                <div className="p-tablewrap">
-                  <table className="p-table">
-                    <thead><tr><th scope="col">Customer</th><th scope="col">Report</th><th scope="col">Period</th><th scope="col">Added</th><th scope="col"><span className="sr-only">Delete</span></th></tr></thead>
-                    <tbody>
-                      {shown.map((r) => (
-                        <tr key={r.id}>
-                          <th scope="row">
-                            <span className="p-person">
-                              <Avatar userId={r.user_id} version={customers.find((c) => c.id === r.user_id)?.avatar_version} name={r.customer} size="sm" />
-                              {r.customer}
-                            </span>
-                          </th>
-                          <td>{r.title}<small className="p-up__file">{r.filename} · {fileSize(r.size)}</small></td>
-                          <td>{period(r)}</td>
-                          <td>{new Date(r.uploaded_at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}</td>
-                          <td><button type="button" className="p-iconbtn" aria-label={`Delete ${r.title}`} onClick={() => remove(r)}><Icon name="close" /></button></td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                  {reports && !shown.length && <p className="p-empty">{reports.length ? 'No reports match that filter.' : 'No reports have been uploaded yet.'}</p>}
-                </div>
-              </section>
-            </div>
-          </>
-        )}
+        {signedIn ? <ReportManager onSignedOut={signedOut} /> : <Gate onIn={() => setSignedIn(true)} />}
       </main>
     </div>
   );

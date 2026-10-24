@@ -63,11 +63,13 @@ export const config = {
     apiUrl: env('WELLWALLET_API_URL', 'https://tag.alfa-bot.com/api/prod/v1').replace(/\/$/, ''),
     token: env('WELLWALLET_API_TOKEN'),
     webhookKey: env('WELLWALLET_WEBHOOK_KEY'),
-    walletType: env('WELLWALLET_WALLET_TYPE', 'user'),
+    // "accounting" = exchange wallet (as the TOPUP bot uses in production), "user" = private wallet.
+    walletType: env('WELLWALLET_WALLET_TYPE', 'accounting'),
     pollSeconds: Math.max(30, Number(env('WELLWALLET_POLL_SECONDS', '120'))),
   },
   portal: {
     inviteDays: Number(env('PORTAL_INVITE_DAYS', '7')),
+    resetMinutes: Number(env('PORTAL_RESET_MINUTES', '30')), // how long a "forgot password" link works
     accessMinutes: 60,
     refreshDays: Number(env('PORTAL_SESSION_DAYS', '30')),
   },

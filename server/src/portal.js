@@ -8,6 +8,7 @@
 //   GET    /api/staff/customers                    (staff, admin)  customers who have a login
 //   GET    /api/staff/reports                      (staff, admin)  every report
 //   POST   /api/staff/reports                      (staff, admin)  upload a report for a customer
+//   POST   /api/staff/reports/notify               (staff, admin)  { customer, reports: [ids] }: one email to their login ID
 //   DELETE /api/staff/reports/:id                  (staff, admin)
 
 import { Router } from 'express';
@@ -17,6 +18,9 @@ import { UUID } from './db.js';
 import { addReport, deleteReport, getAccount, getReportFile, getUser, listDays, listPayments, listReports, listUsers } from './portal-db.js';
 import { HttpError } from './routes.js';
 import { paymentDetails, paymentsEnabled } from './payments.js';
+import { config } from './config.js';
+import { emailReportReady } from './email.js';
+import { rateLimit } from './rate-limit.js';
 
 export const MAX_REPORT_BYTES = 3 * 1024 * 1024;
 const TYPES = {
@@ -30,7 +34,7 @@ export const portalRouter = Router();
 
 portalRouter.get('/billing/statement', requireUser('customer'), async (req, res) => {
   const account = await getAccount(req.user.id);
-  if (!account) throw new HttpError(404, 'Your billing is not set up yet. Our team will let you know when it is ready.');
+  if (!account) throw new HttpError(404, 'Your billing account has not been set up yet. Our team will notify you once it is ready.');
   const today = localDate(new Date(), account.timezone);
   // Customers get the last five days at most; older bills reach them as reports.
   const asked = DAY.test(req.query.from) ? req.query.from : today;
@@ -42,15 +46,15 @@ portalRouter.get('/billing/statement', requireUser('customer'), async (req, res)
 
 // Where to send the payment: the customer's own USDT (TRC-20) address. It counts once confirmed on the blockchain.
 portalRouter.post('/billing/statement/pay', requireUser('customer'), async (req, res) => {
-  if (!paymentsEnabled) throw new HttpError(503, 'Online payment is not switched on yet. Message us on Telegram or email and we will help you pay.');
-  if (!await getAccount(req.user.id)) throw new HttpError(404, 'Your billing is not set up yet. Our team will let you know when it is ready.');
+  if (!paymentsEnabled) throw new HttpError(503, 'Online payments are not yet available. Please contact our support team via Telegram or email for payment assistance.');
+  if (!await getAccount(req.user.id)) throw new HttpError(404, 'Your billing account has not been set up yet. Our team will notify you once it is ready.');
   const amount = Number(req.body?.amount);
-  if (!Number.isFinite(amount) || amount < 1 || amount > 1e7) throw new HttpError(400, 'Please enter an amount of at least $1.');
+  if (!Number.isFinite(amount) || amount < 1 || amount > 1e7) throw new HttpError(400, 'Please enter an amount of at least $1.00.');
   try {
     res.json(await paymentDetails(req.user, amount.toFixed(2)));
   } catch (err) {
     console.error(`[payments] no payment address for ${req.user.email}:`, err.message);
-    throw new HttpError(502, 'We could not get your payment address just now. Please try again in a minute.');
+    throw new HttpError(502, 'Your deposit address could not be retrieved at this time. Please try again shortly.');
   }
 });
 
@@ -98,6 +102,31 @@ staff.post('/reports', async (req, res) => {
   res.status(201).json(await addReport({
     userId: customer.id, title, note, periodFrom: body.period_from, periodTo: body.period_to, filename, contentType: TYPES[ext], content,
   }));
+});
+
+// After an upload (one file or several): one email to the customer's login ID listing the new reports.
+// Only customers who can log in are emailed; the reply says whether it went and, if not, why.
+staff.post('/reports/notify', rateLimit({ windowMs: 10 * 60_000, max: 30 }), async (req, res) => {
+  const body = req.body || {};
+  const customer = UUID.test(body.customer) && await getUser(body.customer);
+  if (!customer || customer.role !== 'customer') throw new HttpError(400, 'Choose a customer.');
+  const ids = new Set((Array.isArray(body.reports) ? body.reports : []).filter((id) => UUID.test(id)));
+  const reports = (await listReports(customer.id)).filter((r) => ids.has(r.id));
+  if (!reports.length) throw new HttpError(400, 'No reports to notify the customer about.');
+
+  if (customer.status !== 'active') {
+    const reason = customer.status === 'disabled' ? 'their login is deactivated' : 'they have not activated their login yet';
+    return res.json({ emailed: false, reason });
+  }
+  const link = `${config.portalUrl}/reports${reports.length === 1 ? `?open=${encodeURIComponent(reports[0].id)}` : ''}`;
+  let emailed = false;
+  try {
+    emailed = await emailReportReady({ name: customer.name, email: customer.email, reports: reports.reverse(), link });
+  } catch (err) {
+    console.error(`[email] could not send the report notice to ${customer.email}:`, err.message);
+    return res.json({ emailed: false, reason: 'the email could not be sent' });
+  }
+  res.json(emailed ? { emailed: true, email: customer.email } : { emailed: false, reason: 'email is not set up on the server' });
 });
 
 staff.delete('/reports/:id', async (req, res) => {

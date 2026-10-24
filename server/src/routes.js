@@ -13,10 +13,11 @@ import { addMessage, createSession, getSession, linkTelegramMessage, listMessage
 import { notifyNewChat, notifyVisitorEnded, notifyVisitorMessage } from './telegram.js';
 import { emailNewChat, emailVisitorMessage } from './email.js';
 import { rateLimit } from './rate-limit.js';
-import { ANONYMOUS_NAME } from './format.js';
+import { ANONYMOUS_NAME, clientIp } from './format.js';
 import { config } from './config.js';
 import { findSessionUser } from './portal-db.js';
 import { hashToken } from './auth-crypto.js';
+import { CSRF_HEADER, sessionToken } from './security.js';
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
@@ -45,14 +46,16 @@ const emailFailed = (err) => console.error('[email] could not send notification:
 
 function teamUnreachable(err) {
   console.error('[support] could not reach Telegram:', err.message);
-  return new HttpError(502, 'We could not reach our team just now. Please try again in a moment.');
+  return new HttpError(502, 'Our team could not be reached at this time. Please try again shortly.');
 }
 
 export const router = Router();
 
 // A customer signed in to the portal (its Bearer token), or null for a website visitor.
+// A session cookie only counts with the portal's own header, so another page cannot start a chat in a customer's name.
 async function portalCustomer(req) {
-  const token = /^Bearer (.+)$/.exec(req.get('authorization') || '')?.[1];
+  const { token, viaCookie } = sessionToken(req);
+  if (viaCookie && req.get(CSRF_HEADER) !== '1') return null;
   const user = token && await findSessionUser(hashToken(token));
   return user?.role === 'customer' ? user : null;
 }
@@ -74,7 +77,7 @@ router.post('/chat', rateLimit({ windowMs: 10 * 60_000, max: 5 }), async (req, r
 
   const id = randomUUID();
   const chat = {
-    id, name, email, message, transcript, anonymous: !givenName,
+    id, name, email, message, transcript, anonymous: !givenName, ip: clientIp(req),
     ...(customer && { portal: true, portalUserId: customer.id, company: customer.company }),
   };
   let posted;
@@ -85,20 +88,20 @@ router.post('/chat', rateLimit({ windowMs: 10 * 60_000, max: 5 }), async (req, r
   }
 
   const messageId = await createSession({
-    id, name, email, threadId: posted.threadId, message, portalUserId: customer?.id ?? null, company: customer?.company ?? '',
+    id, name, email, threadId: posted.threadId, message, portalUserId: customer?.id ?? null, company: customer?.company ?? '', ip: chat.ip,
   });
   await linkTelegramMessage(config.telegram.chatId, posted.messageId, id);
   emailNewChat(chat, messageId).catch(emailFailed);
-  res.status(201).json({ session_id: id, message: 'Thanks. Our team has your message and will reply here shortly.' });
+  res.status(201).json({ session_id: id, message: 'Thank you. Our team has received your message and will respond here shortly.' });
 });
 
 router.post('/chat/:sessionId', rateLimit({ windowMs: 60_000, max: 30 }), async (req, res) => {
   const session = await loadSession(req);
   const message = text(req.body?.message, 'message', { max: 2000 });
-  if (session.status !== 'open') throw new HttpError(409, 'This chat has ended. Start a new chat to keep talking to our team.');
+  if (session.status !== 'open') throw new HttpError(409, 'This chat has been closed. Please start a new chat to continue the conversation.');
 
   try {
-    await notifyVisitorMessage(session, message);
+    await notifyVisitorMessage(session, message, clientIp(req));
   } catch (err) {
     throw teamUnreachable(err);
   }

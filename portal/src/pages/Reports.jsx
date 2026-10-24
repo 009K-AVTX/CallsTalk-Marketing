@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import Icon from '../components/Icons.jsx';
 import { ErrorNote, PageHead } from '../components/Shell.jsx';
 import SheetViewer, { downloadReport } from '../components/SheetViewer.jsx';
@@ -34,6 +34,15 @@ export default function Reports() {
   const [fileError, setFileError] = useState('');
   const close = useCallback(() => setOpen(null), []);
 
+  // The "report ready" email links to /reports?open=<id>: open that report once the list is in.
+  useEffect(() => {
+    const wanted = new URLSearchParams(window.location.search).get('open');
+    const report = wanted && data?.find((r) => r.id === wanted);
+    if (!report) return;
+    setOpen(report);
+    window.history.replaceState({}, '', '/reports');
+  }, [data]);
+
   const months = {};
   for (const r of data || []) (months[r.period_to.slice(0, 7)] ||= []).push(r);
   const keys = Object.keys(months).sort().reverse();
@@ -50,7 +59,7 @@ export default function Reports() {
         <section className="p-card p-empty-card">
           <span className="p-insights__icon"><Icon name="reports" /></span>
           <h2>No Reports Yet</h2>
-          <p>When our team sends you a billing report, it will appear here immediately.</p>
+          <p>Billing reports issued by our team will appear here as soon as they are uploaded.</p>
           {showUploadLink() && <a href={UPLOAD_PATH} target="_blank" rel="noopener" className="btn btn--light btn--sm p-empty-card__cta"><Icon name="download" className="p-icon p-icon--up" />Upload a Report</a>}
         </section>
       )}

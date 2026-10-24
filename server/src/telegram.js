@@ -12,8 +12,8 @@
 
 import { config } from './config.js';
 import {
-  addMessage, findSessionByShortId, findSessionByTelegramMessage, findSessionByThread,
-  getSession, getValue, linkTelegramMessage, setStatus, setValue,
+  addMessage, claimTelegramUpdate, findSessionByShortId, findSessionByTelegramMessage, findSessionByThread,
+  forgetHandledTelegram, getSession, getValue, linkTelegramMessage, setStatus, setValue,
 } from './db.js';
 import { accessDetails, chatKind, clip, escapeHtml, shortId, TEAM_ENDED_MESSAGE, transcriptLines, visitorDetails } from './format.js';
 
@@ -62,6 +62,8 @@ function replyTo(msg, text) {
 }
 
 const tag = (session) => `<code>#${shortId(session)}</code>`;
+// The visitor's IP as its own line, in <code> so a tap copies it.
+const ipLine = (ip) => (ip ? `\n<b>IP:</b> <code>${escape(ip)}</code>` : '');
 const replyButton = (sessionId) => ({ inline_keyboard: [[{ text: 'Reply >', callback_data: `reply:${sessionId}` }]] });
 
 // Posts a new chat with the visitor's details. Returns the Telegram ids to store with the session.
@@ -81,6 +83,7 @@ export async function notifyNewChat(chat) {
   const text = `<b>New ${chatKind(chat)} chat</b> ${tag({ id })}\n\n`
     + (config.isDev ? '<b>Local test</b>\n\n' : '')
     + visitorDetails(chat).map(([label, value]) => `<b>${label}:</b> ${escape(value)}`).join('\n')
+    + ipLine(chat.ip)
     + `\n\n<b>Message</b>\n<blockquote>${escape(message)}</blockquote>`
     + history;
 
@@ -92,12 +95,15 @@ export async function notifyNewChat(chat) {
 export async function notifyAccessRequest(request) {
   const text = '<b>New access request</b>\n\n'
     + accessDetails(request).map(([label, value]) => `<b>${label}:</b> ${escape(value)}`).join('\n')
+    + ipLine(request.ip)
     + (request.message ? `\n\n<b>Message</b>\n<blockquote>${escape(request.message)}</blockquote>` : '');
   await send(text);
 }
 
-export async function notifyVisitorMessage(session, text) {
-  const head = `<b>${escape(session.name)}</b> ${tag(session)}`;
+// `ip`: where this message came from; shown only when it is not the address the chat started from.
+export async function notifyVisitorMessage(session, text, ip = '') {
+  const moved = ip && session.ip && ip !== session.ip ? ` · new IP <code>${escape(ip)}</code>` : '';
+  const head = `<b>${escape(session.name)}</b> ${tag(session)}${moved}`;
   const sent = await send(`${head}\n${escape(text)}`, session.thread_id, { reply_markup: replyButton(session.id) });
   await linkTelegramMessage(chatId, sent.message_id, session.id);
 }
@@ -155,11 +161,19 @@ async function handleMessage(msg) {
     console.warn(`[telegram] ignored a message from chat ${msg.chat.id}; only TELEGRAM_CHAT_ID=${chatId} is accepted`);
     return;
   }
+  // Answered once, even if Telegram delivers it twice (two copies of the server, or a restart before it was confirmed).
+  if (!await claimTelegramUpdate(`${msg.chat.id}:${msg.message_id}`)) return;
   if (command?.[1] === 'help' || command?.[1] === 'start') return replyTo(msg, HELP);
 
   let session = null;
   let body = command ? command[2].trim() : text;
-  if (msg.reply_to_message) session = await findSessionByTelegramMessage(msg.chat.id, msg.reply_to_message.message_id);
+  if (msg.reply_to_message) {
+    const target = msg.reply_to_message;
+    session = await findSessionByTelegramMessage(msg.chat.id, target.message_id);
+    // A reply to any message that names the chat (every bot message about a chat ends in its #tag) counts too.
+    const tagged = !session && /#([0-9a-f]{8})\b/i.exec(target.text || target.caption || '');
+    if (tagged) session = await findSessionByShortId(tagged[1]);
+  }
   if (!session && msg.is_topic_message && msg.message_thread_id !== sharedThreadId) session = await findSessionByThread(msg.message_thread_id);
   if (!session) {
     const prefixed = body.match(/^#?([0-9a-f]{8})\b\s*([\s\S]*)$/i);
@@ -213,6 +227,7 @@ async function handleMessage(msg) {
 // reply to this prompt, which is linked to the chat.
 async function handleReplyButton(query) {
   const answer = (text) => api('answerCallbackQuery', { callback_query_id: query.id, text }).catch(() => {});
+  if (!await claimTelegramUpdate(`button:${query.id}`)) return undefined; // one reply box per tap
   const sessionId = /^reply:([0-9a-f-]{36})$/.exec(query.data || '')?.[1];
   const msg = query.message;
   if (!sessionId || !msg || String(msg.chat.id) !== chatId) return answer();
@@ -233,6 +248,9 @@ async function handleReplyButton(query) {
 
 // Long-polls Telegram for the team's replies. Runs for the life of the process.
 export async function startBot() {
+  const prune = () => forgetHandledTelegram().catch((err) => console.error('[telegram] cleanup failed:', err.message));
+  prune();
+  setInterval(prune, 6 * 3_600_000).unref();
   let ready = false;
   let offset = Number((await getValue('telegram_offset')) || 0);
 

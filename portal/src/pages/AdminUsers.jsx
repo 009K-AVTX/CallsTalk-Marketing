@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Avatar } from '../avatar.jsx';
 import { createUser, listUsers, loginState, signedIn, TIME_ZONES } from '../admin.js';
 import Icon from '../components/Icons.jsx';
@@ -105,21 +105,40 @@ function NewLogin({ onCreated }) {
   );
 }
 
+const PAGE = 50;
+
 export default function AdminUsers({ onSignedOut }) {
-  const users = useLoad(signedIn(onSignedOut, listUsers), []);
   const [adding, setAdding] = useState(false);
   const [filter, setFilter] = useState('');
+  const [q, setQ] = useState('');
+  const [role, setRole] = useState('');
+  const [offset, setOffset] = useState(0);
+  // The server searches and pages (50 at a time); typing waits a moment before asking.
+  useEffect(() => {
+    const t = setTimeout(() => setQ(filter.trim()), 300);
+    return () => clearTimeout(t);
+  }, [filter]);
+  useEffect(() => setOffset(0), [q, role]);
+  const users = useLoad(signedIn(onSignedOut, () => listUsers({ q, role, limit: PAGE, offset })), [q, role, offset]);
+  // The heading counts everyone, so it keeps the figures from the last page loaded without a search.
+  const [overall, setOverall] = useState(null);
+  useEffect(() => {
+    if (users.data && !q) setOverall(users.data);
+  }, [users.data, q]);
 
-  const q = filter.trim().toLowerCase();
-  const shown = (users.data || []).filter((u) => !q || [u.name, u.email, u.company].some((v) => (v || '').toLowerCase().includes(q)));
-  const count = (role) => (users.data || []).filter((u) => u.role === role).length;
+  const page = users.data;
+  const shown = page?.results || [];
+  const total = page?.total || 0;
+  const count = (r) => page?.counts?.[r] || 0;
+  const everyone = count('customer') + count('staff') + count('admin');
   const counted = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
-  const waiting = (users.data || []).filter((u) => u.status === 'invited').length;
-  const summary = [counted(count('customer'), 'customer'), count('staff') && `${count('staff')} staff`, counted(count('admin'), 'admin'), waiting && `${waiting} not set up yet`];
+  const all = (r) => overall?.counts?.[r] || 0;
+  const waiting = overall?.waiting || 0;
+  const summary = [counted(all('customer'), 'customer'), all('staff') && `${all('staff')} staff`, counted(all('admin'), 'admin'), waiting && `${waiting} not set up yet`];
 
   return (
     <>
-      <PageHead title="Logins" sub={users.data ? summary.filter(Boolean).join(' · ') : 'Loading…'}>
+      <PageHead title="Logins" sub={overall ? summary.filter(Boolean).join(' · ') : 'Loading…'}>
         <button type="button" className="btn btn--quiet btn--sm" onClick={users.reload}><Icon name="refresh" />Refresh</button>
         <button type="button" className="btn btn--light btn--sm" onClick={() => setAdding(!adding)} aria-expanded={adding}><Icon name={adding ? 'close' : 'plus'} />{adding ? 'Close' : 'New Login'}</button>
       </PageHead>
@@ -129,7 +148,16 @@ export default function AdminUsers({ onSignedOut }) {
       <section className="p-card p-card--flush">
         <header className="p-card__head">
           <div><h2>Everyone Who Can Sign In</h2><p>Open a login to change it, send a new link, or enter a customer's calls and payments.</p></div>
-          <label className="p-search"><span className="sr-only">Filter</span><input type="search" placeholder="Filter by name, email or company" value={filter} onChange={(e) => setFilter(e.target.value)} /></label>
+          <div className="p-card__tools p-card__tools--wrap">
+            <div className="p-ranges" role="radiogroup" aria-label="Show">
+              {[['', 'Everyone', everyone], ['customer', 'Customers', count('customer')], ['staff', 'Staff', count('staff')], ['admin', 'Admins', count('admin')]].map(([key, label, n]) => (
+                <button key={key || 'all'} type="button" role="radio" aria-checked={role === key} className={role === key ? 'is-on' : ''} onClick={() => setRole(key)}>
+                  {label}<span className="p-ranges__count">{n}</span>
+                </button>
+              ))}
+            </div>
+            <label className="p-search"><span className="sr-only">Filter</span><input type="search" placeholder="Name, email or company" value={filter} onChange={(e) => setFilter(e.target.value)} /></label>
+          </div>
         </header>
         <div className="p-tablewrap">
           <table className={`p-table p-table--click${users.loading ? ' is-loading' : ''}`}>
@@ -155,8 +183,17 @@ export default function AdminUsers({ onSignedOut }) {
               })}
             </tbody>
           </table>
-          {users.data && !shown.length && <p className="p-empty">{users.data.length ? 'No logins match that filter.' : 'No logins yet.'}</p>}
+          {page && !shown.length && <p className="p-empty">{q || role ? 'No logins match. Clear the filter or pick Everyone.' : 'No logins yet. Use New Login to add the first one.'}</p>}
         </div>
+        {total > PAGE && (
+          <div className="p-pager">
+            <span>{offset + 1}–{offset + shown.length} of {total}</span>
+            <div>
+              <button type="button" className="btn btn--quiet btn--sm" disabled={!offset || users.loading} onClick={() => setOffset(Math.max(0, offset - PAGE))}>Previous</button>
+              <button type="button" className="btn btn--quiet btn--sm" disabled={offset + PAGE >= total || users.loading} onClick={() => setOffset(offset + PAGE)}>Next</button>
+            </div>
+          </div>
+        )}
       </section>
     </>
   );

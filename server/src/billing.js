@@ -1,6 +1,6 @@
 // A customer's statement, worked out from their billing terms, daily calls and payments.
 // The shape and the rules are the ones in docs/customer-billing-api.md:
-//   charges = calls x price per call; balance = opening - charges + completed payments;
+//   charges = (calls - replacements) x price per call; balance = opening - charges + completed payments;
 //   each day opens on the previous day's balance; amount_due = max(-balance, 0).
 
 // Customers see the last five days, today included (src/lib/portal.js HISTORY_DAYS).
@@ -49,14 +49,17 @@ export function statement({ user, account, days, payments, from, now = new Date(
   for (let date = account.start_date; date <= today; date = addDays(date, 1)) {
     const row = perDay.get(date);
     const calls = row ? row.calls : 0;
+    // Replaced calls are not charged: "125 - 2" bills 123.
+    const replacements = row ? Math.min(row.replacements || 0, calls) : 0;
+    const billable = calls - replacements;
     const price = cents(row ? row.price_per_call : account.price_per_call);
-    const charges = calls * price;
+    const charges = billable * price;
     const received = paidOn.get(date) || 0;
     const opening = balance;
     balance = opening - charges + received;
     if (date >= from) {
       out.push({
-        date, is_today: date === today, opening_balance: money(opening), calls, price_per_call: money(price),
+        date, is_today: date === today, opening_balance: money(opening), calls, replacements, billable_calls: billable, price_per_call: money(price),
         charges: money(charges), payment_received: money(received), balance: money(balance),
       });
     }
@@ -75,7 +78,9 @@ export function statement({ user, account, days, payments, from, now = new Date(
     payments: payments
       .filter((p) => localDate(p.paid_at, timezone) >= from)
       .map((p) => ({
-        id: p.id, amount: money(cents(p.amount)), currency: p.currency, status: p.status, provider: p.provider,
+        id: p.id, amount: money(cents(p.amount)), currency: p.currency, status: p.status,
+        // How it was paid, without naming the payment provider: "manual" (recorded by our team) or "usdt_trc20".
+        method: p.provider === 'manual' ? 'manual' : 'usdt_trc20',
         reference: p.reference, note: p.note, date: new Date(p.paid_at).toISOString(),
       }))
       .reverse(),

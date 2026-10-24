@@ -420,6 +420,12 @@ h3 { font-size: 1.5rem; }
 .contact__icon--telegram circle { fill: rgba(214, 163, 255, .14); } /* same lilac tint as the mail icon */
 .contact__icon--telegram path { fill: var(--accent); }
 .contact__icon--mail { padding: 7px; border-radius: 50%; background: rgba(214, 163, 255, .14); fill: none; stroke: var(--accent); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+/* Element X, Zangi and Signal (ContactLinks.jsx), matching the Telegram icon */
+.contact__icon--app .contact__bg { fill: rgba(214, 163, 255, .14); }
+.contact__icon--app .contact__mark { fill: var(--accent); }
+.contact__icon--app .contact__line { fill: none; stroke: var(--accent); stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.contact__icon--app .contact__line--bold { stroke-width: 2; }
+.contact__icon--app .contact__line--dash { stroke-width: 1.1; stroke-dasharray: 2.1 1.35; }
 
 /* Reviews */
 .answers { background: radial-gradient(50% 70% at 15% 40%, rgba(126, 72, 190, .14), transparent 70%); }
@@ -474,7 +480,8 @@ h3 { font-size: 1.5rem; }
 .access-card select { appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M4 6l4 4 4-4' fill='none' stroke='%23b3abbd' stroke-width='1.6' stroke-linecap='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; background-size: 14px; }
 .access-card input:focus, .access-card select:focus, .access-card textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(214, 163, 255, .18); }
 .access-card__trap { position: absolute; left: -9999px; width: 1px; height: 1px; opacity: 0; }
-.access-card__error { margin: 0; padding: 10px 14px; border-radius: 10px; background: #1a1220; border-left: 3px solid var(--accent); color: var(--white); font-size: .9rem; }
+/* Error messages are small red text, never a box. */
+.access-card__error { margin: 0; color: #ff6b81; font-size: .84rem; font-weight: 500; line-height: 1.45; }
 .access-card .btn { width: 100%; }
 .access-card--sent { justify-items: center; text-align: center; padding: 48px 34px; }
 .access-card--sent p { margin: 0; color: var(--on-dark-soft); max-width: 26em; }
@@ -576,10 +583,9 @@ h3 { font-size: 1.5rem; }
 .chat__send:disabled { opacity: .35; cursor: default; }
 .chat__foot { display: flex; justify-content: center; padding: 0 14px 12px; background: var(--abyss-raised); min-height: 12px; }
 .chat__text-btn { background: none; border: 0; font: inherit; font-size: .9rem; font-weight: 500; color: var(--graphite); cursor: pointer; text-decoration: underline; text-decoration-color: var(--accent); text-underline-offset: 4px; padding: 4px; }
-.chat__error { margin: 0; padding: 10px 18px; font-size: .88rem; color: var(--white); background: #1c1820; border-left: 3px solid var(--accent); }
+.chat__error { margin: 0; padding: 6px 18px; font-size: .84rem; font-weight: 500; line-height: 1.45; color: #ff6b81; }
 .handoff { display: grid; gap: 12px; padding: 18px; background: var(--abyss-raised); border: 1px solid var(--rule); border-radius: 18px; }
 .handoff p { margin: 0; font-size: .92rem; color: var(--slate); }
-.handoff .chat__error { border-radius: 10px; }
 .handoff label { display: grid; gap: 5px; font-size: .85rem; font-weight: 500; }
 .handoff input, .handoff textarea { font: inherit; font-size: .95rem; padding: 10px 12px; border: 1px solid var(--rule); border-radius: 12px; resize: vertical; color: var(--graphite); background: var(--abyss); }
 .handoff input:focus, .handoff textarea:focus { outline: none; border-color: var(--accent); }
@@ -697,6 +703,7 @@ h3 { font-size: 1.5rem; }
 .bill__head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 20px; background: linear-gradient(90deg, rgba(214, 163, 255, .2), rgba(127, 75, 208, .08)); border-bottom: 1px solid rgba(214, 163, 255, .3); }
 .bill__head h3 { margin: 0; font-size: 1.02rem; letter-spacing: -.01em; color: var(--white); }
 .bill__head h3 span { font-weight: 500; color: var(--on-dark-soft); }
+.bill__note { caption-side: bottom; padding: 10px 20px 14px; text-align: left; font-size: .8rem; color: var(--slate); }
 .bill__live { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 999px; font-size: .74rem; font-weight: 600; color: var(--pos); background: rgba(94, 224, 160, .12); }
 .bill__live i { width: 6px; height: 6px; border-radius: 50%; background: currentColor; animation: billing-pulse 2s infinite; }
 .bill__table { width: 100%; border-collapse: collapse; font-size: .95rem; font-variant-numeric: tabular-nums; }

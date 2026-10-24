@@ -6,7 +6,15 @@ import { config } from './config.js';
 // Telegram message and topic ids are BIGINT columns; they stay far below 2^53, so plain numbers are safe.
 pg.types.setTypeParser(pg.types.builtins.INT8, Number);
 
-export const pool = new pg.Pool({ ...config.db, max: 10 });
+// No query or transaction may hold a connection for long, and a request waiting for a free connection gives up
+// after 5 s: under a flood the pool fails fast instead of piling requests up behind it.
+export const pool = new pg.Pool({
+  ...config.db,
+  max: 10,
+  connectionTimeoutMillis: 5_000,
+  statement_timeout: 15_000,
+  idle_in_transaction_session_timeout: 10_000,
+});
 pool.on('error', (err) => console.error('[db] idle connection error:', err.message));
 
 export const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
@@ -27,6 +35,8 @@ const SCHEMA = `
   -- Chats started by a signed-in customer in the portal (portal_users.id); null for website visitors.
   ALTER TABLE sessions ADD COLUMN IF NOT EXISTS portal_user_id uuid;
   ALTER TABLE sessions ADD COLUMN IF NOT EXISTS company text NOT NULL DEFAULT '';
+  -- The address the chat was started from, shown to the team in Telegram.
+  ALTER TABLE sessions ADD COLUMN IF NOT EXISTS ip text NOT NULL DEFAULT '';
 
   CREATE TABLE IF NOT EXISTS messages (
     id          serial PRIMARY KEY,
@@ -47,6 +57,9 @@ const SCHEMA = `
   );
 
   CREATE TABLE IF NOT EXISTS kv (key text PRIMARY KEY, value text NOT NULL);
+
+  -- Telegram messages and button taps already acted on, so one that arrives twice is answered once.
+  CREATE TABLE IF NOT EXISTS telegram_handled (key text PRIMARY KEY, handled_at timestamptz NOT NULL DEFAULT now());
 `;
 
 export async function initDb() {
@@ -59,12 +72,12 @@ const one = async (sql, params) => (await pool.query(sql, params)).rows[0];
 const all = async (sql, params) => (await pool.query(sql, params)).rows;
 
 // Returns the id of the visitor's first message.
-export async function createSession({ id, name, email, threadId, message, portalUserId = null, company = '' }) {
+export async function createSession({ id, name, email, threadId, message, portalUserId = null, company = '', ip = '' }) {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    await client.query('INSERT INTO sessions (id, short_id, name, email, thread_id, portal_user_id, company) VALUES ($1, $2, $3, $4, $5, $6, $7)',
-      [id, id.slice(0, 8), name, email, threadId ?? null, portalUserId, company]);
+    await client.query('INSERT INTO sessions (id, short_id, name, email, thread_id, portal_user_id, company, ip) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)',
+      [id, id.slice(0, 8), name, email, threadId ?? null, portalUserId, company, ip]);
     const { rows } = await client.query(
       "INSERT INTO messages (session_id, sender, sender_name, message) VALUES ($1, 'visitor', $2, $3) RETURNING id",
       [id, name, message]);
@@ -104,6 +117,10 @@ export const listTranscript = (sessionId) =>
 export const linkTelegramMessage = (chatId, messageId, sessionId) =>
   pool.query('INSERT INTO telegram_links (chat_id, message_id, session_id) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING',
     [String(chatId), messageId, sessionId]);
+// True the first time a Telegram message (or button tap) is claimed; false if it was already handled.
+export const claimTelegramUpdate = async (key) =>
+  Boolean(await one('INSERT INTO telegram_handled (key) VALUES ($1) ON CONFLICT DO NOTHING RETURNING key', [key]));
+export const forgetHandledTelegram = () => pool.query("DELETE FROM telegram_handled WHERE handled_at < now() - interval '3 days'");
 export const getValue = async (key) => (await one('SELECT value FROM kv WHERE key = $1', [key]))?.value;
 export const setValue = (key, value) =>
   pool.query('INSERT INTO kv (key, value) VALUES ($1, $2) ON CONFLICT (key) DO UPDATE SET value = excluded.value', [key, String(value)]);

@@ -1,18 +1,23 @@
 // Client for the customer portal: our server's accounts, billing and reports routes (server/src/accounts.js,
 // server/src/portal.js), the same calls call_platform was going to provide.
 //
-//   POST /accounts/login            email + password    -> { access, refresh } or { mfa_required, temp_token }
-//   POST /accounts/verify-mfa       temp_token + code   -> { access, refresh, role }
-//   POST /accounts/refresh          refresh             -> { access }
+//   POST /accounts/login            email + password    -> { mfa_required, temp_token }
+//   POST /accounts/verify-mfa       temp_token + code   -> { email, name, role }, and the session cookies
+//   POST /accounts/refresh          (refresh cookie)    -> a new session cookie
 //   GET  /billing/statement?from=  YYYY-MM-DD          -> balance and every day's bill since that date
 //   POST /billing/statement/pay     amount              -> { address, network, currency, amount, qr_svg } (USDT TRC-20)
 //   GET  /accounts/me                                   -> profile
 //   POST /accounts/change-password  current_password, new_password
 //   GET  /accounts/invite/:token                        -> setup link: who it is for, QR code and key
-//   POST /accounts/invite/:token    password + code     -> { access, refresh, role }
+//   POST /accounts/invite/:token    password + code     -> as verify-mfa
 //
 // Logins are made by our admins (portal /admin) and set up from a one-use link; there is no sign-up.
-// The session keeps the login's role: "customer" sees billing, "staff" the report uploads, "admin" everything.
+//
+// The session itself is in HttpOnly cookies (server/src/security.js) that no script can read, so the API must be
+// on the portal's own address (VITE_PORTAL_API_URL=/api, as nginx serves it). This browser keeps only who is
+// signed in, for drawing the page: { access: 'cookie', email, name, role }. `access` is a marker, not a token.
+// The role decides the pages: "customer" sees billing, "staff" the report uploads, "admin" everything; the server
+// checks it again on every call.
 
 import { previewProfile, previewStatement } from './preview.js';
 
@@ -29,11 +34,23 @@ export const portalEnabled = Boolean(BASE) || PREVIEW;
 
 export function loadSession() {
   try {
-    return JSON.parse(localStorage.getItem(STORAGE_KEY)) || null;
+    const session = JSON.parse(localStorage.getItem(STORAGE_KEY)) || null;
+    // Kept by an older version of the portal, with the tokens themselves: drop them and sign in again.
+    if (session?.refresh) {
+      localStorage.removeItem(STORAGE_KEY);
+      return null;
+    }
+    return session;
   } catch {
     return null;
   }
 }
+
+const signedInAs = (data, email) => saveSession({ access: 'cookie', email: data.email || email, name: data.name || '', role: data.role || 'customer' });
+
+// Sent with every call: the server only accepts changes made with the session cookie when this header is there,
+// which another website cannot add (server/src/security.js).
+export const SESSION_HEADERS = { 'X-CallsTalk': '1' };
 
 function saveSession(session) {
   try {
@@ -47,17 +64,18 @@ function saveSession(session) {
 
 export class SignedOut extends Error {}
 
-async function call(path, { method = 'GET', body, token } = {}) {
+async function call(path, { method = 'GET', body } = {}) {
   if (!BASE) throw new Error('Billing is not available right now. Please contact us.');
   let res;
   try {
     res = await fetch(`${BASE}${path}`, {
       method,
-      headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json', ...SESSION_HEADERS },
       body: body ? JSON.stringify(body) : undefined,
     });
   } catch {
-    throw new Error('We could not reach the server. Check your connection and try again.');
+    throw new Error('Unable to connect to the server. Please check your internet connection and try again.');
   }
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
@@ -71,18 +89,18 @@ async function call(path, { method = 'GET', body, token } = {}) {
 // Returns { mfa: tempToken } when the account has two-step sign-in, otherwise signs in.
 export async function signIn(email, password) {
   if (PREVIEW) {
-    saveSession({ access: 'preview', refresh: 'preview', email: email.trim(), role: 'customer' });
+    saveSession({ access: 'preview', email: email.trim(), role: 'customer' });
     return {};
   }
   const data = await call('/accounts/login', { method: 'POST', body: { email: email.trim(), password } });
   if (data.mfa_required) return { mfa: data.temp_token };
-  saveSession({ access: data.access, refresh: data.refresh, email: data.email || email.trim(), role: data.role || 'customer' });
+  signedInAs(data, email.trim());
   return {};
 }
 
 export async function verifyCode(tempToken, code, email) {
   const data = await call('/accounts/verify-mfa', { method: 'POST', body: { temp_token: tempToken, token: code.trim() } });
-  saveSession({ access: data.access, refresh: data.refresh, email: data.email || email, role: data.role || 'customer' });
+  signedInAs(data, email);
 }
 
 export const isAdmin = () => loadSession()?.role === 'admin';
@@ -94,28 +112,48 @@ export const fetchInvite = (token) => call(`/accounts/invite/${encodeURIComponen
 
 export async function completeSetup(token, password, code) {
   const data = await call(`/accounts/invite/${encodeURIComponent(token)}`, { method: 'POST', body: { password, code: code.trim() } });
-  saveSession({ access: data.access, refresh: data.refresh, email: data.email, role: data.role });
+  signedInAs(data, data.email);
+}
+
+// Forgotten password: request a link by email (the reply is the same whether or not the login exists),
+// then choose a new password on that link with the authenticator code.
+export const requestPasswordReset = (email) => (PREVIEW
+  ? Promise.resolve({ message: 'Preview mode: with a live account, a reset link is emailed to you.' })
+  : call('/accounts/forgot', { method: 'POST', body: { email: email.trim() } }));
+
+export const fetchReset = (token) => call(`/accounts/reset/${encodeURIComponent(token)}`);
+
+export async function completeReset(token, password, code) {
+  const data = await call(`/accounts/reset/${encodeURIComponent(token)}`, { method: 'POST', body: { password, code: code.trim() } });
+  signedInAs(data, data.email);
 }
 
 export function signOut() {
   const session = loadSession();
   saveSession(null);
-  if (session?.access) call('/accounts/logout', { method: 'POST', token: session.access }).catch(() => {});
+  if (session?.access === 'cookie') call('/accounts/logout', { method: 'POST' }).catch(() => {});
 }
 
-// An authorised request; renews the 60-minute access token once when it has expired.
+// Renews the 60-minute session cookie from the refresh cookie. Calls that find it expired at the same moment
+// share one renewal instead of each sending their own.
+let renewing = null;
+export function renewSession() {
+  renewing ||= call('/accounts/refresh', { method: 'POST' }).finally(() => { renewing = null; });
+  return renewing;
+}
+
+// An authorised request (the session cookie goes with it); renews the session once when it has expired.
 export async function authed(path, options) {
   const session = loadSession();
   if (!session?.access) throw new SignedOut();
   try {
-    return await call(path, { ...options, token: session.access });
+    return await call(path, options);
   } catch (err) {
-    if (err.status !== 401 || !session.refresh) throw err;
+    if (err.status !== 401 || session.access !== 'cookie') throw err;
   }
   try {
-    const { access } = await call('/accounts/refresh', { method: 'POST', body: { refresh: session.refresh } });
-    saveSession({ ...session, access });
-    return await call(path, { ...options, token: access });
+    await renewSession();
+    return await call(path, options);
   } catch (err) {
     if (err.status === 401) {
       saveSession(null);
@@ -143,7 +181,7 @@ export const fetchStatement = () => (PREVIEW
   : authed(`/billing/statement?from=${historyFrom()}`));
 
 export const startPayment = (amount) => (PREVIEW
-  ? Promise.reject(new Error(`Preview mode: with a real login, your USDT (TRC-20) payment address for $${amount} would appear here.`))
+  ? Promise.reject(new Error(`Preview mode: your USDT (TRC-20) deposit address for $${amount} is shown here when signed in to a live account.`))
   : authed('/billing/statement/pay', { method: 'POST', body: { amount: String(amount) } }));
 
 
@@ -153,6 +191,23 @@ const previewAvatar = () => { try { return localStorage.getItem(PREVIEW_AVATAR);
 export const fetchProfile = () => (PREVIEW
   ? previewGuard(() => ({ ...previewProfile(loadSession()?.email), id: 'preview', avatar_version: previewAvatar() ? 1 : null }))
   : authed('/accounts/me'));
+
+// ── contact methods (Telegram, Element X, Zangi, Signal, another email) ──────
+
+const PREVIEW_CONTACTS = 'callstalk.previewContacts';
+
+export const fetchContacts = async () => {
+  if (!PREVIEW) return (await authed('/accounts/contacts')).contacts;
+  try { return JSON.parse(localStorage.getItem(PREVIEW_CONTACTS)) || {}; } catch { return {}; }
+};
+
+// Returns { contacts, changed, notified }: the saved values (as the server wrote them down), what changed,
+// and whether our team was emailed.
+export async function saveContacts(contacts) {
+  if (!PREVIEW) return authed('/accounts/contacts', { method: 'PUT', body: contacts });
+  try { localStorage.setItem(PREVIEW_CONTACTS, JSON.stringify(contacts)); } catch { /* preview only */ }
+  return { contacts, changed: Object.keys(contacts), notified: false };
+}
 
 // ── profile photos ───────────────────────────────────────────────────────────
 // Photos are not public: they are fetched with the session and shown from an object URL, one per version.
@@ -184,11 +239,11 @@ export function avatarUrl(userId, version) {
   if (PREVIEW) return Promise.resolve(previewAvatar());
   const key = `${userId}:${version}`;
   if (!photos.has(key)) {
-    const get = () => fetch(`${BASE}/accounts/avatar/${encodeURIComponent(userId)}?v=${version}`, { headers: { Authorization: `Bearer ${loadSession()?.access}` } });
+    const get = () => fetch(`${BASE}/accounts/avatar/${encodeURIComponent(userId)}?v=${version}`, { credentials: 'same-origin', headers: SESSION_HEADERS });
     photos.set(key, (async () => {
       let res = await get();
       if (res.status === 401) {
-        await authed('/accounts/me'); // renews an expired access token
+        await renewSession().catch(() => {}); // an expired session cookie
         res = await get();
       }
       if (!res.ok) throw new Error('No photo');

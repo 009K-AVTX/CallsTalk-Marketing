@@ -14,16 +14,18 @@ export const NAV = [
   { to: '/settings', label: 'Settings', icon: 'settings' },
 ];
 
-// Admins: logins and customers' billing. Report uploads open the billing team's page.
+// Admins: logins and customers' billing, money across customers, the audit log and customer reports.
 export const ADMIN_NAV = [
   { to: '/admin', label: 'Logins', icon: 'users' },
-  { href: '/upload', label: 'Reports', icon: 'reports' },
+  { to: '/admin/finance', label: 'Finance', icon: 'finance' },
+  { to: '/admin/audit', label: 'Audit Log', icon: 'audit' },
+  { to: '/admin/reports', label: 'Reports', icon: 'reports' },
   { to: '/settings', label: 'Settings', icon: 'settings' },
 ];
 
-// Staff: report uploads only.
+// Staff: customer reports only.
 export const STAFF_NAV = [
-  { href: '/upload', label: 'Reports', icon: 'reports' },
+  { to: '/upload', label: 'Reports', icon: 'reports' },
   { to: '/settings', label: 'Settings', icon: 'settings' },
 ];
 
@@ -51,6 +53,8 @@ export function logOut() {
 // `team` ("admin" or "staff") swaps the customer's balance and Pay Now for that team's sections.
 export default function Shell({ path, statement, children, nav = NAV, team }) {
   const [menu, setMenu] = useState(false);
+  // Admin and staff on small screens: the sections fold into a menu behind a button, as on the website.
+  const [navOpen, setNavOpen] = useState(false);
   const email = loadSession()?.email || '';
   const crew = TEAM[team];
   const home = crew ? crew.home : '/';
@@ -63,20 +67,34 @@ export default function Shell({ path, statement, children, nav = NAV, team }) {
     return () => document.removeEventListener('click', close);
   }, [menu]);
 
+  // The menu closes on a new page, on Escape and on a tap outside it.
+  useEffect(() => setNavOpen(false), [path]);
+  useEffect(() => {
+    if (!navOpen) return undefined;
+    const outside = (e) => !e.target.closest('.p-nav, .p-nav__toggle') && setNavOpen(false);
+    const escape = (e) => e.key === 'Escape' && setNavOpen(false);
+    document.addEventListener('click', outside);
+    document.addEventListener('keydown', escape);
+    return () => {
+      document.removeEventListener('click', outside);
+      document.removeEventListener('keydown', escape);
+    };
+  }, [navOpen]);
+
   return (
     <div className="p-app">
-      <header className="p-top">
+      <header className={`p-top${crew ? ' p-top--team' : ''}`}>
         <div className="p-top__inner">
           <Link to={home} className="p-brand" aria-label="CallsTalk Portal home">
             <LogoMark className="p-brand__mark" />
             <span>Calls<b>Talk</b></span>
             <em>{crew ? crew.label : 'Portal'}</em>
           </Link>
-          <nav className="p-nav" aria-label="Portal">
+          <nav id="portal-nav" className={`p-nav${navOpen ? ' is-open' : ''}`} aria-label="Portal">
             {nav.map(({ to, href, label, icon }) => (href ? (
               <a key={href} href={href} className="p-nav__link"><Icon name={icon} />{label}</a>
             ) : (
-              <Link key={to} to={to} className={`p-nav__link${path === to ? ' is-active' : ''}`} aria-current={path === to ? 'page' : undefined}>
+              <Link key={to} to={to} onClick={() => setNavOpen(false)} className={`p-nav__link${path === to ? ' is-active' : ''}`} aria-current={path === to ? 'page' : undefined}>
                 <Icon name={icon} />{label}
               </Link>
             )))}
@@ -108,6 +126,11 @@ export default function Shell({ path, statement, children, nav = NAV, team }) {
                 </div>
               )}
             </div>
+            {crew && (
+              <button type="button" className="p-nav__toggle" aria-label={navOpen ? 'Close menu' : 'Open menu'} aria-expanded={navOpen} aria-controls="portal-nav" onClick={() => setNavOpen(!navOpen)}>
+                <span /><span />
+              </button>
+            )}
           </div>
         </div>
       </header>

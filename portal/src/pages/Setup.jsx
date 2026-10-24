@@ -5,7 +5,8 @@ import Icon from '../components/Icons.jsx';
 import { navigate } from '../router.jsx';
 
 const SITE = import.meta.env.VITE_SITE_URL || 'https://callstalk-marketing.vercel.app';
-const token = () => new URLSearchParams(window.location.search).get('token') || '';
+// New links carry the token after # (never sent to a server); links emailed before that have it in ?token=.
+const token = () => new URLSearchParams(window.location.hash.slice(1)).get('token') || new URLSearchParams(window.location.search).get('token') || '';
 const home = () => ({ admin: '/admin', staff: '/upload' }[loadSession()?.role] || '/');
 
 // The one-use link from the setup email: add CallsTalk to an authenticator app, choose a password,
@@ -21,7 +22,7 @@ export default function Setup() {
 
   useEffect(() => {
     document.title = 'Set Up Your Login | CallsTalk Portal';
-    if (!token()) return setLoadError('This setup link is not complete. Open it again from your email.');
+    if (!token()) return setLoadError('This setup link is incomplete. Please open it again from your email.');
     fetchInvite(token()).then(setInvite, (err) => setLoadError(err.message));
   }, []);
 
@@ -57,12 +58,12 @@ export default function Setup() {
           <span>Calls<b>Talk</b></span>
           <em>Portal</em>
         </a>
-        <h1>Set Up Your Login.</h1>
-        <p>Your login has two parts: a password you choose, and a 6-digit code from an authenticator app on your phone.</p>
+        <h1>Activate Your Account.</h1>
+        <p>Your account is protected by two-step verification: a password of your choice and a 6-digit code from an authenticator app.</p>
         <ol className="p-setup__steps">
-          <li><b>Add CallsTalk to Your App</b>Google Authenticator, Microsoft Authenticator or Authy all work.</li>
-          <li><b>Choose a Password</b>At least 8 characters.</li>
-          <li><b>Enter the Code</b>The 6 digits the app shows for CallsTalk.</li>
+          <li><b>Add CallsTalk to Your Authenticator App</b>Google Authenticator, Microsoft Authenticator and Authy are supported.</li>
+          <li><b>Create a Password</b>A minimum of 8 characters.</li>
+          <li><b>Confirm with a Code</b>Enter the 6-digit code displayed for CallsTalk.</li>
         </ol>
       </div>
 
@@ -72,9 +73,9 @@ export default function Setup() {
             <>
               <h2>Link Not Valid</h2>
               <p className="access-card__error" role="alert">{loadError}</p>
-              <p className="portal-login__help">Already set up? <a href="/login">Log In</a>.</p>
+              <p className="portal-login__help">Already activated? <a href="/login">Log In</a>.</p>
             </>
-          ) : <p className="access-card__lead">Opening your setup link…</p>}
+          ) : <p className="access-card__lead">Verifying your setup link…</p>}
         </div>
       ) : (
         <form className="access-card p-login__card" onSubmit={submit}>
@@ -84,23 +85,23 @@ export default function Setup() {
           <div className="p-setup__qr">
             <img src={`data:image/svg+xml;charset=utf-8,${encodeURIComponent(invite.qr_svg)}`} alt="QR code to add CallsTalk to an authenticator app" width="168" height="168" />
             <div>
-              <p><b>1. Scan this code</b> with your authenticator app.</p>
-              <p className="p-setup__alt">Can't scan it? Choose <i>enter a setup key</i> in the app and type:</p>
+              <p><b>1. Scan this QR code</b> with your authenticator app.</p>
+              <p className="p-setup__alt">Unable to scan? Select <i>Enter a setup key</i> in your app and enter:</p>
               <button type="button" className="p-setup__key" onClick={copyKey} title="Copy the key">
                 <code>{invite.secret}</code>
                 <span>{copied ? <><Icon name="check" />Copied</> : 'Copy'}</span>
               </button>
-              <a className="p-setup__open" href={invite.otpauth_url}>On this phone? Open it in the app</a>
+              <a className="p-setup__open" href={invite.otpauth_url}>Using this device? Open in your authenticator app</a>
             </div>
           </div>
 
-          <label>2. Choose a Password<input required type="password" value={form.password} onChange={set('password')} autoComplete="new-password" minLength={8} maxLength={200} /></label>
+          <label>2. Create a Password<input required type="password" value={form.password} onChange={set('password')} autoComplete="new-password" minLength={8} maxLength={200} /></label>
           <label>Repeat Password<input required type="password" value={form.again} onChange={set('again')} autoComplete="new-password" minLength={8} maxLength={200} /></label>
-          <label>3. Code from the App<input required value={form.code} onChange={set('code')} inputMode="numeric" autoComplete="one-time-code" pattern="[0-9 ]{6,7}" maxLength={7} placeholder="123456" /></label>
+          <label>3. Verification Code<input required value={form.code} onChange={set('code')} inputMode="numeric" autoComplete="one-time-code" pattern="[0-9 ]{6,7}" maxLength={7} placeholder="123456" /></label>
 
           {status === 'error' && <p className="access-card__error" role="alert">{error}</p>}
-          <button type="submit" className="btn btn--light" disabled={status === 'sending'}>{status === 'sending' ? 'Setting Up…' : 'Finish Setup'}</button>
-          <p className="portal-login__help">This link works once and expires on {new Date(invite.expires_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}.</p>
+          <button type="submit" className="btn btn--light" disabled={status === 'sending'}>{status === 'sending' ? 'Activating…' : 'Activate Account'}</button>
+          <p className="portal-login__help">This link can be used once and expires on {new Date(invite.expires_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}.</p>
         </form>
       )}
     </main>

@@ -1,18 +1,23 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { loadSession } from '../../../src/lib/portal.js';
 import {
-  addPayment, clearDay, fetchBilling, listUsers, removePayment, removeUser, saveDay, saveTerms, sendLink, signedIn, TIME_ZONES, updateUser,
+  addPayment, clearDay, fetchAudit, fetchBilling, getUser, isConflict, removePayment, removeUser, saveDay, saveTerms, sendLink, signedIn,
+  TIME_ZONES, updateUser,
 } from '../admin.js';
+import { actor, describe, failed, groupOf, stamp } from '../audit-text.js';
 import Icon from '../components/Icons.jsx';
+import { CONTACT_METHODS, contactLink } from '../contacts.js';
 import { ErrorNote, PageHead } from '../components/Shell.jsx';
 import { dayLabel, money, today } from '../format.js';
+import { callsLabel } from '../../../src/components/BillingPage.jsx';
 import { Link, navigate } from '../router.jsx';
 import useLoad from '../useLoad.js';
 import { LinkResult, ROLE_LABEL, StatePill, when } from './AdminUsers.jsx';
 import { Avatar } from '../avatar.jsx';
 
 // A form's own state: what was typed, sending, and the last error or confirmation.
-function useForm(initial) {
+// `onConflict`: someone else saved this first (409); the page then loads the latest, and what was typed stays.
+function useForm(initial, onConflict) {
   const [form, setForm] = useState(initial);
   const [state, setState] = useState({ status: 'idle', message: '' });
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
@@ -25,6 +30,7 @@ function useForm(initial) {
       return result;
     } catch (err) {
       setState({ status: 'error', message: err.message });
+      if (isConflict(err)) onConflict?.();
       return null;
     }
   };
@@ -37,11 +43,11 @@ function Note({ f }) {
   return null;
 }
 
-function Profile({ user, onSaved }) {
-  const f = useForm({ name: user.name, company: user.company, role: user.role });
+function Profile({ user, onSaved, onConflict }) {
+  const f = useForm({ name: user.name, company: user.company, role: user.role }, onConflict);
   const self = user.email === loadSession()?.email;
   return (
-    <form className="p-card p-form" onSubmit={(e) => f.run(e, async () => onSaved((await updateUser(user.id, f.form)).user), 'Saved.')}>
+    <form className="p-card p-form" onSubmit={(e) => f.run(e, async () => onSaved((await updateUser(user.id, { ...f.form, version: user.version })).user), 'Saved.')}>
       <header className="p-card__head"><div><h2>Details</h2><p>Login ID: <b>{user.email}</b></p></div></header>
       <label>Full Name<input required value={f.form.name} onChange={f.set('name')} maxLength={100} /></label>
       <label>Company<input value={f.form.company} onChange={f.set('company')} maxLength={120} /></label>
@@ -58,8 +64,8 @@ function Profile({ user, onSaved }) {
   );
 }
 
-function Access({ user, onSaved }) {
-  const f = useForm({});
+function Access({ user, onSaved, onConflict }) {
+  const f = useForm({}, onConflict);
   const [link, setLink] = useState(null);
   const self = user.email === loadSession()?.email;
   const setUp = Boolean(user.activated_at) && user.status !== 'invited';
@@ -74,8 +80,8 @@ function Access({ user, onSaved }) {
   };
   const toggle = (e) => {
     const off = user.status !== 'disabled';
-    if (off && !window.confirm(`Turn off ${user.email}? They are signed out and cannot log in until you turn the login back on.`)) return;
-    f.run(e, async () => onSaved((await updateUser(user.id, { status: off ? 'disabled' : 'active' })).user), off ? 'Login turned off.' : 'Login turned back on.');
+    if (off && !window.confirm(`Deactivate ${user.email}? They will be signed out and unable to log in until the login is reactivated.`)) return;
+    f.run(e, async () => onSaved((await updateUser(user.id, { status: off ? 'disabled' : 'active', version: user.version })).user), off ? 'Login deactivated.' : 'Login reactivated.');
   };
   const remove = (e) => {
     if (!window.confirm(`Delete ${user.email}? This also deletes their billing, payments and reports, and cannot be undone.`)) return;
@@ -101,7 +107,7 @@ function Access({ user, onSaved }) {
               <Icon name="link" />{setUp ? 'Reset Login and Send Link' : 'Send a New Setup Link'}
             </button>
           )}
-          <button type="button" className="btn btn--quiet btn--sm" onClick={toggle} disabled={f.status === 'sending'}>{user.status === 'disabled' ? 'Turn Login Back On' : 'Turn Login Off'}</button>
+          <button type="button" className="btn btn--quiet btn--sm" onClick={toggle} disabled={f.status === 'sending'}>{user.status === 'disabled' ? 'Reactivate Login' : 'Deactivate Login'}</button>
           <button type="button" className="btn btn--quiet btn--sm p-danger" onClick={remove} disabled={f.status === 'sending'}><Icon name="close" />Delete</button>
         </div>
       )}
@@ -111,13 +117,39 @@ function Access({ user, onSaved }) {
   );
 }
 
-function Terms({ id, account, onSaved }) {
+// The customer's own contact methods (they set these in Settings; we get an email when they change).
+function ContactsCard({ contacts = {} }) {
+  const given = CONTACT_METHODS.filter(({ key }) => contacts[key]);
+  return (
+    <section className="p-card">
+      <header className="p-card__head">
+        <div><h2>Contact Methods</h2><p>{contacts.updated_at ? `Set by the customer, last changed ${when(contacts.updated_at)}.` : 'Set by the customer in their Settings.'}</p></div>
+      </header>
+      {given.length ? (
+        <dl className="p-facts p-facts--contacts">
+          {CONTACT_METHODS.map(({ key, label, icon: AppIcon }) => {
+            const value = contacts[key];
+            const link = contactLink(key, value);
+            return (
+              <div key={key}>
+                <dt className="p-contacts__label"><AppIcon />{label}</dt>
+                <dd>{value ? (link ? <a href={link} target="_blank" rel="noopener noreferrer">{value}</a> : value) : '—'}</dd>
+              </div>
+            );
+          })}
+        </dl>
+      ) : <p className="p-admin__note">None added yet.</p>}
+    </section>
+  );
+}
+
+function Terms({ id, account, onSaved, onConflict }) {
   const f = useForm({
     price_per_call: account?.price_per_call ?? '', opening_balance: account?.opening_balance ?? '0',
     start_date: account?.start_date ?? today(), timezone: account?.timezone ?? TIME_ZONES[0],
-  });
+  }, onConflict);
   return (
-    <form className="p-card p-form" onSubmit={(e) => f.run(e, async () => onSaved(await saveTerms(id, f.form)), 'Billing terms saved.')}>
+    <form className="p-card p-form" onSubmit={(e) => f.run(e, async () => onSaved(await saveTerms(id, { ...f.form, version: account?.version ?? 0 })), 'Billing terms saved.')}>
       <header className="p-card__head"><div><h2>Billing Terms</h2><p>A new price applies to days entered from now on; past days keep their original price.</p></div></header>
       <div className="p-form__row">
         <label>Price per Call ($)<input required type="number" min="0" step="0.01" value={f.form.price_per_call} onChange={f.set('price_per_call')} /></label>
@@ -133,21 +165,38 @@ function Terms({ id, account, onSaved }) {
   );
 }
 
-function Calls({ id, account, picked, onSaved }) {
-  const f = useForm({ date: today(), calls: '', price: '' });
-  useEffect(() => { if (picked) f.setForm({ date: picked.date, calls: String(picked.calls), price: '' }); }, [picked]); // eslint-disable-line react-hooks/exhaustive-deps
+// A day's calls and replacements. Replacements (calls not charged) are often added after the day, which
+// changes that day's balance and every day after it, as on the "125 - 2" bill sheets.
+// `versions`: each shown day's version (0 for a shown day with nothing entered); older days are not checked.
+function Calls({ id, account, picked, versions, shown, onSaved, onConflict }) {
+  const f = useForm({ date: today(), calls: '', replacements: '0', price: '' }, onConflict);
+  const versionOf = (date) => versions?.[date] ?? (shown.includes(date) ? 0 : undefined);
+  useEffect(() => {
+    if (picked) f.setForm({ date: picked.date, calls: String(picked.calls), replacements: String(picked.replacements || 0), price: '' });
+  }, [picked]); // eslint-disable-line react-hooks/exhaustive-deps
+  const calls = Number(f.form.calls) || 0;
+  const replaced = Number(f.form.replacements) || 0;
+  const price = f.form.price !== '' ? Number(f.form.price) : Number(picked?.date === f.form.date ? picked.price_per_call : account.price_per_call);
+  const charged = Math.max(calls - replaced, 0);
   return (
-    <form className="p-card p-form p-admin__calls" onSubmit={(e) => f.run(e, async () => onSaved(await saveDay(id, f.form.date, f.form.calls, f.form.price)), `Calls saved for ${dayLabel(f.form.date)}.`)}>
-      <header className="p-card__head"><div><h2>Billable Calls</h2><p>The day's total. Entering a day again replaces it. Pick a day in the table to change it.</p></div></header>
-      <div className="p-form__row">
+    <form className="p-card p-form p-admin__calls" onSubmit={(e) => f.run(e, async () => onSaved(await saveDay(id, f.form.date, f.form.calls, f.form.price, f.form.replacements, versionOf(f.form.date))), `Calls saved for ${dayLabel(f.form.date)}.`)}>
+      <header className="p-card__head"><div><h2>Calls and Replacements</h2><p>The day's total calls, and how many were replaced (not charged). Pick a day in the table to change it, even days later.</p></div></header>
+      <div className="p-form__row p-form__row--3">
         <label>Day<input required type="date" value={f.form.date} min={account.start_date} max={today()} onChange={f.set('date')} /></label>
-        <label>Calls<input required type="number" min="0" step="1" value={f.form.calls} onChange={f.set('calls')} placeholder="0" /></label>
+        <label>Total Calls<input required type="number" min="0" step="1" value={f.form.calls} onChange={f.set('calls')} placeholder="0" /></label>
+        <label><span>Replacements <i className="p-optional">not charged</i></span><input type="number" min="0" max={calls || undefined} step="1" value={f.form.replacements} onChange={f.set('replacements')} placeholder="0" /></label>
       </div>
+      {f.form.calls !== '' && (
+        <p className="p-admin__note p-calls__sum">
+          Shown as <b>{replaced ? `${calls} − ${replaced}` : calls}</b>: {charged} charged × {money(price)} = <b>{money(charged * price)}</b>
+          {replaced > calls && <span className="is-neg"> (more replacements than calls)</span>}
+        </p>
+      )}
       <label><span>Price per Call ($) <i className="p-optional">optional, default {money(account.price_per_call)}</i></span><input type="number" min="0" step="0.01" value={f.form.price} onChange={f.set('price')} /></label>
       <Note f={f} />
       <div className="p-admin__actions">
         <button type="submit" className="btn btn--light btn--sm" disabled={f.status === 'sending'}>{f.status === 'sending' ? 'Saving…' : 'Save Calls'}</button>
-        <button type="button" className="btn btn--quiet btn--sm" disabled={f.status === 'sending'} onClick={(e) => f.run(e, async () => onSaved(await clearDay(id, f.form.date)), `Calls cleared for ${dayLabel(f.form.date)}.`)}>Clear This Day</button>
+        <button type="button" className="btn btn--quiet btn--sm" disabled={f.status === 'sending'} onClick={(e) => f.run(e, async () => onSaved(await clearDay(id, f.form.date, versionOf(f.form.date))), `Calls cleared for ${dayLabel(f.form.date)}.`)}>Clear This Day</button>
       </div>
     </form>
   );
@@ -202,9 +251,9 @@ function Ledger({ id, statement, onPick, onSaved }) {
                 <tr key={d.date} tabIndex={0} onClick={() => onPick(d)} onKeyDown={(e) => e.key === 'Enter' && onPick(d)}>
                   <th scope="row">{dayLabel(d.date)}{d.is_today && <span className="bill__live"><i aria-hidden="true" />Today</span>}</th>
                   <td className={Number(d.opening_balance) < 0 ? 'is-neg' : ''}>{money(d.opening_balance, currency)}</td>
-                  <td>{d.calls.toLocaleString('en-US')}</td>
+                  <td title={d.replacements ? `${d.replacements} replaced, not charged` : undefined}>{callsLabel(d)}</td>
                   <td>{money(d.price_per_call, currency)}</td>
-                  <td className={d.calls ? 'is-neg' : ''}>{d.calls ? `-${money(d.charges, currency)}` : money(0, currency)}</td>
+                  <td className={Number(d.charges) ? 'is-neg' : ''}>{Number(d.charges) ? `-${money(d.charges, currency)}` : money(0, currency)}</td>
                   <td className={Number(d.payment_received) ? 'is-pos' : ''}>{Number(d.payment_received) ? `+${money(d.payment_received, currency)}` : money(0, currency)}</td>
                   <td className={Number(d.balance) < 0 ? 'is-neg' : 'is-pos'}><b>{money(d.balance, currency)}</b></td>
                 </tr>
@@ -234,24 +283,59 @@ function Ledger({ id, statement, onPick, onSaved }) {
   );
 }
 
+// The latest audit entries by or about this login, refreshed after each change made on this page.
+function Activity({ id, onSignedOut, watch }) {
+  const log = useLoad(signedIn(onSignedOut, () => fetchAudit({ about: id }, { limit: 8 })), [id, ...watch]);
+  const rows = log.data?.rows || [];
+  return (
+    <section className="p-card p-card--flush">
+      <header className="p-card__head">
+        <div><h2>Recent Activity</h2><p>Changes to this login and what it did, newest first.</p></div>
+        <Link to={`/admin/audit?about=${id}`} className="btn btn--quiet btn--sm"><Icon name="audit" />Open in Audit Log</Link>
+      </header>
+      <ErrorNote error={log.error} onRetry={log.reload} />
+      {rows.length ? (
+        <ol className={`p-activity${log.loading ? ' is-refreshing' : ''}`}>
+          {rows.map((r) => (
+            <li key={r.id} className={failed(r) ? 'is-bad' : ''}>
+              <span className={`p-audit__dot is-${groupOf(r.action)}`} aria-hidden="true" />
+              <span className="p-activity__what">{describe(r)}<small>{actor(r)} · {stamp(r.created_at)}</small></span>
+              {failed(r) && <span className="p-pill is-off">Refused</span>}
+            </li>
+          ))}
+        </ol>
+      ) : log.data && <p className="p-empty">Nothing recorded yet. Sign-ins and changes show here as they happen.</p>}
+    </section>
+  );
+}
+
 export default function AdminUser({ id, onSignedOut }) {
-  const people = useLoad(signedIn(onSignedOut, listUsers), [id]);
-  const user = people.data?.find((u) => u.id === id);
+  // Just this login (not the whole list); null once it no longer exists.
+  const person = useLoad(signedIn(onSignedOut, () => getUser(id)), [id]);
+  const user = person.data;
   const customer = user?.role === 'customer';
   const [billing, setBilling] = useState(null);
   const [billingError, setBillingError] = useState('');
   const [picked, setPicked] = useState(null);
 
-  useEffect(() => {
-    if (!customer) return;
+  const loadBilling = useCallback(() => {
     signedIn(onSignedOut, () => fetchBilling(id))().then(setBilling, (err) => setBillingError(err.message));
-  }, [id, customer, onSignedOut]);
+  }, [id, onSignedOut]);
+  useEffect(() => {
+    if (customer) loadBilling();
+  }, [customer, loadBilling]);
 
   useEffect(() => {
-    if (people.data && !user) navigate('/admin', { replace: true });
-  }, [people.data, user]);
+    if (user === null && !person.loading && !person.error) navigate('/admin', { replace: true });
+  }, [user, person.loading, person.error]);
 
-  if (!user) return <ErrorNote error={people.error} onRetry={people.reload} />;
+  // Someone else saved first: show the latest of everything on the page.
+  const latest = () => {
+    person.reload();
+    if (customer) loadBilling();
+  };
+
+  if (!user) return <ErrorNote error={person.error} onRetry={person.reload} />;
   const s = billing?.statement;
   const owes = s && Number(s.balance) < 0;
 
@@ -268,24 +352,26 @@ export default function AdminUser({ id, onSignedOut }) {
         )}
       </PageHead>
       <div className="p-grid">
-        <Access user={user} onSaved={people.reload} />
-        <Profile key={user.id + user.role} user={user} onSaved={people.reload} />
+        <Access user={user} onSaved={person.reload} onConflict={latest} />
+        <Profile key={user.id + user.role} user={user} onSaved={person.reload} onConflict={latest} />
       </div>
       {customer && (
         <>
           <ErrorNote error={billingError} />
+          {billing && <ContactsCard contacts={billing.contacts} />}
           <div className="p-grid">
-            <Terms key={billing?.account ? 'set' : 'new'} id={id} account={billing?.account} onSaved={(b) => { setBilling(b); people.reload(); }} />
+            <Terms key={billing?.account ? 'set' : 'new'} id={id} account={billing?.account} onSaved={(b) => { setBilling(b); person.reload(); }} onConflict={latest} />
             {billing?.account ? <Payment id={id} account={billing.account} onSaved={setBilling} /> : <section className="p-card p-empty-card"><h2>No billing yet</h2><p>Set the billing terms first. Then enter calls and payments here.</p></section>}
           </div>
           {billing?.account && (
             <>
-              <Calls id={id} account={billing.account} picked={picked} onSaved={setBilling} />
+              <Calls id={id} account={billing.account} picked={picked} versions={billing.day_versions} shown={s.days.map((d) => d.date)} onSaved={setBilling} onConflict={latest} />
               <Ledger id={id} statement={s} onPick={(d) => { setPicked(d); window.scrollTo({ top: document.querySelector('.p-admin__calls')?.offsetTop ?? 0, behavior: 'smooth' }); }} onSaved={setBilling} />
             </>
           )}
         </>
       )}
+      <Activity id={id} onSignedOut={onSignedOut} watch={[billing, person.data]} />
     </>
   );
 }

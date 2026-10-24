@@ -5,16 +5,20 @@ import Shell, { ADMIN_NAV, NAV, STAFF_NAV } from './components/Shell.jsx';
 import { navigate, usePath } from './router.jsx';
 import Login from './pages/Login.jsx';
 import Setup from './pages/Setup.jsx';
+import Reset from './pages/Reset.jsx';
 import Reports from './pages/Reports.jsx';
 import Billing from './pages/Billing.jsx';
 import Settings from './pages/Settings.jsx';
-import Upload from './pages/Upload.jsx';
+import Upload, { ReportManager } from './pages/Upload.jsx';
+import { staffSignInKind } from './reports.js';
 import AdminUsers from './pages/AdminUsers.jsx';
 import AdminUser from './pages/AdminUser.jsx';
+import AdminFinance from './pages/AdminFinance.jsx';
+import AdminAudit from './pages/AdminAudit.jsx';
 import SupportChat from './components/SupportChat.jsx';
 
 const PAGES = { '/': Billing, '/reports': Reports, '/settings': Settings };
-const PUBLIC = ['/login', '/setup', '/upload'];
+const PUBLIC = ['/login', '/setup', '/reset', '/upload'];
 const toLogin = () => navigate(`/login?next=${encodeURIComponent(window.location.pathname)}`, { replace: true });
 
 // Signed in as a customer: billing, reports and settings.
@@ -37,33 +41,50 @@ function Portal({ path }) {
   );
 }
 
-// Signed in as an admin: logins and customers' billing, plus their own settings.
+// Signed in as an admin: logins and customers' billing, finance, the audit log, plus their own settings.
+const ADMIN_PAGES = {
+  '/admin': { title: 'Logins', Page: AdminUsers },
+  '/admin/finance': { title: 'Finance', Page: AdminFinance },
+  '/admin/audit': { title: 'Audit Log', Page: AdminAudit },
+  '/admin/reports': { title: 'Reports', Page: ReportManager },
+};
+
 function Admin({ path }) {
   const userId = /^\/admin\/users\/([0-9a-f-]{36})$/.exec(path)?.[1];
-  const known = path === '/admin' || path === '/settings' || userId;
-  const title = path === '/settings' ? 'Settings' : 'Logins';
+  const known = ADMIN_PAGES[path] || path === '/settings' || userId;
+  const title = path === '/settings' ? 'Settings' : ADMIN_PAGES[path]?.title || 'Logins';
+  const Page = ADMIN_PAGES[path]?.Page || AdminUsers;
 
   useEffect(() => {
     document.title = `${title} | CallsTalk Admin`;
-    if (!known) navigate('/admin', { replace: true });
-  }, [known, title]);
+    // Older links to the standalone upload page open Reports inside the admin portal.
+    if (path === '/upload') navigate('/admin/reports', { replace: true });
+    else if (!known) navigate('/admin', { replace: true });
+  }, [known, title, path]);
+
+  if (path === '/upload') return null;
 
   return (
     <Shell path={userId ? '/admin' : path} nav={ADMIN_NAV} team="admin">
-      {path === '/settings' ? <Settings team="admin" /> : userId ? <AdminUser id={userId} onSignedOut={toLogin} /> : <AdminUsers onSignedOut={toLogin} />}
+      {path === '/settings' ? <Settings team="admin" /> : userId ? <AdminUser id={userId} onSignedOut={toLogin} /> : <Page key={path} onSignedOut={toLogin} />}
     </Shell>
   );
 }
 
-// Signed in as staff: report uploads (/upload, its own page) and their own settings. Nothing else.
+// Signed in as staff: customer reports (/upload) and their own settings, in the same frame as admins. Nothing else.
 function Staff({ path }) {
+  const known = path === '/upload' || path === '/settings';
   useEffect(() => {
-    if (path === '/settings') document.title = 'Settings | CallsTalk Staff';
+    if (known) document.title = `${path === '/settings' ? 'Settings' : 'Reports'} | CallsTalk Staff`;
     else navigate('/upload', { replace: true });
-  }, [path]);
+  }, [path, known]);
 
-  if (path !== '/settings') return null;
-  return <Shell path={path} nav={STAFF_NAV} team="staff"><Settings team="staff" /></Shell>;
+  if (!known) return null;
+  return (
+    <Shell path={path} nav={STAFF_NAV} team="staff">
+      {path === '/settings' ? <Settings team="staff" /> : <ReportManager onSignedOut={toLogin} />}
+    </Shell>
+  );
 }
 
 export default function App() {
@@ -72,11 +93,15 @@ export default function App() {
   const signedIn = Boolean(session?.access);
 
   useEffect(() => {
-    if (!signedIn && !PUBLIC.includes(path)) navigate(`/login?next=${encodeURIComponent(path)}`, { replace: true });
+    // Keeps the query too, so a link like /reports?open=<id> from an email still opens the report after logging in.
+    if (!signedIn && !PUBLIC.includes(path)) navigate(`/login?next=${encodeURIComponent(path + window.location.search)}`, { replace: true });
   }, [signedIn, path]);
 
-  if (path === '/upload') return <Upload />;
+  // Signed-in admins and staff get reports inside their portal; the standalone page is for the demo and local key.
+  const team = signedIn && staffSignInKind === 'login' && ['admin', 'staff'].includes(session.role);
+  if (path === '/upload' && !team) return <Upload />;
   if (path === '/setup') return <Setup />;
+  if (path === '/reset') return <Reset />;
   if (path === '/login') return <Login />;
   if (!signedIn) return null;
   if (session.role === 'admin') return <Admin path={path} />;

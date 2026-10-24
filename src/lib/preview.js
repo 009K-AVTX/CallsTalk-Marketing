@@ -44,14 +44,16 @@ export function previewStatement(from, viewFrom = from) {
   for (let d = new Date(y, mo - 1, d0), i = 0; iso(d) <= iso(now); d.setDate(d.getDate() + 1), i++) {
     const date = iso(d);
     const n = perDay[date] || 0;
-    const charges = n * PRICE;
+    // Some past days have a call or two replaced (not charged), as on the real bill sheets.
+    const replaced = date !== iso(now) && i % 4 === 1 ? Math.min(n, 1 + (i % 3)) : 0;
+    const charges = (n - replaced) * PRICE;
     // Every third day the customer pays what the previous days came to, rounded down to $100.
     const received = i % 3 === 2 ? Math.floor(unpaid / 100) * 100 : 0;
     unpaid += charges - received;
     const opening = balance;
     balance = opening - charges + received;
-    days.push({ date, is_today: date === iso(now), opening_balance: m(opening), calls: n, price_per_call: m(PRICE), charges: m(charges), payment_received: m(received), balance: m(balance) });
-    if (received) payments.push({ id: date, amount: m(received), currency: 'USD', status: 'completed', provider: 'manual', reference: '', note: 'Bank transfer', date: `${date}T14:20:00Z` });
+    days.push({ date, is_today: date === iso(now), opening_balance: m(opening), calls: n, replacements: replaced, billable_calls: n - replaced, price_per_call: m(PRICE), charges: m(charges), payment_received: m(received), balance: m(balance) });
+    if (received) payments.push({ id: date, amount: m(received), currency: 'USD', status: 'completed', method: 'manual', reference: '', note: 'Bank transfer', date: `${date}T14:20:00Z` });
   }
   return {
     customer: CUSTOMER, currency: 'USD', price_per_call: m(PRICE), timezone: 'America/New_York',

@@ -569,6 +569,30 @@ chats ([7.6](#76-delete-old-chats)). The `node_modules` folders can be deleted a
   | Reply page view / submit | 60 / 20 per minute |
 
   The limits are kept in memory, so they reset whenever the process restarts.
+- On top of those, every `/api` request is limited (`server/src/index.js`, `server/src/rate-limit.js`):
+
+  | What | Limit | Past it |
+  |---|---|---|
+  | Requests per address | 300 a minute | 429, with `Retry-After` |
+  | Requests in progress per address | 12 | 429 at once (no queueing) |
+  | Requests in progress, whole API | 400 | 503 at once |
+  | Session renewals per address | 60 per 10 minutes | 429 |
+  | Finance reports and Audit Log summaries/downloads | 2 at a time, 10 more wait up to 15 s; 60 a minute and 20 downloads per 10 minutes per login | 503 / 429 |
+
+  Slow clients are cut off (headers within 15 s, a whole request within 60 s), every database query is stopped
+  after 15 s, and a request waits at most 5 s for a database connection. Large bodies (report uploads, photos)
+  are only read after the login is checked.
+- nginx limits before Node (`server/deploy/nginx-portal.conf`, `server/deploy/nginx.conf`): 10 API requests a
+  second per address (bursts of 60), 12 sign-in requests a minute, 30 connections, and short timeouts. A flood
+  larger than the server's own connection can only be stopped in front of it (a CDN such as Cloudflare, or the
+  host's DDoS protection).
+- Portal sessions live in **HttpOnly cookies** that no script can read; the browser keeps only the login's email,
+  name and role. Changes sent with the cookie must come from the portal itself (its Origin and an `X-CallsTalk`
+  header), and the portal page runs only its own scripts (Content-Security-Policy in nginx). Setup links carry their
+  token after `#`, so it never reaches a server log.
+- **Concurrency:** logins, billing terms and days have a version. A save made from an older version is refused
+  (409, "Someone else saved a change here...") and the page reloads the latest, so two admins never silently
+  overwrite each other. Changes that could remove the last admin run one at a time.
 - Reply links are signed and expire after `REPLY_LINK_DAYS`. Treat notification emails as internal; see 11.4.
 - The Telegram group decides who can answer visitors. Remove people from the group when they leave the team.
 
@@ -646,7 +670,7 @@ Customers log in at **https://portal.callstalk.com** (the website's Log In goes 
 | Built portal | `/var/www/Callstalk/portal/dist` (served by nginx) |
 | API | The same Node process, `/api/accounts`, `/api/admin`, `/api/billing`, `/api/portal`, `/api/staff` |
 | nginx site | `/etc/nginx/sites-available/portal.callstalk.com` (from `server/deploy/nginx-portal.conf`) |
-| Data | Tables `portal_*` and `billing_*` in the `callstalk_chat` database, created on startup |
+| Data | Tables `portal_*`, `billing_*` and `audit_log` in the `callstalk_chat` database, created on startup |
 
 ### 16.1 First-time setup
 
@@ -681,6 +705,15 @@ Customers log in at **https://portal.callstalk.com** (the website's Log In goes 
 - **Lost phone or forgotten password:** open the login → **Reset Login and Send Link**. Their old password and
   code app stop working at once.
 - **Someone leaves:** **Turn Login Off** signs them out everywhere and blocks logging in.
+- **Finance:** billed, collected and owed across all customers (or one) for any period, with charts and a table per
+  customer. **Download** gives a PDF report or CSVs (by customer, per day, payments). The figures follow the same
+  rules as each customer's own bill.
+- **Audit Log:** every change made in the portal (logins, billing terms, calls, payments, reports, contact details,
+  passwords), every sign-in and failed sign-in, deposits credited by the payment check, and every Finance or Audit
+  Log download: who, when, from which IP and device, and the values before and after. Open an entry to see it all;
+  download the filtered list as PDF or CSV. A login's page shows its own **Recent Activity**. Entries are kept for
+  good (table `audit_log`) and cannot be edited or deleted from the portal. A new API route that changes something
+  must be added to `ROUTES` in `server/src/audit.js` to be logged.
 
 ### 16.3 Customer payments (USDT, TRC-20)
 
@@ -697,12 +730,19 @@ Setting it up, once:
 
 1. In the Well Wallet bot: Settings → Settings → API → API Keys Management → create a key, and switch on the
    **Wallets** and **Transactions** APIs for it. Turn on 2FA and the backup email (Settings → Security), as they ask.
-2. Send Well Wallet support (https://t.me/WellWallet_Support) the VPS IP `168.231.112.65` for their whitelist.
-   It takes up to 2 business days.
+2. The VPS IP `168.231.112.65` must be on Well Wallet's allowlist. It already is for the TOPUP bot's account; if
+   CallsTalk uses a different Well Wallet account, send the IP to support (https://t.me/WellWallet_Support), which
+   takes up to 2 business days. A blocked IP shows in the log as "blocked (HTTP 403) ... allowlist".
 3. In `/var/www/Callstalk/server/.env` set `WELLWALLET_API_TOKEN` and a long random `WELLWALLET_WEBHOOK_KEY`
    (`openssl rand -hex 24`), then `pm2 restart callstalk-chat`. The log shows no "[payments] ... is not set" line.
-4. In the bot: Settings → Settings → API → Webhooks Management → create one with the URL
-   `https://portal.callstalk.com/api/payments/webhook?key=<WELLWALLET_WEBHOOK_KEY>`.
+4. Webhook (optional, deposits are also checked every 2 minutes): in the bot, Settings → Settings → API →
+   Webhooks Management, or through Well Wallet support, register
+   `https://portal.callstalk.com/api/payments/webhook?key=<WELLWALLET_WEBHOOK_KEY>`. If the account is shared with the
+   TOPUP bot and allows only one webhook, keep TOPUP's and rely on the 2-minute check.
+
+Wallets are made as `accounting` (exchange) wallets, one per customer, named `CallsTalk <company>`, and are never
+deleted. Well Wallet allows 500 per network per account; the TOPUP bot's clean-up only touches its own `tg-...`
+wallets, but on a shared account both count towards the 500.
 
 Check: `pm2 logs callstalk-chat --lines 50 --nostream | grep payments` shows each address made and each deposit.
 Without the token, Pay tells customers to contact us and admins record payments by hand.
@@ -711,3 +751,22 @@ Without the token, Pay tells customers to contact us and admins record payments 
 
 With no other admin to reset them, run `npm run portal:admin -- their@email.com` in `server/`. It resets that
 login and prints a new setup link.
+
+### 16.5 Once, when deploying the cookie sessions and limits
+
+1. Deploy as in [6.1](#61-normal-update). The portal must be built with `VITE_PORTAL_API_URL=/api` (it already
+   is): session cookies only go to the portal's own address.
+2. Install the new nginx configs (**shared**: always `nginx -t` before reloading):
+
+   ```bash
+   cp /var/www/Callstalk/server/deploy/nginx-portal.conf /etc/nginx/sites-available/portal.callstalk.com
+   cp /var/www/Callstalk/server/deploy/nginx.conf /etc/nginx/sites-available/callstalk-chat   # if that site is in use
+   nginx -t && systemctl reload nginx
+   ```
+
+   Certbot added the HTTPS lines to these files when it was first run; run `certbot --nginx -d portal.callstalk.com`
+   (and the chat domain) again after copying so they come back.
+3. Everyone signs in once more: sessions from before were kept by the browser itself and are dropped.
+
+Check: in the browser's developer tools on the portal, Application → Local Storage shows no tokens, and
+`document.cookie` in the console prints an empty string.

@@ -226,32 +226,76 @@ export async function emailVisitorMessage(session, message, messageId) {
   await sendMail(session, mail);
 }
 
+// A customer changed their contact methods in portal Settings: every method, before and now, changes in bold.
+export function contactsChangedMail({ user, before, after, changed, labels }) {
+  const who = user.company || user.name || user.email;
+  const show = (v) => (v ? html(v) : `<span style="color:${c.muted}">not given</span>`);
+  const cell = 'padding:9px 10px 9px 0;border-top:1px solid ' + c.rule + ';font:400 13px/1.45 ' + BODY + ';vertical-align:top;overflow-wrap:anywhere';
+  const rows = Object.keys(labels).map((k) => {
+    const on = changed.includes(k);
+    const weight = on ? `font-weight:600;color:${c.ink}` : `color:${c.body}`;
+    return `<tr><td style="${cell};${weight};width:24%">${labels[k]}${on ? ` <span style="color:${c.accentDeep}">(changed)</span>` : ''}</td>`
+      + `<td style="${cell};color:${c.muted};width:38%">${on ? show(before[k]) : ''}</td>`
+      + `<td style="${cell};${weight};width:38%">${show(after[k])}</td></tr>`;
+  }).join('');
+  const head = (t) => `<td style="padding:0 10px 6px 0;font:600 11px/1.3 ${BODY};letter-spacing:.06em;text-transform:uppercase;color:${c.accentDeep}">${t}</td>`;
+  const body = `<tr><td class="px" style="padding:0 28px 22px">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="table-layout:fixed"><tr>${head('Method')}${head('Before')}${head('Now')}</tr>${rows}</table>
+</td></tr>`;
+  const list = changed.map((k) => labels[k]).join(', ');
+  return {
+    subject: `${config.isDev ? '[Local test] ' : ''}Contact details updated: ${who}`,
+    preview: `${who} changed ${list}.`,
+    heading: `${escapeHtml(who)} updated their contact details`,
+    sub: `<b>${escapeHtml(list)}</b> changed in the portal by ${escapeHtml(user.name || user.email)} (${escapeHtml(user.email)}) at ${formatClock()}.`,
+    body,
+    text: `${who} updated their contact details in the portal (${user.email}).\n\n`
+      + Object.keys(labels).map((k) => `${labels[k]}: ${after[k] || 'not given'}${changed.includes(k) ? `  (was: ${before[k] || 'not given'})` : ''}`).join('\n') + '\n',
+  };
+}
+
+// Returns false when email is turned off (EMAIL_TO empty).
+export async function emailContactsChanged(change) {
+  if (!transport) return false;
+  const { subject: subjectLine, text, ...content } = contactsChangedMail(change);
+  await transport.sendMail({
+    from,
+    to,
+    replyTo: { name: change.user.name || change.user.email, address: change.user.email },
+    subject: subjectLine,
+    html: layout({ ...content, name: change.user.name || change.user.email, email: change.user.email }),
+    text,
+    attachments: images,
+  });
+  return true;
+}
+
 // A portal setup link for a new login, or a fresh one after a reset. Returns false when SMTP is not set up.
 export function inviteMail({ name, email, link, expiresAt, reset, timeZone = config.timezone }) {
   // "October 31, 11:12 PM EDT", in the customer's own time zone.
   const until = expiresAt.toLocaleString('en-US', { timeZone, month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZoneName: 'short' });
   const steps = [
-    ['Open your setup link', 'It works <b>once</b>, until <b>' + escapeHtml(until) + '</b>.'],
-    ['Add CallsTalk to an authenticator app', 'Scan the QR code with <b>Google Authenticator</b>, Microsoft Authenticator or Authy.'],
-    ['Choose your password', 'Then enter the <b>6-digit code</b> from the app to finish.'],
+    ['Open Your Setup Link', 'This link can be used <b>once</b> and is valid until <b>' + escapeHtml(until) + '</b>.'],
+    ['Add CallsTalk to Your Authenticator App', 'Scan the QR code with <b>Google Authenticator</b>, Microsoft Authenticator or Authy.'],
+    ['Create Your Password', 'Then enter the <b>6-digit code</b> from the app to complete activation.'],
   ];
   const body = `<tr><td class="px" style="padding:0 28px 22px">${steps.map(([title, text], i) => `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-top:1px solid ${c.rule}"><tr>
 <td width="34" valign="top" style="padding:12px 0"><span style="display:inline-block;width:24px;height:24px;border-radius:12px;background:${c.panel};color:${c.accentDeep};font:600 12px/24px ${BODY};text-align:center">${i + 1}</span></td>
 <td valign="top" style="padding:12px 0"><p style="margin:0;font:600 14px/1.45 ${BODY};color:${c.ink}">${title}</p><p style="margin:2px 0 0;font:400 13px/1.5 ${BODY};color:${c.body}">${text}</p></td>
 </tr></table>`).join('')}</td></tr>`;
   return {
-    subject: reset ? 'Your new CallsTalk Portal setup link' : 'Set up your CallsTalk Portal login',
+    subject: reset ? 'Your New CallsTalk Portal Setup Link' : 'Activate Your CallsTalk Portal Account',
     preview: 'Set your password and add your authenticator app.',
-    heading: reset ? 'Set up your login again' : 'Your CallsTalk login is ready',
-    sub: `${name ? `Hi ${escapeHtml(name)}, ` : ''}your login ID is <b>${escapeHtml(email)}</b>. Set it up in three short steps.`,
+    heading: reset ? 'Reactivate Your Account' : 'Your CallsTalk Portal Account Is Ready',
+    sub: `${name ? `Dear ${escapeHtml(name)}, y` : 'Y'}our login ID is <b>${escapeHtml(email)}</b>. Please complete the three steps below to activate your account.`,
     body,
-    cta: { href: link, label: 'Set Up My Login' },
-    footer: `<b style="color:#fff">Did not expect this?</b> You can ignore it, nothing happens until the link is used.`,
-    footnote: `Link works <b style="color:${c.onPlum}">once</b>`,
-    text: `${reset ? 'Set up your CallsTalk Portal login again' : 'Your CallsTalk Portal login is ready'}\n\nLogin ID: ${email}\n\n`
-      + `1. Open your setup link (it works once, until ${until}):\n${link}\n`
+    cta: { href: link, label: 'Activate My Account' },
+    footer: `<b style="color:#fff">Not expecting this email?</b> You may safely disregard it; no action is taken unless the link is used.`,
+    footnote: `Single-use link`,
+    text: `${reset ? 'Reactivate your CallsTalk Portal account' : 'Your CallsTalk Portal account is ready'}\n\nLogin ID: ${email}\n\n`
+      + `1. Open your setup link (single use, valid until ${until}):\n${link}\n`
       + '2. Scan the QR code with an authenticator app (Google Authenticator, Microsoft Authenticator or Authy).\n'
-      + '3. Choose your password and enter the 6-digit code from the app.\n',
+      + '3. Create your password and enter the 6-digit code from the app to complete activation.\n',
   };
 }
 
@@ -263,6 +307,99 @@ export async function emailInvite(invite) {
   });
   return true;
 }
+
+const atTime = (when) => when.toLocaleString('en-US', { timeZone: config.timezone, month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZoneName: 'short' });
+const securityFooter = `<b style="color:#fff">Did not make this request?</b> Your password stays the same unless this link is used. If you are concerned, please contact our support team.`;
+
+// "Forgot password": a one-use link to choose a new password (the authenticator code is still asked for).
+export function passwordResetMail({ name, email, link, expiresAt }) {
+  const until = atTime(expiresAt);
+  const body = `<tr><td class="px" style="padding:0 28px 22px"><p style="margin:0;padding:12px 0 0;border-top:1px solid ${c.rule};font:400 13px/1.55 ${BODY};color:${c.body}">`
+    + `The link can be used <b>once</b> and is valid until <b>${escapeHtml(until)}</b>. You will be asked for the <b>6-digit code</b> from your authenticator app to confirm the change.</p></td></tr>`;
+  return {
+    subject: 'Reset Your CallsTalk Portal Password',
+    preview: 'Use this link to choose a new password for your CallsTalk Portal account.',
+    heading: 'Reset Your Password',
+    sub: `${name ? `Dear ${escapeHtml(name)}, w` : 'W'}e received a request to reset the password for <b>${escapeHtml(email)}</b>. Use the button below to choose a new password.`,
+    body,
+    cta: { href: link, label: 'Choose a New Password' },
+    footer: securityFooter,
+    footnote: 'Single-use link',
+    text: `Reset your CallsTalk Portal password\n\nWe received a request to reset the password for ${email}.\n\n`
+      + `Choose a new password (single use, valid until ${until}):\n${link}\n\n`
+      + 'You will be asked for the 6-digit code from your authenticator app to confirm the change.\n'
+      + 'If you did not make this request, your password stays the same unless this link is used.\n',
+  };
+}
+
+// Sent after any password change, so the owner notices one they did not make.
+export function passwordChangedMail({ name, email, when, how }) {
+  const at = atTime(when);
+  const way = how === 'reset' ? 'using a password reset link' : 'from the account settings';
+  return {
+    subject: 'Your CallsTalk Portal Password Was Changed',
+    preview: `The password for ${email} was changed on ${at}.`,
+    heading: 'Your Password Was Changed',
+    sub: `${name ? `Dear ${escapeHtml(name)}, t` : 'T'}he password for <b>${escapeHtml(email)}</b> was changed on <b>${escapeHtml(at)}</b>, ${way}. All other devices have been signed out.`,
+    body: '<tr><td style="padding:0 0 8px"></td></tr>',
+    footer: `<b style="color:#fff">Did not make this change?</b> Please contact our support team immediately so we can secure your account.`,
+    footnote: '',
+    text: `The password for your CallsTalk Portal account (${email}) was changed on ${at}, ${way}. All other devices have been signed out.\n\n`
+      + 'If you did not make this change, please contact our support team immediately so we can secure your account.\n',
+  };
+}
+
+// New billing report(s) in the customer's portal. The files are never attached: they are only in the portal.
+const dayText = (iso) => new Date(`${iso}T12:00:00Z`).toLocaleDateString('en-US', { timeZone: 'UTC', month: 'short', day: 'numeric', year: 'numeric' });
+const periodText = (r) => (r.period_from === r.period_to ? dayText(r.period_from) : `${dayText(r.period_from)} to ${dayText(r.period_to)}`);
+
+export function reportReadyMail({ name, reports, link }) {
+  const one = reports.length === 1;
+  const span = (() => {
+    const from = reports.map((r) => r.period_from).sort()[0];
+    const to = reports.map((r) => r.period_to).sort().at(-1);
+    return periodText({ period_from: from, period_to: to });
+  })();
+  const cell = `padding:9px 12px 9px 0;border-top:1px solid ${c.rule};font:400 13px/1.45 ${BODY};vertical-align:top;overflow-wrap:anywhere`;
+  const rows = reports.map((r) => `<tr><td style="${cell};font-weight:600;color:${c.ink}">${escapeHtml(r.title)}</td>`
+    + `<td style="${cell};color:${c.body};white-space:nowrap">${escapeHtml(periodText(r))}</td></tr>`
+    + (r.note ? `<tr><td colspan="2" style="padding:0 0 10px;font:400 12px/1.45 ${BODY};color:${c.muted}">Note from our team: ${escapeHtml(r.note)}</td></tr>` : '')).join('');
+  const head = (t) => `<td style="padding:0 12px 6px 0;font:600 11px/1.3 ${BODY};letter-spacing:.06em;text-transform:uppercase;color:${c.accentDeep}">${t}</td>`;
+  const body = `<tr><td class="px" style="padding:0 28px 22px">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>${head(one ? 'Report' : 'Reports')}${head('Period')}</tr>${rows}</table>
+</td></tr>`;
+  return {
+    subject: one ? `New Billing Report Available: ${periodText(reports[0])}` : `New Billing Reports Available: ${span}`,
+    preview: one ? `A new billing report covering ${periodText(reports[0])} is now available in your CallsTalk Portal.` : `${reports.length} new billing reports are now available in your CallsTalk Portal.`,
+    heading: one ? 'Your Billing Report Is Ready' : 'Your Billing Reports Are Ready',
+    sub: (() => {
+      const news = one
+        ? `a new billing report covering <b>${escapeHtml(periodText(reports[0]))}</b> is now available in your CallsTalk Portal.`
+        : `<b>${reports.length} new billing reports</b> covering <b>${escapeHtml(span)}</b> are now available in your CallsTalk Portal.`;
+      return name ? `Dear ${escapeHtml(name)}, ${news}` : news.charAt(0).toUpperCase() + news.slice(1);
+    })(),
+    body,
+    cta: { href: link, label: one ? 'View Report' : 'View Reports' },
+    footer: '<b style="color:#fff">For your security,</b> reports are not attached to emails. They are available only through your secure portal login.',
+    footnote: '',
+    text: `${one ? 'Your billing report is ready' : 'Your billing reports are ready'}\n\n`
+      + `${one ? `A new billing report covering ${periodText(reports[0])} is` : `${reports.length} new billing reports covering ${span} are`} now available in your CallsTalk Portal.\n\n`
+      + reports.map((r) => `- ${r.title} (${periodText(r)})${r.note ? `\n  Note from our team: ${r.note}` : ''}`).join('\n')
+      + `\n\nView ${one ? 'it' : 'them'} here: ${link}\n\n`
+      + 'For your security, reports are not attached to emails. They are available only through your secure portal login.\n',
+  };
+}
+
+// Customer security emails. Return false when SMTP is not set up.
+async function sendCustomerMail(to, mail) {
+  if (!customerTransport) return false;
+  const { subject: subjectLine, text, ...content } = mail;
+  await customerTransport.sendMail({ from, to, subject: subjectLine, html: layout(content), text, attachments: images });
+  return true;
+}
+export const emailPasswordReset = (reset) => sendCustomerMail(reset.email, passwordResetMail(reset));
+export const emailPasswordChanged = (change) => sendCustomerMail(change.email, passwordChangedMail(change));
+export const emailReportReady = (notice) => sendCustomerMail(notice.email, reportReadyMail(notice));
 
 // For previewing the design (layout without sending).
 export const renderMail = ({ session, ...mail }) => layout({ ...mail, name: session.name, email: session.email });

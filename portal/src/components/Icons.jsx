@@ -21,6 +21,10 @@ const PATHS = {
   link: <><path d="M10 14a4.5 4.5 0 0 0 6.4 0l3-3a4.5 4.5 0 0 0-6.4-6.4l-1 1" /><path d="M14 10a4.5 4.5 0 0 0-6.4 0l-3 3a4.5 4.5 0 0 0 6.4 6.4l1-1" /></>,
   back: <path d="M15 5l-7 7 7 7" />,
   refresh: <><path d="M21 12a9 9 0 0 1-15.5 6.3L3 16M3 12a9 9 0 0 1 15.5-6.3L21 8" /><path d="M21 3v5h-5M3 21v-5h5" /></>,
+  // A ledger page with a running line: the Finance report.
+  finance: <><rect x="4" y="3.5" width="16" height="17" rx="2.5" /><path d="M8 15.5l3-3 2.2 2.2L16.5 11M8 7.5h8" /></>,
+  // A list with one line ticked: the audit log.
+  audit: <><path d="M9 6h11M9 12h11M10 18h5" /><path d="M3.5 6h1.5M3.5 12h1.5" /><path d="m3 17.8 1.3 1.3L7 16.4" /></>,
 };
 
 export default function Icon({ name, className = 'p-icon' }) {

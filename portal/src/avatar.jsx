@@ -61,8 +61,8 @@ export function MyAvatar({ size, fallback, className }) {
 // Crops the middle square out of the picture and scales it to 256px, as WebP (JPEG where WebP is not supported).
 function squarePhoto(file) {
   return new Promise((resolve, reject) => {
-    if (!/^image\/(jpeg|png|webp|gif|bmp|avif|heic|heif)$/i.test(file.type)) return reject(new Error('Choose a photo (JPG, PNG or WebP).'));
-    if (file.size > MAX_INPUT_MB * 1024 * 1024) return reject(new Error(`Choose a photo smaller than ${MAX_INPUT_MB} MB.`));
+    if (!/^image\/(jpeg|png|webp|gif|bmp|avif|heic|heif)$/i.test(file.type)) return reject(new Error('Please select a JPG, PNG or WebP image.'));
+    if (file.size > MAX_INPUT_MB * 1024 * 1024) return reject(new Error(`Please select an image smaller than ${MAX_INPUT_MB} MB.`));
     const url = URL.createObjectURL(file);
     const img = new Image();
     img.onload = () => {
@@ -78,7 +78,7 @@ function squarePhoto(file) {
     };
     img.onerror = () => {
       URL.revokeObjectURL(url);
-      reject(new Error('That photo could not be opened. Try a JPG or PNG.'));
+      reject(new Error('This image could not be processed. Please try a JPG or PNG file.'));
     };
     img.src = url;
   });
@@ -115,7 +115,7 @@ export function AvatarEditor() {
       <MyAvatar size="xl" />
       <div>
         <p className="p-avatar-edit__title">Profile Photo</p>
-        <p className="p-avatar-edit__hint">Shown on your account throughout the portal. JPG, PNG or WebP; it will be cropped to a square.</p>
+        <p className="p-avatar-edit__hint">Displayed on your account throughout the portal. Accepted formats: JPG, PNG and WebP. Images are cropped to a square.</p>
         <div className="p-admin__actions">
           <label className={`btn btn--light btn--sm p-avatar-edit__pick${status === 'sending' ? ' is-busy' : ''}`}>
             <input ref={input} type="file" accept="image/jpeg,image/png,image/webp" onChange={pick} disabled={status === 'sending'} />
