@@ -647,7 +647,7 @@ h3 { font-size: 1.5rem; }
 .wallet__presets button:hover { color: var(--white); border-color: #4d4555; }
 .wallet__presets button.is-on { color: var(--accent); border-color: rgba(214, 163, 255, .6); background: rgba(214, 163, 255, .1); }
 .wallet__method { display: flex; align-items: center; gap: 10px; margin: 0; font-size: .88rem; color: var(--on-dark-soft); }
-.wallet__method span { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; background: #26a17b; color: #fff; font-weight: 700; font-size: .85rem; }
+.wallet__method span { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; background: rgba(214, 163, 255, .16); color: var(--accent); font-weight: 700; font-size: .8rem; }
 .wallet__pay .btn { width: 100%; }
 .wallet__secure { margin: 0; font-size: .8rem; color: var(--slate); text-align: center; }
 

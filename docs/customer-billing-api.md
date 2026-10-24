@@ -52,7 +52,7 @@ Rules the page relies on:
 
 ## `POST /billing/statement/pay` (Bearer)
 
-Body `{ "amount": "250.00" }` → `{ "payment_url": "https://capitalist.net/merchant/pay?…" }`. The site redirects the customer there. When the provider confirms, the payment appears in `payments` as completed and the balance moves.
+Body `{ "amount": "250.00" }` → `{ "payment_url": "<WellWallet checkout URL>" }`. Payments go through **WellWallet** (not Capitalist); online payments come back in `payments` with `provider: "wellwallet"`. The site redirects the customer there. When the provider confirms, the payment appears in `payments` as completed and the balance moves.
 
 ## Trying the page without the backend
 

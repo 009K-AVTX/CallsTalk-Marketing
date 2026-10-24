@@ -99,12 +99,12 @@ export function Wallet({ data, onPaid }) {
             <button key={p} type="button" className={Number(amount) === p ? 'is-on' : ''} onClick={() => setAmount(String(p))}>${p.toLocaleString('en-US')}</button>
           ))}
         </div>
-        <p className="wallet__method"><span aria-hidden="true">₮</span>Capitalist · USDT (TRC-20) and wallets</p>
+        <p className="wallet__method"><span aria-hidden="true">W</span>Pay with WellWallet</p>
         {status === 'error' && <p className="access-card__error" role="alert">{error}</p>}
         <button type="submit" className="btn btn--light" disabled={!valid || status === 'sending'}>
           {status === 'sending' ? 'Opening Checkout…' : valid ? `Pay ${money(amount, data.currency)}` : 'Pay Now'}
         </button>
-        <p className="wallet__secure">You finish the payment on the secure Capitalist page. It shows here as soon as it clears.</p>
+        <p className="wallet__secure">You finish the payment on the secure WellWallet page. It shows here as soon as it clears.</p>
       </form>
     </section>
   );
@@ -240,7 +240,7 @@ export function BillingSections({ data, onPaid }) {
           <ul>
             {data.payments.map((p) => (
               <li key={p.id}>
-                <span>{dayLabel(p.date.slice(0, 10))}<small>{p.note || (p.provider === 'capitalist' ? 'Paid online' : 'Recorded by our team')}</small></span>
+                <span>{dayLabel(p.date.slice(0, 10))}<small>{p.note || (p.provider && p.provider !== 'manual' ? 'Paid online with WellWallet' : 'Recorded by our team')}</small></span>
                 <span className={`billing__status is-${p.status}`}>{p.status}</span>
                 <b className={p.status === 'completed' ? 'is-pos' : ''}>{money(p.amount, p.currency)}</b>
               </li>

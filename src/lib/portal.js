@@ -4,7 +4,7 @@
 //   POST /accounts/verify-mfa       temp_token + code   -> { access, refresh }
 //   POST /accounts/refresh          refresh             -> { access }
 //   GET  /billing/statement?from=  YYYY-MM-DD          -> balance and every day's bill since that date
-//   POST /billing/statement/pay     amount              -> { payment_url } (Capitalist checkout)
+//   POST /billing/statement/pay     amount              -> { payment_url } (WellWallet checkout)
 //   GET  /accounts/me                                   -> profile
 //   POST /accounts/change-password  current_password, new_password
 //
