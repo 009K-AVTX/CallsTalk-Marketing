@@ -112,9 +112,19 @@ async function authed(path, options) {
 // Bills are shown from the start of September 2026: every day since, newest first.
 export const BILLING_FROM = '2026-09-01';
 
+// Customers see their last five days of bills and payments, today included. Older ones are in the
+// Excel reports our team uploads.
+export const HISTORY_DAYS = 5;
+export function historyFrom() {
+  const d = new Date();
+  d.setDate(d.getDate() - (HISTORY_DAYS - 1));
+  const from = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  return from < BILLING_FROM ? BILLING_FROM : from;
+}
+
 export const fetchStatement = () => (PREVIEW
-  ? previewGuard(() => previewStatement(BILLING_FROM))
-  : authed(`/billing/statement?from=${BILLING_FROM}`));
+  ? previewGuard(() => previewStatement(BILLING_FROM, historyFrom()))
+  : authed(`/billing/statement?from=${historyFrom()}`));
 
 export const startPayment = (amount) => (PREVIEW
   ? Promise.reject(new Error(`Preview mode: a real login would now open the checkout for $${amount}.`))

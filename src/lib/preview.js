@@ -33,7 +33,8 @@ function dataset(from) {
   return { perDay, now };
 }
 
-export function previewStatement(from) {
+// Worked out from the account's first day so balances carry over, then cut to the days asked for.
+export function previewStatement(from, viewFrom = from) {
   const { perDay, now } = dataset(from);
   const days = [];
   const payments = [];
@@ -55,7 +56,8 @@ export function previewStatement(from) {
   return {
     customer: CUSTOMER, currency: 'USD', price_per_call: m(PRICE), timezone: 'America/New_York',
     as_of: now.toISOString(), balance: m(balance), amount_due: m(Math.max(-balance, 0)),
-    days: days.reverse(), payments: payments.reverse().slice(0, 10),
+    days: days.filter((d) => d.date >= viewFrom).reverse(),
+    payments: payments.filter((p) => p.date.slice(0, 10) >= viewFrom).reverse(),
   };
 }
 

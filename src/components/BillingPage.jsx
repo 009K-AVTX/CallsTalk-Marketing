@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import Tabs from './Tabs.jsx';
-import { BILLING_FROM, fetchStatement, loadSession, signOut, SignedOut, startPayment } from '../lib/portal.js';
+import { fetchStatement, HISTORY_DAYS, loadSession, signOut, SignedOut, startPayment } from '../lib/portal.js';
 
 const REFRESH_MS = 30_000;
 const PRESETS = [500, 1000, 2500];
@@ -111,18 +110,11 @@ export function Wallet({ data, onPaid }) {
   );
 }
 
-const monthLabel = (key) => {
-  const [y, m] = key.split('-').map(Number);
-  return new Date(y, m - 1, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-};
 const sum = (rows, k) => rows.reduce((t, r) => t + Number(r[k]), 0);
 
-// Every day's bill since BILLING_FROM, one tab per month, newest month first.
+// The days the statement covers (the last five), newest first, with their total.
 export function History({ days, currency }) {
-  const months = [...new Set(days.map((d) => d.date.slice(0, 7)))];
-  const [chosen, setChosen] = useState(null);
-  const active = months.includes(chosen) ? chosen : months[0];
-  const rows = days.filter((d) => d.date.startsWith(active));
+  const rows = days;
   if (!rows.length) return null;
   const calls = rows.reduce((t, r) => t + r.calls, 0);
   const paid = sum(rows, 'payment_received');
@@ -131,11 +123,9 @@ export function History({ days, currency }) {
     <section className="billing__history" aria-labelledby="history-title">
       <div className="billing__history-head">
         <h2 id="history-title">Billing History</h2>
-        {months.length > 1 && (
-          <Tabs tabs={months.map((id) => ({ id, label: monthLabel(id).split(' ')[0] }))} active={active} onChange={setChosen} />
-        )}
+        <span className="billing__history-range">Last {rows.length} days</span>
       </div>
-      <div className="history" role="region" aria-label={`Daily bills for ${monthLabel(active)}`} tabIndex={0}>
+      <div className="history" role="region" aria-label={`Daily bills for the last ${rows.length} days`} tabIndex={0}>
         <table className="history__table">
           <thead>
             <tr>
@@ -158,7 +148,7 @@ export function History({ days, currency }) {
           </tbody>
           <tfoot>
             <tr>
-              <th scope="row">{monthLabel(active)} Total</th>
+              <th scope="row">{rows.length}-Day Total</th>
               <td />
               <td>{calls.toLocaleString('en-US')}</td>
               <td />
@@ -169,7 +159,7 @@ export function History({ days, currency }) {
           </tfoot>
         </table>
       </div>
-      <p className="billing__history-note">Daily bills since {dayLabel(BILLING_FROM)}. The month's balance is the balance at the end of its latest day.</p>
+      <p className="billing__history-note">Your bills for the last {HISTORY_DAYS} days. For earlier days, see the billing reports from our team under Reports.</p>
     </section>
   );
 }
@@ -218,7 +208,7 @@ export function useStatement(onSignedOut) {
   return { data, error, loading, load };
 }
 
-// Wallet and today, the last three days, every day since September, and payments.
+// Wallet and today, the last three days, and the last five days of bills and payments.
 export function BillingSections({ data, onPaid }) {
   if (!data) {
     return <div className="billing__top" aria-hidden="true"><div className="wallet is-skeleton" /><div className="bill is-skeleton" /></div>;
@@ -242,7 +232,10 @@ export function BillingSections({ data, onPaid }) {
       <History days={data.days} currency={data.currency} />
 
       <section className="billing__payments" aria-labelledby="payments-title">
-        <h2 id="payments-title">Payments</h2>
+        <div className="billing__history-head">
+          <h2 id="payments-title">Payments</h2>
+          <span className="billing__history-range">Last {HISTORY_DAYS} days</span>
+        </div>
         {data.payments.length ? (
           <ul>
             {data.payments.map((p) => (
@@ -253,7 +246,7 @@ export function BillingSections({ data, onPaid }) {
               </li>
             ))}
           </ul>
-        ) : <p className="billing__empty">No payments yet.</p>}
+        ) : <p className="billing__empty">No payments in the last {HISTORY_DAYS} days.</p>}
       </section>
     </>
   );

@@ -350,3 +350,5 @@ html { font-size: 15px; }
   .p-top .p-balance { display: none; }
   .p-top__inner { gap: 0 10px; }
 }
+.p-app .billing__history-head { margin-bottom: 14px; }
+.p-app .billing__history-head h2 { margin: 0; }

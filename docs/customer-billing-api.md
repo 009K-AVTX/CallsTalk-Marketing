@@ -2,7 +2,7 @@
 
 **From:** CallsTalk website (frontend, done) · **For:** backend developer
 
-Customers stop receiving their bill in Telegram. They log in to the **CallsTalk Portal** (callstalk-portal.vercel.app, later app.callstalk.io; the website's Log In links there) with the login ID and password we give them, and its **Billing** page shows their wallet balance, today's bill (live, refreshed every 30 s), the last three days' bills, a Billing History of every day since **1 September 2026** (one tab per month, with monthly totals) and their payments, and lets them pay online.
+Customers stop receiving their bill in Telegram. They log in to the **CallsTalk Portal** (callstalk-portal.vercel.app, later app.callstalk.io; the website's Log In links there) with the login ID and password we give them, and its **Billing** page shows their wallet balance, today's bill (live, refreshed every 30 s), the last three days' bills, a Billing History of the **last 5 days** (with a total) and their payments from those 5 days, and lets them pay online. Older bills reach customers as the Excel reports our team uploads.
 
 The site calls `VITE_PORTAL_API_URL` (falls back to `VITE_SUPPORT_API_URL`), e.g. `https://api.example.com/api`. Add the CallsTalk site origin to `CORS_ALLOWED_ORIGINS`, with the `Authorization` header allowed.
 
@@ -17,9 +17,9 @@ The site calls `VITE_PORTAL_API_URL` (falls back to `VITE_SUPPORT_API_URL`), e.g
 
 Errors: any non-2xx with `{ "detail": "message shown to the customer" }`.
 
-## `GET /billing/statement?from=2026-09-01` (Bearer)
+## `GET /billing/statement?from=YYYY-MM-DD` (Bearer)
 
-Every day from `from` up to and including today (today counted so far), **newest first**. Days are the customer's own days (their time zone's midnight). The site always asks for `from=2026-09-01`, so billing must be backdated to 1 September: each customer needs an opening balance as of that date, and their calls and payments since then must be counted. If a customer's account starts later, return days from their start date only.
+Every day from `from` up to and including today (today counted so far), **newest first**. Days are the customer's own days (their time zone's midnight). The portal asks for the **last 5 days**: `from` is 4 days before today (never earlier than 2026-09-01). Return only those days and **only the payments made in those days**. Customers must not receive older history. Balances still carry over: billing is counted from 1 September 2026, so the first day returned opens on the real running balance, with each customer's opening balance as of 1 September plus their calls and payments since. If a customer's account starts later, return days from their start date only.
 
 ```json
 {
