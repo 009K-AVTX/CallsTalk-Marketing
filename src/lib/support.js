@@ -25,26 +25,9 @@ async function request(path, options = {}) {
   return data;
 }
 
-// The user agent string hides the real browser (Brave says Chrome) and OS version (Windows 11 says 10),
-// so Chromium browsers are asked directly. Safari and Firefox can't say, and the server reads the user agent.
-async function reportedDevice() {
-  try {
-    const hints = await navigator.userAgentData?.getHighEntropyValues(['platformVersion', 'model', 'fullVersionList']);
-    const brands = hints?.fullVersionList || [];
-    const brand = brands.find((b) => !/not.?a.?brand|chromium/i.test(b.brand)) || brands.find((b) => /chromium/i.test(b.brand));
-    if (!brand) return undefined;
-    return {
-      browser: brand.brand, version: brand.version.split('.')[0],
-      platform: hints.platform, platformVersion: hints.platformVersion, model: hints.model,
-    };
-  } catch {
-    return undefined;
-  }
-}
-
 // Name and email are optional; without them the team sees the chat as "Visitor".
 export async function startChat({ name, email, message }) {
-  const body = { name, email, message, referrer: document.referrer, device: await reportedDevice() };
+  const body = { name, email, message };
   const data = await request('', { method: 'POST', body: JSON.stringify(body) });
   return data.session_id;
 }

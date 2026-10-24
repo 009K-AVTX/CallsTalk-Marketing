@@ -2,8 +2,8 @@
 
 Backend for the website's "Talk to Our Team" chat.
 
-- Each new chat is posted to your team's Telegram with the visitor's name, email, referrer,
-  device, time (for example 3:20 PM EST), and their message. Name and email appear only if the visitor filled in the "Talk to Our Team" form;
+- Each new chat is posted to your team's Telegram with the visitor's name, email, time (for example 3:20 PM EST)
+  and their message. Name and email appear only if the visitor filled in the "Talk to Our Team" form;
   a question typed straight into the chat shows up as **Visitor**.
 - Each later visitor message is forwarded to the same Telegram chat.
 - When someone on the team replies in Telegram, the reply appears in the visitor's chat window
@@ -11,6 +11,9 @@ Backend for the website's "Talk to Our Team" chat.
 - Optionally, every new chat and visitor message is also **emailed** to an address you choose.
   Each email has a **Reply in the chat** button that opens a page with the conversation, scrolled
   to that message, where you can type an answer. It reaches the visitor's chat like a Telegram reply.
+- The website's **Request Access** form is posted to the same Telegram chat as a **New access request**
+  (name, company, email, phone, calls per month, time and message) and emailed to the same address.
+  It isn't a chat, so replying to it in Telegram goes nowhere; reply to the email to reach the person.
 
 It runs as one Node.js process and stores conversations in PostgreSQL 18 (the same Postgres
 server as the CRM, with its own database and user). The tables are created on first start.
@@ -221,10 +224,11 @@ database is lost, links in emails already sent stop working (a new signing secre
 
 | Method | Path | Body | Response |
 | --- | --- | --- | --- |
-| POST | `/api/support/chat` | `{ name, email, message, referrer?, transcript? }` | `201 { session_id, message }` |
+| POST | `/api/support/chat` | `{ name, email, message, transcript? }` | `201 { session_id, message }` |
 | POST | `/api/support/chat/:id` | `{ message }` | `200 { message }` |
 | GET | `/api/support/chat/:id` | | `200 { session_id, status, messages: [{ id, sender, message, created_at }] }` |
 | POST | `/api/support/chat/:id/end` | | `200 { status }` |
+| POST | `/api/request-access` | `{ name, email, company, phone?, volume?, message? }` | `200 { ok: true }` |
 | GET | `/api/health` | | `200 { ok: true }` |
 | GET / POST | `/reply/:signedToken` | form: `name`, `message` or `action=end` | HTML reply page (from email links) |
 

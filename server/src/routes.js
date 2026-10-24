@@ -32,13 +32,6 @@ function text(value, field, { max, required = true } = {}) {
   return s;
 }
 
-// The browser's own report of its name, version, OS and model (see reportedDevice in src/lib/support.js).
-function reportedDevice(device) {
-  if (!device || typeof device !== 'object') return undefined;
-  return Object.fromEntries(['browser', 'version', 'platform', 'platformVersion', 'model']
-    .map((key) => [key, typeof device[key] === 'string' ? device[key].trim().slice(0, 40) : '']));
-}
-
 async function loadSession(req) {
   const session = await getSession(req.params.sessionId);
   if (!session) throw new HttpError(404, 'Chat session not found. Please start a new chat.');
@@ -63,19 +56,13 @@ router.post('/chat', rateLimit({ windowMs: 10 * 60_000, max: 5 }), async (req, r
   if (email && !EMAIL.test(email)) throw new HttpError(400, 'Please enter a valid email address.');
   const name = givenName || ANONYMOUS_NAME;
   const message = text(body.message, 'message', { max: 2000 });
-  const referrer = text(body.referrer, 'referrer', { max: 500, required: false });
   const transcript = (Array.isArray(body.transcript) ? body.transcript : [])
     .filter((m) => m && typeof m.text === 'string' && m.text.trim())
     .slice(-20)
     .map((m) => ({ from: m.from === 'visitor' ? 'visitor' : 'assistant', text: m.text.trim().slice(0, 2000) }));
 
   const id = randomUUID();
-  const chat = {
-    id, name, email, message, referrer, transcript,
-    anonymous: !givenName,
-    userAgent: req.get('user-agent'),
-    device: reportedDevice(body.device),
-  };
+  const chat = { id, name, email, message, transcript, anonymous: !givenName };
   let posted;
   try {
     posted = await notifyNewChat(chat);

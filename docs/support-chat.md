@@ -11,7 +11,6 @@ Setup, Hostinger VPS deployment and the Telegram reply commands are in [server/R
 
 - A visitor can just type a question: that starts a chat right away with no name or email
   (the team sees them as "Visitor"). "Talk to Our Team" opens a form that adds their name and email.
-- With each new chat it sends the referrer, so the team knows where the visitor came from.
 - It checks for replies every 3 seconds while open and every 15 seconds while closed.
 - A visitor can keep up to 3 chats, listed in a sidebar. Starting a 4th closes their oldest open chat after the visitor confirms (the team sees **Chat ended** in Telegram). Visitors cannot end a chat themselves, only start a new one. Ended chats clear from the sidebar by themselves. If the visitor is reading a chat when it ends, it stays on screen with the goodbye until they switch chats or start a new one.
 - The team can also get every message by email, with a link to answer in the chat (see the server README).

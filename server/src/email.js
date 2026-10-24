@@ -5,7 +5,7 @@
 import { readFileSync } from 'node:fs';
 import nodemailer from 'nodemailer';
 import { config, emailEnabled } from './config.js';
-import { clip, escapeHtml, formatClock, shortId, transcriptLines, visitorDetails } from './format.js';
+import { accessDetails, clip, escapeHtml, formatClock, shortId, transcriptLines, visitorDetails } from './format.js';
 import { replyLink } from './reply.js';
 
 const { to, from, smtp } = config.email;
@@ -71,7 +71,7 @@ function layout({ preview, heading, sub, body, link, name, email }) {
 <div style="margin:0 0 16px">${wordmark(c.accentDeep, c.ink)}</div>
 <h1 class="h1" style="margin:0 0 4px;font:600 24px/1.2 ${HEAD};letter-spacing:-.02em;color:${c.ink}">${heading}</h1>
 <p style="margin:0 0 16px;font:400 14px/1.5 ${BODY};color:${c.body}">${sub}</p>
-<a href="${escapeHtml(link)}" style="display:inline-block;background:${c.accent};color:#0c0a0e;font:600 14px/1 ${BODY};text-decoration:none;padding:12px 22px;border-radius:999px">Reply to ${escapeHtml(name)}</a>
+${link ? `<a href="${escapeHtml(link)}" style="display:inline-block;background:${c.accent};color:#0c0a0e;font:600 14px/1 ${BODY};text-decoration:none;padding:12px 22px;border-radius:999px">Reply to ${escapeHtml(name)}</a>` : ''}
 </div><!--[if mso]></td><td width="140" valign="middle"><![endif]--><div class="col art" style="display:inline-block;vertical-align:middle;width:100%;max-width:140px;text-align:right">
 <img src="cid:hero@callstalk" width="140" height="117" alt="" style="display:inline-block;width:100%;max-width:140px;height:auto;border:0">
 </div>
@@ -85,7 +85,7 @@ ${body}
 <div style="height:1px;line-height:1px;font-size:0;background:${c.plumRule};margin:0 0 12px">&nbsp;</div>
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
 <td class="stack">${wordmark(c.accent, '#fff', 20)}</td>
-<td class="stack" align="right" style="font:400 12px/1.5 ${BODY};color:${c.onPlumSoft}">Reply button works for <b style="color:${c.onPlum}">${config.replyLinkDays} days</b></td>
+<td class="stack" align="right" style="font:400 12px/1.5 ${BODY};color:${c.onPlumSoft}">${link ? `Reply button works for <b style="color:${c.onPlum}">${config.replyLinkDays} days</b>` : ''}</td>
 </tr></table>
 </td></tr>
 
@@ -173,6 +173,41 @@ export function visitorMessageMail(session, message, link) {
     text: `${session.name} (#${shortId(session)}): ${message}`,
     link,
   };
+}
+
+// A request-access form submission: its own email, not part of any chat thread, with no reply page.
+export function accessRequestMail(request) {
+  const details = accessDetails(request);
+  // The heading already names the person, so the grid leaves the name out.
+  const shown = details.filter(([label]) => label !== 'Name');
+  const body = `${request.message ? messagePanel('Their message', request.message) : ''}
+<tr><td class="px" style="padding:${request.message ? 12 : 0}px 28px 20px">${detailGrid(shown)}</td></tr>`;
+  return {
+    subject: `Access request: ${request.company} (${request.name})`,
+    preview: `${request.name} from ${request.company} asked for access.`,
+    heading: `Access request from ${escapeHtml(request.name)}`,
+    sub: 'Approve it to send a CallsTalk.io login link.',
+    body,
+    text: `New access request\n\n${details.map(([l, v]) => `${l}: ${v}`).join('\n')}`
+      + (request.message ? `\n\nMessage:\n${request.message}` : '')
+      + '\n\nApprove it to send a CallsTalk.io login link.\n',
+  };
+}
+
+// Returns false when email is turned off (EMAIL_TO empty).
+export async function emailAccessRequest(request) {
+  if (!transport) return false;
+  const { subject: subjectLine, text, ...content } = accessRequestMail(request);
+  await transport.sendMail({
+    from,
+    to,
+    replyTo: { name: request.name, address: request.email },
+    subject: subjectLine,
+    html: layout({ ...content, name: request.name, email: request.email }),
+    text,
+    attachments: images,
+  });
+  return true;
 }
 
 export async function emailNewChat(chat, messageId) {

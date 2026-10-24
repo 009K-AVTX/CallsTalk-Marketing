@@ -15,7 +15,7 @@ One Node.js process serves the whole site:
 Visitor ──HTTPS──> nginx (callstalk.com, www, chat) ──> 127.0.0.1:3001  Node "callstalk-chat"
                                                               ├─ website (dist/)
                                                               ├─ /api/chat       AI assistant (Groq)
-                                                              ├─ /api/request-access  request-access form -> Telegram
+                                                              ├─ /api/request-access  request-access form -> Telegram and email
                                                               ├─ /api/support/*  live chat API
                                                               ├─ /reply/*        email reply page
                                                               └─ Telegram bot (long polling), email (SMTP), idle-chat expiry

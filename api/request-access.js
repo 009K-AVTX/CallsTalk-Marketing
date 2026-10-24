@@ -42,7 +42,7 @@ export default async function handler(req, res) {
   const ip = (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || 'unknown';
   if (throttled(ip)) return res.status(429).json({ error: 'Too many requests. Please try again in a few minutes.' });
 
-  const results = await Promise.all([sendTelegram(data, req), sendEmail(data, req)]);
+  const results = await Promise.all([sendTelegram(data), sendEmail(data)]);
   if (results.every((r) => r === 'off')) {
     console.error('[api/request-access] neither Telegram nor email is configured');
     return res.status(500).json({ error: 'Requests are not set up yet. Please use the chat instead.' });
@@ -53,10 +53,8 @@ export default async function handler(req, res) {
   return res.status(200).json({ ok: true });
 }
 
-const source = (req) => req.headers.referer || 'CallsTalk website';
-
 // Returns 'sent', 'failed' or 'off' (not configured).
-async function sendTelegram(data, req) {
+async function sendTelegram(data) {
   const token = process.env.TELEGRAM_BOT_TOKEN?.trim();
   const chatId = process.env.TELEGRAM_CHAT_ID?.trim();
   if (!token || !chatId) return 'off';
@@ -67,7 +65,6 @@ async function sendTelegram(data, req) {
     `<b>Email:</b> ${escape(data.email)}`,
     data.phone && `<b>Phone:</b> ${escape(data.phone)}`,
     data.volume && `<b>Calls per month:</b> ${escape(data.volume)}`,
-    `<b>Page:</b> ${escape(source(req))}`,
     data.message && `\n<b>Message</b>\n<blockquote>${escape(data.message)}</blockquote>`,
     '\n<b>Approve</b> to send a CallsTalk.io login link.',
   ].filter(Boolean);
@@ -86,17 +83,17 @@ async function sendTelegram(data, req) {
   return 'failed';
 }
 
-async function sendEmail(data, req) {
+async function sendEmail(data) {
   const key = process.env.RESEND_API_KEY?.trim();
   const to = process.env.ACCESS_REQUEST_EMAIL_TO?.trim();
   if (!key || !to) return 'off';
   const from = process.env.ACCESS_REQUEST_EMAIL_FROM?.trim() || 'CallsTalk <onboarding@resend.dev>';
-  const rows = [['Name', data.name], ['Company', data.company], ['Email', data.email], ['Phone', data.phone], ['Calls per month', data.volume], ['Message', data.message], ['Page', source(req)]]
+  const rows = [['Name', data.name], ['Company', data.company], ['Email', data.email], ['Phone', data.phone], ['Calls per month', data.volume], ['Message', data.message]]
     .filter(([, v]) => v)
     .map(([k, v]) => `<tr><td style="padding:8px 16px 8px 0;color:#666;vertical-align:top;white-space:nowrap">${k}</td><td style="padding:8px 0;white-space:pre-wrap">${escape(v)}</td></tr>`)
     .join('');
   const html = `<div style="font-family:system-ui,sans-serif;font-size:15px;color:#111"><h2 style="margin:0 0 4px">New access request</h2><p style="margin:0 0 16px;color:#666">Review this request. If approved, send ${escape(data.name)} a CallsTalk.io login link. Replying to this email reaches them directly.</p><table style="border-collapse:collapse">${rows}</table></div>`;
-  const text = [`New access request`, '', `Name: ${data.name}`, `Company: ${data.company}`, `Email: ${data.email}`, data.phone && `Phone: ${data.phone}`, data.volume && `Calls per month: ${data.volume}`, data.message && `Message: ${data.message}`, `Page: ${source(req)}`].filter(Boolean).join('\n');
+  const text = [`New access request`, '', `Name: ${data.name}`, `Company: ${data.company}`, `Email: ${data.email}`, data.phone && `Phone: ${data.phone}`, data.volume && `Calls per month: ${data.volume}`, data.message && `Message: ${data.message}`].filter(Boolean).join('\n');
   try {
     const r = await fetch('https://api.resend.com/emails', {
       method: 'POST',

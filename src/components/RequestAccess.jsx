@@ -3,7 +3,7 @@ import { useState } from 'react';
 const VOLUMES = ['Under 100', '100–1,000', '1,000–10,000', 'Over 10,000'];
 const EMPTY = { name: '', email: '', company: '', phone: '', volume: '', message: '', website: '' };
 
-// The request-access card: posts to /api/request-access, which forwards it to the team on Telegram.
+// The request-access card: posts to /api/request-access, which forwards it to the team on Telegram and by email.
 export default function RequestAccess() {
   const [form, setForm] = useState(EMPTY);
   const [status, setStatus] = useState('idle'); // idle | sending | sent | error
@@ -21,7 +21,8 @@ export default function RequestAccess() {
         body: JSON.stringify(form),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || 'Something went wrong. Please try again.');
+      // Vercel's function answers with { error }, the VPS chat server with { detail }.
+      if (!res.ok) throw new Error(data.error || data.detail || 'Something went wrong. Please try again.');
       setStatus('sent');
       setForm(EMPTY);
     } catch (err) {

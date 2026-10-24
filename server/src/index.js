@@ -8,6 +8,7 @@ import path from 'node:path';
 import express from 'express';
 import { assertConfig, config } from './config.js';
 import { errorHandler, router } from './routes.js';
+import { accessRouter } from './access.js';
 import { initReplyLinks, replyRouter } from './reply.js';
 import { verifyEmail } from './email.js';
 import { startBot } from './telegram.js';
@@ -46,15 +47,13 @@ app.use((req, res, next) => {
 app.use(express.json({ limit: '64kb' }));
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 app.use('/api/support', router);
+app.use('/api/request-access', accessRouter);
 app.use('/reply', replyRouter);
 
 if (config.serveSite) {
   // Same handler Vercel runs, so the AI assistant behaves identically here.
   const { default: assistant } = await import('../../api/chat.js');
   app.all('/api/chat', assistant);
-  // The request-access form; it posts to the same Telegram chat with the bot token above.
-  const { default: requestAccess } = await import('../../api/request-access.js');
-  app.all('/api/request-access', requestAccess);
 
   const index = path.join(config.siteDir, 'index.html');
   const notFound = path.join(config.siteDir, '404.html');

@@ -15,7 +15,7 @@ import {
   addMessage, findSessionByShortId, findSessionByTelegramMessage, findSessionByThread,
   getSession, getValue, linkTelegramMessage, setStatus, setValue,
 } from './db.js';
-import { clip, escapeHtml, shortId, TEAM_ENDED_MESSAGE, transcriptLines, visitorDetails } from './format.js';
+import { accessDetails, clip, escapeHtml, shortId, TEAM_ENDED_MESSAGE, transcriptLines, visitorDetails } from './format.js';
 
 const { token, chatId, threadId: sharedThreadId, topicPerChat } = config.telegram;
 const MAX_TEXT = 4096;
@@ -85,6 +85,15 @@ export async function notifyNewChat(chat) {
 
   const sent = await send(text, threadId, { reply_markup: replyButton(id) });
   return { threadId, messageId: sent.message_id };
+}
+
+// A request-access form submission. It isn't a chat, so replies to it in Telegram go nowhere.
+export async function notifyAccessRequest(request) {
+  const text = '<b>New access request</b>\n\n'
+    + accessDetails(request).map(([label, value]) => `<b>${label}:</b> ${escape(value)}`).join('\n')
+    + (request.message ? `\n\n<b>Message</b>\n<blockquote>${escape(request.message)}</blockquote>` : '')
+    + '\n\n<b>Approve</b> to send a CallsTalk.io login link.';
+  await send(text);
 }
 
 export async function notifyVisitorMessage(session, text) {
