@@ -118,8 +118,12 @@ function Access({ user, onSaved, onConflict }) {
 }
 
 // The customer's own contact methods (they set these in Settings; we get an email when they change).
-function ContactsCard({ contacts = {} }) {
+function ContactsCard({ contacts = {}, telegram }) {
   const given = CONTACT_METHODS.filter(({ key }) => contacts[key]);
+  // Their own Telegram chat with our bot (Connect Telegram in their Settings): where report notices go.
+  const bot = telegram?.connected
+    ? `Connected${telegram.username ? ` as @${telegram.username}` : ''} since ${when(telegram.linked_at)}. New reports can be announced there.`
+    : 'Not connected. The customer can connect it under Settings in their portal to get report notices on Telegram.';
   return (
     <section className="p-card">
       <header className="p-card__head">
@@ -139,6 +143,11 @@ function ContactsCard({ contacts = {} }) {
           })}
         </dl>
       ) : <p className="p-admin__note">None added yet.</p>}
+      {telegram && (
+        <p className="p-admin__note p-contacts__bot">
+          <span className={`p-pill ${telegram.connected ? 'is-ok' : ''}`}>Telegram Notifications</span> {bot}
+        </p>
+      )}
     </section>
   );
 }
@@ -358,7 +367,7 @@ export default function AdminUser({ id, onSignedOut }) {
       {customer && (
         <>
           <ErrorNote error={billingError} />
-          {billing && <ContactsCard contacts={billing.contacts} />}
+          {billing && <ContactsCard contacts={billing.contacts} telegram={billing.telegram} />}
           <div className="p-grid">
             <Terms key={billing?.account ? 'set' : 'new'} id={id} account={billing?.account} onSaved={(b) => { setBilling(b); person.reload(); }} onConflict={latest} />
             {billing?.account ? <Payment id={id} account={billing.account} onSaved={setBilling} /> : <section className="p-card p-empty-card"><h2>No billing yet</h2><p>Set the billing terms first. Then enter calls and payments here.</p></section>}

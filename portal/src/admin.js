@@ -71,3 +71,9 @@ export const fetchAuditSummary = (filters) => authed(`/admin/audit/summary${quer
 export const fetchFinance = ({ from, to, customer, payments_offset, payments_limit }, exportAs) => authed(`/admin/finance${query({
   from, to, customer, payments_offset, payments_limit, export: exportAs,
 })}`);
+
+// ── the team's billing notices on Telegram (server/src/billing-notices.js) ───
+// -> { settings: { payments, summary, summary_time }, time_zone, separate_chat, available }
+export const fetchNotices = () => authed('/admin/notifications');
+export const saveNotices = (settings) => authed('/admin/notifications', json('PUT', settings));
+export const sendSummaryNow = () => authed('/admin/notifications/test', json('POST'));

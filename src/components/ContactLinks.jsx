@@ -1,4 +1,5 @@
-import { SUPPORT_EMAIL, TELEGRAM_HANDLE } from '../legal.js';
+import { useEffect, useRef, useState } from 'react';
+import { SIMPLEX_LINK, SIMPLEX_NAME, SUPPORT_EMAIL, TELEGRAM_HANDLE, ZANGI_ID } from '../legal.js';
 
 export function TelegramIcon() {
   return (
@@ -51,8 +52,60 @@ export function SignalIcon() {
   );
 }
 
-// Telegram and email, used in the pricing section and the footer.
+// SimpleX: two interlocking X marks.
+export function SimplexIcon() {
+  return (
+    <svg className="contact__icon contact__icon--app" viewBox="0 0 24 24" aria-hidden="true">
+      <circle className="contact__bg" cx="12" cy="12" r="12" />
+      <path className="contact__line contact__line--bold" d="M7 8.2l5 7.6M12 8.2l-5 7.6M12 8.2l5 7.6M17 8.2l-5 7.6" />
+    </svg>
+  );
+}
+
+const copy = async (text) => {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    return false; // clipboard blocked: the text is on screen
+  }
+};
+
+// The SimpleX invitation: the QR code to scan from a phone, or the link to open the app on this device.
+function SimplexDialog({ open, onClose }) {
+  const ref = useRef(null);
+  const [copied, setCopied] = useState(false);
+  useEffect(() => {
+    const d = ref.current;
+    if (open && !d.open) d.showModal();
+    else if (!open && d.open) d.close();
+  }, [open]);
+
+  return (
+    <dialog ref={ref} className="simplex" aria-labelledby="simplex-title" onClose={onClose} onClick={(e) => e.target === ref.current && onClose()}>
+      <button type="button" className="simplex__close" aria-label="Close" onClick={onClose}>×</button>
+      <h3 id="simplex-title">Chat with Us on SimpleX</h3>
+      <p>Scan the code with the SimpleX app, or open the link on this device.</p>
+      <img src="/simplex-qr.svg" width="220" height="220" alt={`SimpleX QR code for ${SIMPLEX_NAME}`} />
+      <b className="simplex__name"><SimplexIcon />{SIMPLEX_NAME}</b>
+      <div className="simplex__actions">
+        <a className="btn btn--light btn--sm" href={SIMPLEX_LINK} target="_blank" rel="noopener noreferrer">Open in SimpleX</a>
+        <button type="button" className="btn btn--quiet btn--sm" onClick={async () => setCopied(await copy(SIMPLEX_LINK))}>{copied ? 'Link Copied' : 'Copy Link'}</button>
+      </div>
+    </dialog>
+  );
+}
+
+// Telegram, SimpleX, Zangi and email, used in the pricing section and the footer.
 export default function ContactLinks({ className = '' }) {
+  const [simplex, setSimplex] = useState(false);
+  const [zangiCopied, setZangiCopied] = useState(false);
+  const copyZangi = async () => {
+    if (!await copy(ZANGI_ID)) return;
+    setZangiCopied(true);
+    setTimeout(() => setZangiCopied(false), 2000);
+  };
+
   return (
     <ul className={`contact ${className}`}>
       <li>
@@ -60,6 +113,19 @@ export default function ContactLinks({ className = '' }) {
           <TelegramIcon />
           <span><small>Telegram</small>@{TELEGRAM_HANDLE}</span>
         </a>
+      </li>
+      <li>
+        <button type="button" className="contact__item" onClick={() => setSimplex(true)} aria-haspopup="dialog">
+          <SimplexIcon />
+          <span><small>SimpleX · Link and QR Code</small>{SIMPLEX_NAME}</span>
+        </button>
+        <SimplexDialog open={simplex} onClose={() => setSimplex(false)} />
+      </li>
+      <li>
+        <button type="button" className="contact__item" onClick={copyZangi} title="Copy the Zangi ID">
+          <ZangiIcon />
+          <span><small aria-live="polite">{zangiCopied ? 'Zangi · ID Copied' : 'Zangi ID'}</small>{ZANGI_ID}</span>
+        </button>
       </li>
       <li>
         <a href={`mailto:${SUPPORT_EMAIL}`}>

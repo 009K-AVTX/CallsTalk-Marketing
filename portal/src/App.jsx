@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useStatement } from '../../src/components/BillingPage.jsx';
 import { loadSession } from '../../src/lib/portal.js';
 import Shell, { ADMIN_NAV, NAV, STAFF_NAV } from './components/Shell.jsx';
@@ -10,7 +10,8 @@ import Reports from './pages/Reports.jsx';
 import Billing from './pages/Billing.jsx';
 import Settings from './pages/Settings.jsx';
 import Upload, { ReportManager } from './pages/Upload.jsx';
-import { staffSignInKind } from './reports.js';
+import { listMine, markReportsSeen, reportsSeenAt, staffSignInKind, unseenReports } from './reports.js';
+import useLoad from './useLoad.js';
 import AdminUsers from './pages/AdminUsers.jsx';
 import AdminUser from './pages/AdminUser.jsx';
 import AdminFinance from './pages/AdminFinance.jsx';
@@ -25,6 +26,11 @@ const toLogin = () => navigate(`/login?next=${encodeURIComponent(window.location
 function Portal({ path }) {
   const onSignedOut = useCallback(toLogin, []);
   const statement = useStatement(onSignedOut);
+  // Their reports, for Billing, Reports and the count of new ones on the Reports tab. Checked again every 5 minutes.
+  const reports = useLoad(listMine, []);
+  const [seenAt, setSeenAt] = useState(reportsSeenAt);
+  const unseen = unseenReports(reports.data, seenAt);
+  const onSeen = useCallback(() => setSeenAt(markReportsSeen(reports.data)), [reports.data]);
   const Page = PAGES[path] || Billing;
   const title = NAV.find((n) => n.to === path)?.label || 'Billing';
 
@@ -33,9 +39,15 @@ function Portal({ path }) {
     if (!PAGES[path]) navigate('/', { replace: true });
   }, [path, title]);
 
+  const { reload } = reports;
+  useEffect(() => {
+    const t = setInterval(reload, 5 * 60 * 1000);
+    return () => clearInterval(t);
+  }, [reload]);
+
   return (
-    <Shell path={path} statement={statement.data}>
-      <Page statement={statement} />
+    <Shell path={path} statement={statement.data} badges={{ '/reports': unseen.length }}>
+      <Page statement={statement} reports={reports} unseen={unseen} onSeen={onSeen} />
       <SupportChat company={statement.data?.customer} />
     </Shell>
   );

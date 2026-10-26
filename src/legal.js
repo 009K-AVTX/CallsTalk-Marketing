@@ -2,6 +2,10 @@
 // Contact addresses live here so they can be changed in one place.
 export const SUPPORT_EMAIL = 'support@callstalk.com';
 export const TELEGRAM_HANDLE = 'callstalk';
+// SimpleX Chat: our contact address (its QR code is public/simplex-qr.svg) and the profile name it opens.
+export const SIMPLEX_LINK = 'https://smp12.simplex.im/i#OtGudtjVlxXRhn6DtJxDBa3_H4vUy5Jx/WeoJ-ftye1IoSx-v0AdGuZeAzAoduWeuvhBcdbIUfjY';
+export const SIMPLEX_NAME = 'Calls Talk';
+export const ZANGI_ID = '23-6327-9692';
 // The customer portal (billing, reports, payments) on the VPS. The website's Log In links go here.
 export const PORTAL_URL = (import.meta.env.VITE_PORTAL_APP_URL || 'https://portal.callstalk.com').replace(/\/$/, '');
 export const PORTAL_LOGIN = `${PORTAL_URL}/login`;

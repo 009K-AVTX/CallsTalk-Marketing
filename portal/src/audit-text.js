@@ -5,8 +5,8 @@ import { dayLabel, money } from './format.js';
 // The four groups on the Audit Log's chart and filter, in the chart's colour order.
 export const GROUPS = [
   { key: 'signin', label: 'Sign-Ins', kinds: ['auth'] },
-  { key: 'access', label: 'Logins and Access', kinds: ['login', 'password', 'contacts', 'photo'] },
-  { key: 'billing', label: 'Billing', kinds: ['billing', 'calls', 'payment'] },
+  { key: 'access', label: 'Logins and Access', kinds: ['login', 'password', 'contacts', 'telegram', 'photo'] },
+  { key: 'billing', label: 'Billing', kinds: ['billing', 'calls', 'payment', 'notify'] },
   { key: 'reports', label: 'Reports and Downloads', kinds: ['report', 'audit', 'finance'] },
 ];
 export const groupOf = (action) => GROUPS.find((g) => g.kinds.includes(action.split('.')[0]))?.key || 'access';
@@ -25,6 +25,8 @@ export const ACTIONS = {
   'login.delete': 'Deleted a Login',
   'password.change': 'Changed Their Password',
   'contacts.update': 'Changed Their Contact Methods',
+  'telegram.connect': 'Connected Telegram',
+  'telegram.disconnect': 'Disconnected Telegram',
   'photo.update': 'Changed Their Photo',
   'photo.delete': 'Removed Their Photo',
   'billing.terms': 'Changed Billing Terms',
@@ -36,6 +38,9 @@ export const ACTIONS = {
   'payment.address': 'Opened Pay',
   'report.upload': 'Uploaded a Report',
   'report.delete': 'Deleted a Report',
+  'report.notify': 'Notified a Customer of Reports',
+  'notify.settings': 'Changed Billing Notifications',
+  'notify.test': 'Posted the Billing Summary',
   'audit.export': 'Downloaded the Audit Log',
   'finance.export': 'Downloaded the Finance Report',
 };
@@ -56,7 +61,8 @@ const FIELD = {
   currency: 'Currency', amount: 'Amount', reference: 'Reference', note: 'Note', date: 'Day', telegram: 'Telegram',
   element: 'Element X', zangi: 'Zangi', signal: 'Signal', email: 'Email', title: 'Title', filename: 'File',
   period_from: 'Period From', period_to: 'Period To', format: 'Format', rows: 'Rows', from: 'From', to: 'To',
-  file_bytes: 'File Size', emailed: 'Emailed', reason: 'Reason', customer: 'Customer', kind: 'Groups', q: 'Search',
+  file_bytes: 'File Size', emailed: 'Emailed', telegram_sent: 'Sent on Telegram', reports: 'Reports', payments: 'Each Payment',
+  summary: 'Daily Summary', summary_time: 'Summary Time', username: 'Telegram User', via: 'Via', reason: 'Reason', customer: 'Customer', kind: 'Groups', q: 'Search',
   outcome: 'Outcome', user: 'Person', target: 'About', about: 'By or About', action: 'Action', method: 'Method',
   paid_at: 'Paid', report_id: 'Report',
 };

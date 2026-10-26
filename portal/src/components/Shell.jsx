@@ -51,7 +51,8 @@ export function logOut() {
 
 // The portal frame: a top bar with the sections, the live balance and the account menu.
 // `team` ("admin" or "staff") swaps the customer's balance and Pay Now for that team's sections.
-export default function Shell({ path, statement, children, nav = NAV, team }) {
+// `badges`: a count beside a section, by its path (new reports, say).
+export default function Shell({ path, statement, children, nav = NAV, team, badges = {} }) {
   const [menu, setMenu] = useState(false);
   // Admin and staff on small screens: the sections fold into a menu behind a button, as on the website.
   const [navOpen, setNavOpen] = useState(false);
@@ -96,6 +97,7 @@ export default function Shell({ path, statement, children, nav = NAV, team }) {
             ) : (
               <Link key={to} to={to} onClick={() => setNavOpen(false)} className={`p-nav__link${path === to ? ' is-active' : ''}`} aria-current={path === to ? 'page' : undefined}>
                 <Icon name={icon} />{label}
+                {badges[to] > 0 && <span className="p-nav__badge"><span className="sr-only">, new: </span>{badges[to]}</span>}
               </Link>
             )))}
           </nav>

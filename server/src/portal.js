@@ -8,18 +8,19 @@
 //   GET    /api/staff/customers                    (staff, admin)  customers who have a login
 //   GET    /api/staff/reports                      (staff, admin)  every report
 //   POST   /api/staff/reports                      (staff, admin)  upload a report for a customer
-//   POST   /api/staff/reports/notify               (staff, admin)  { customer, reports: [ids] }: one email to their login ID
+//   POST   /api/staff/reports/notify               (staff, admin)  { customer, reports: [ids], email, telegram }: tell the customer
 //   DELETE /api/staff/reports/:id                  (staff, admin)
 
 import { Router } from 'express';
 import { requireUser } from './accounts.js';
 import { addDays, HISTORY_DAYS, localDate, statement } from './billing.js';
 import { UUID } from './db.js';
-import { addReport, deleteReport, getAccount, getReportFile, getUser, listDays, listPayments, listReports, listUsers } from './portal-db.js';
+import { addReport, deleteReport, getAccount, getReportFile, getUser, listDays, listPayments, listReports, listUsers, telegramLinked } from './portal-db.js';
 import { HttpError } from './routes.js';
 import { paymentDetails, paymentsEnabled } from './payments.js';
 import { config } from './config.js';
 import { emailReportReady } from './email.js';
+import { reportReadyToTelegram } from './telegram-link.js';
 import { rateLimit } from './rate-limit.js';
 
 export const MAX_REPORT_BYTES = 3 * 1024 * 1024;
@@ -77,7 +78,11 @@ staff.use(requireUser('staff', 'admin'));
 
 staff.get('/customers', async (req, res) => {
   const customers = (await listUsers()).filter((u) => u.role === 'customer' && u.status !== 'disabled');
-  res.json({ results: customers.map((u) => ({ id: u.id, name: u.company || u.name || u.email, login: u.email, avatar_version: u.avatar_version })) });
+  // `telegram`: they connected Telegram in their Settings, so a new report can be announced there too.
+  const linked = await telegramLinked(customers.map((u) => u.id));
+  res.json({ results: customers.map((u) => ({
+    id: u.id, name: u.company || u.name || u.email, login: u.email, avatar_version: u.avatar_version, telegram: linked.has(u.id),
+  })) });
 });
 
 staff.get('/reports', async (req, res) => {
@@ -104,29 +109,41 @@ staff.post('/reports', async (req, res) => {
   }));
 });
 
-// After an upload (one file or several): one email to the customer's login ID listing the new reports.
-// Only customers who can log in are emailed; the reply says whether it went and, if not, why.
+// After an upload (one file or several): tell the customer about the new reports, once for the whole upload.
+// body: { customer, reports: [ids], email = true, telegram = false }
+// -> { emailed, email | reason, telegram: { sent, username | reason } }. Each channel's outcome is reported on its own,
+// and a failed notice never undoes the upload. Only customers who can log in are told.
 staff.post('/reports/notify', rateLimit({ windowMs: 10 * 60_000, max: 30 }), async (req, res) => {
   const body = req.body || {};
   const customer = UUID.test(body.customer) && await getUser(body.customer);
   if (!customer || customer.role !== 'customer') throw new HttpError(400, 'Choose a customer.');
   const ids = new Set((Array.isArray(body.reports) ? body.reports : []).filter((id) => UUID.test(id)));
-  const reports = (await listReports(customer.id)).filter((r) => ids.has(r.id));
+  const reports = (await listReports(customer.id)).filter((r) => ids.has(r.id)).reverse(); // oldest first
   if (!reports.length) throw new HttpError(400, 'No reports to notify the customer about.');
+  const wantEmail = body.email !== false;
+  const wantTelegram = body.telegram === true;
 
   if (customer.status !== 'active') {
     const reason = customer.status === 'disabled' ? 'their login is deactivated' : 'they have not activated their login yet';
-    return res.json({ emailed: false, reason });
+    return res.json({ emailed: false, reason, telegram: { sent: false, reason } });
   }
   const link = `${config.portalUrl}/reports${reports.length === 1 ? `?open=${encodeURIComponent(reports[0].id)}` : ''}`;
-  let emailed = false;
-  try {
-    emailed = await emailReportReady({ name: customer.name, email: customer.email, reports: reports.reverse(), link });
-  } catch (err) {
-    console.error(`[email] could not send the report notice to ${customer.email}:`, err.message);
-    return res.json({ emailed: false, reason: 'the email could not be sent' });
-  }
-  res.json(emailed ? { emailed: true, email: customer.email } : { emailed: false, reason: 'email is not set up on the server' });
+
+  const email = async () => {
+    if (!wantEmail) return { emailed: false, reason: 'not asked for' };
+    try {
+      return await emailReportReady({ name: customer.name, email: customer.email, reports, link })
+        ? { emailed: true, email: customer.email }
+        : { emailed: false, reason: 'email is not set up on the server' };
+    } catch (err) {
+      console.error(`[email] could not send the report notice to ${customer.email}:`, err.message);
+      return { emailed: false, reason: 'the email could not be sent' };
+    }
+  };
+  const telegram = async () => (wantTelegram ? reportReadyToTelegram(customer.id, reports, link) : { sent: false, reason: 'not asked for' });
+
+  const [byEmail, byTelegram] = await Promise.all([email(), telegram()]);
+  res.json({ ...byEmail, telegram: byTelegram });
 });
 
 staff.delete('/reports/:id', async (req, res) => {

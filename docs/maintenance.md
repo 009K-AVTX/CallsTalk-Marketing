@@ -803,6 +803,52 @@ wallets, but on a shared account both count towards the 500.
 Check: `pm2 logs callstalk-chat --lines 50 --nostream | grep payments` shows each address made and each deposit.
 Without the token, Pay tells customers to contact us and admins record payments by hand.
 
+### 16.3.1 Telegram notifications
+
+The same bot (`@CTLKMBOT`) also sends billing notices. Nothing new to install; the tables are created on startup.
+
+**Buyers: "Your report has been updated."**
+
+1. The buyer opens **Settings** in the portal and presses **Connect Telegram**. Telegram opens the bot with a one-use
+   link (it works for `TELEGRAM_LINK_MINUTES`, 15 by default); they press **Start** and the portal shows
+   **Connected**. Only the buyer can do this: the team cannot connect someone's Telegram for them.
+2. When staff or an admin uploads a report, **Send on Telegram** (next to **Email the customer**) sends the buyer
+   "Your report has been updated. You can now download it from your portal." with the report's name, period and an
+   **Open Report** button. It is greyed out for buyers who have not connected; the customer list marks the ones who
+   have with "· Telegram".
+3. A buyer stops the messages with **Disconnect** in Settings or `/stop` in the bot. If they block the bot, the next
+   message fails and they are disconnected automatically; the upload page says so.
+
+An admin can see whether a buyer is connected on that buyer's page (**Contact Methods** card). Connecting and
+disconnecting are in the Audit Log.
+
+**Team: payments and the daily paid/pending summary**
+
+- **Payment Received**: each payment that completes (a USDT deposit, or one an admin records), with the buyer's
+  new balance and whether they are now **Paid** (and how many more calls their credit covers at their price) or
+  still **Pending** (what they owe and how many calls that is).
+- **Daily Billing Summary**: every buyer, Pending first (largest debt first), then Paid (closest to running out
+  first), with totals owed, held in credit and still confirming. Deactivated logins are left out.
+
+Admins switch each on or off and set the summary's time (EST) under **Settings → Billing Notifications**;
+**Post Summary Now** sends one straight away. The first summary goes out the day after this version is deployed.
+
+Keep them out of the website-chat thread: either make a topic for billing in the support group and set
+`TELEGRAM_BILLING_THREAD_ID` (send `/chatid` inside that topic to get its id), or put the bot in a separate group
+and set `TELEGRAM_BILLING_CHAT_ID`. Then `pm2 restart callstalk-chat`. With neither set, they post in the support
+chat itself, and the Settings card says so.
+
+Only the live server posts these by itself. A copy started with `TELEGRAM_POLLING=false` or `NODE_ENV=development`
+(a local copy borrowing the live bot) posts nothing on its own, and its **Post Summary Now** is labelled **Local test**.
+
+Check: `pm2 logs callstalk-chat --lines 50 --nostream | grep -E "billing|connected Telegram"`.
+
+| Symptom | Fix |
+|---|---|
+| Buyer pressed Start but the portal still waits | The link expired or was used twice: press Connect Telegram again. The bot must be running (`listening for replies` in the log). |
+| Upload says "they blocked the bot" | The buyer blocked or deleted the chat. They reconnect from Settings. |
+| No payment or summary messages | Check the switches in Settings; `[billing] could not post` in the log means the bot is not in the billing chat or topic. |
+
 ### 16.4 If an admin is locked out
 
 With no other admin to reset them, run `npm run portal:admin -- their@email.com` in `server/`. It resets that

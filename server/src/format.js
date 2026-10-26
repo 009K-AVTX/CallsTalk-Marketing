@@ -50,3 +50,17 @@ export function accessDetails({ name, company, email, phone, volume }) {
 
 export const transcriptLines = (transcript = []) =>
   transcript.map((m) => `${m.from === 'visitor' ? 'Visitor' : 'Assistant'}: ${m.text}`);
+
+// Telegram refuses a message over 4,096 characters, and cutting HTML anywhere else breaks its tags. Messages that
+// list many things keep whole lines within a budget instead: -> { shown: lines that fit in `room`, rest: how many not }.
+export const TELEGRAM_BUDGET = 3800;
+export function fitLines(lines, room) {
+  const shown = [];
+  let used = 0;
+  for (const line of lines) {
+    if (used + line.length + 1 > room) break;
+    shown.push(line);
+    used += line.length + 1;
+  }
+  return { shown, rest: lines.length - shown.length };
+}

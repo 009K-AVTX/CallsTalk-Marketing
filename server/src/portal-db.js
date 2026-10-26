@@ -61,6 +61,24 @@ const SCHEMA = `
     updated_at  timestamptz NOT NULL DEFAULT now()
   );
 
+  -- The Telegram chat a customer linked in Settings (Connect Telegram), where the bot sends them their own
+  -- notices, such as a new report. One login has one chat; one person may link the same chat to several logins.
+  CREATE TABLE IF NOT EXISTS customer_telegram (
+    user_id     uuid PRIMARY KEY REFERENCES portal_users (id) ON DELETE CASCADE,
+    chat_id     text NOT NULL,
+    username    text NOT NULL DEFAULT '',
+    first_name  text NOT NULL DEFAULT '',
+    linked_at   timestamptz NOT NULL DEFAULT now()
+  );
+  CREATE INDEX IF NOT EXISTS customer_telegram_chat ON customer_telegram (chat_id);
+
+  -- One-use codes behind the t.me/<bot>?start=<code> link that Connect Telegram opens. Only their hash is kept.
+  CREATE TABLE IF NOT EXISTS telegram_link_codes (
+    code_hash   text PRIMARY KEY,
+    user_id     uuid NOT NULL REFERENCES portal_users (id) ON DELETE CASCADE,
+    expires_at  timestamptz NOT NULL
+  );
+
   CREATE TABLE IF NOT EXISTS portal_sessions (
     id               uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id          uuid NOT NULL REFERENCES portal_users (id) ON DELETE CASCADE,
@@ -343,6 +361,32 @@ export const saveContacts = (userId, c) => one(`
   ON CONFLICT (user_id) DO UPDATE SET telegram = excluded.telegram, element = excluded.element, zangi = excluded.zangi,
     signal = excluded.signal, email = excluded.email, updated_at = now()
   RETURNING ${CONTACT_FIELDS}`, [userId, c.telegram, c.element, c.zangi, c.signal, c.email]);
+
+// ── the customer's Telegram chat with the bot (telegram-link.js) ─────────────
+
+// A new code replaces the login's unused ones.
+export async function createTelegramCode(userId, codeHash, expiresAt) {
+  await pool.query('DELETE FROM telegram_link_codes WHERE user_id = $1 OR expires_at < now()', [userId]);
+  await pool.query('INSERT INTO telegram_link_codes (code_hash, user_id, expires_at) VALUES ($1, $2, $3)', [codeHash, userId, expiresAt]);
+}
+
+// Uses the code up: only one Start can win. Returns the login it belongs to, or null if used or expired.
+export const useTelegramCode = async (codeHash) =>
+  (await one('DELETE FROM telegram_link_codes WHERE code_hash = $1 AND expires_at > now() RETURNING user_id', [codeHash]))?.user_id ?? null;
+
+export const saveCustomerTelegram = (userId, { chatId, username, firstName }) => one(`
+  INSERT INTO customer_telegram (user_id, chat_id, username, first_name) VALUES ($1, $2, $3, $4)
+  ON CONFLICT (user_id) DO UPDATE SET chat_id = excluded.chat_id, username = excluded.username, first_name = excluded.first_name, linked_at = now()
+  RETURNING *`, [userId, String(chatId), username || '', firstName || '']);
+
+export const getCustomerTelegram = (userId) => one('SELECT * FROM customer_telegram WHERE user_id = $1', [userId]);
+export const deleteCustomerTelegram = (userId) => pool.query('DELETE FROM customer_telegram WHERE user_id = $1', [userId]);
+// /stop in the bot, or the person blocked it: every login linked to that chat. Returns those logins' ids.
+export const deleteTelegramChat = async (chatId) =>
+  (await all('DELETE FROM customer_telegram WHERE chat_id = $1 RETURNING user_id', [String(chatId)])).map((r) => r.user_id);
+// Which of these logins have a chat linked.
+export const telegramLinked = async (userIds) =>
+  new Set((await all('SELECT user_id FROM customer_telegram WHERE user_id = ANY($1)', [userIds])).map((r) => r.user_id));
 
 // ── profile photos ───────────────────────────────────────────────────────────
 

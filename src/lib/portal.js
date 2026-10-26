@@ -209,6 +209,36 @@ export async function saveContacts(contacts) {
   return { contacts, changed: Object.keys(contacts), notified: false };
 }
 
+// ── Telegram notifications (server/src/telegram-link.js) ─────────────────────
+// The customer links their own Telegram chat with our bot: a one-use link opens the bot, they press Start.
+// -> { available, connected, username, first_name, linked_at, bot }
+
+const PREVIEW_TELEGRAM = 'callstalk.previewTelegram';
+const previewTelegram = () => { try { return JSON.parse(localStorage.getItem(PREVIEW_TELEGRAM)) || {}; } catch { return {}; } };
+const keepPreviewTelegram = (v) => { try { localStorage.setItem(PREVIEW_TELEGRAM, JSON.stringify(v)); } catch { /* preview only */ } };
+
+export async function fetchTelegram() {
+  if (!PREVIEW) return authed('/accounts/telegram');
+  // Preview: "pressing Start" is pretended a few seconds after the link is opened.
+  const t = previewTelegram();
+  if (t.pendingSince && Date.now() - t.pendingSince > 4000) keepPreviewTelegram({ linkedAt: new Date().toISOString() });
+  const now = previewTelegram();
+  return { available: true, connected: Boolean(now.linkedAt), username: now.linkedAt ? 'preview_buyer' : '', first_name: now.linkedAt ? 'Preview' : '', linked_at: now.linkedAt || null, bot: 'CTLKMBOT' };
+}
+
+// -> { url, expires_at, bot }: open `url` in Telegram and press Start there.
+export async function linkTelegram() {
+  if (!PREVIEW) return authed('/accounts/telegram/link', { method: 'POST' });
+  keepPreviewTelegram({ pendingSince: Date.now() });
+  return { url: 'https://t.me/CTLKMBOT', expires_at: new Date(Date.now() + 15 * 60_000).toISOString(), bot: 'CTLKMBOT' };
+}
+
+export async function unlinkTelegram() {
+  if (!PREVIEW) return authed('/accounts/telegram', { method: 'DELETE' });
+  keepPreviewTelegram({});
+  return fetchTelegram();
+}
+
 // ── profile photos ───────────────────────────────────────────────────────────
 // Photos are not public: they are fetched with the session and shown from an object URL, one per version.
 

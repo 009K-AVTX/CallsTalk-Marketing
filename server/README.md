@@ -230,6 +230,9 @@ database is lost, links in emails already sent stop working (a new signing secre
 | POST | `/api/support/chat/:id/end` | | `200 { status }` |
 | POST | `/api/request-access` | `{ name, email, company, phone?, volume?, message? }` | `200 { ok: true }` |
 | GET | `/api/health` | | `200 { ok: true }` |
+
+Portal additions for Telegram notices (buyers connect their own chat; the team gets payment notices and a daily
+paid/pending summary): see `docs/maintenance.md` §16.3.1, `server/src/telegram-link.js` and `server/src/billing-notices.js`.
 | GET / POST | `/reply/:signedToken` | form: `name`, `message` or `action=end` | HTML reply page (from email links) |
 
 `sender` is `visitor` or `agent`. `status` is `open` or `ended` (by either side). Messages to an ended chat return `409`.
