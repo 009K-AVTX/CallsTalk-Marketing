@@ -155,10 +155,14 @@ export function paymentReceived(userId, { amount, method, buyerMethod = method, 
 // ── Daily Billing Summary ────────────────────────────────────────────────────
 
 // Telegram shows <pre> in a fixed-width font, so the figures line up in columns. A table stays within TABLE_WIDTH
-// characters, about what a phone held upright shows without wrapping: the buyer's name gets the room the figures
-// leave (at least 10 characters, cut with "…"). Amounts are in US dollars, without the "$" to save room.
-const TABLE_WIDTH = 36;
-const figure = (c) => usd(c).replace('$', '');
+// characters, what a narrow phone (an iPhone held upright) shows without wrapping; a wider row would push the Calls
+// column onto a line of its own. The buyer's name gets the room the figures leave (at least 8 characters, cut with
+// "…"). Amounts are in US dollars, without the "$", and without cents when every amount in the column is whole.
+const TABLE_WIDTH = 32;
+const amounts = (list) => {
+  const whole = list.every((c) => c % 100 === 0);
+  return list.map((c) => (whole ? (c / 100).toLocaleString('en-US') : usd(c).replace('$', '')));
+};
 const count = (k) => (k === null ? '-' : k.toLocaleString('en-US'));
 const cut = (s, n) => (s.length > n ? `${s.slice(0, n - 1).trimEnd()}…` : s);
 
@@ -166,7 +170,7 @@ const cut = (s, n) => (s.length > n ? `${s.slice(0, n - 1).trimEnd()}…` : s);
 function table(header, rows) {
   const widths = header.map((h, i) => Math.max(h.length, ...rows.map((r) => r[i].length)));
   const figures = widths.slice(1).reduce((t, w) => t + w + 2, 0);
-  widths[0] = Math.min(widths[0], Math.max(TABLE_WIDTH - figures, 10));
+  widths[0] = Math.min(widths[0], Math.max(TABLE_WIDTH - figures, 8));
   const line = (r) => r.map((v, i) => (i ? v.padStart(widths[i]) : cut(v, widths[0]).padEnd(widths[0]))).join('  ');
   return [header, ...rows].map(line);
 }
@@ -199,16 +203,27 @@ export function summaryText(customers, now = new Date(), { title = 'Daily Billin
     const { shown, rest } = fitLines(body.map(escape), room - MORE - header.length - 15);
     return `<pre>${[escape(header), ...shown].join('\n')}</pre>` + (rest ? `\n…and ${rest} more in Finance` : '');
   };
-  const pendingTable = table(['Buyer', 'Price', 'Owed', 'Calls'], pending.map((r) => [r.name, figure(r.price), figure(r.owed), count(r.calls)]));
-  const paidTable = table(['Buyer', 'Price', 'Credit', 'Calls'], paid.map((r) => [r.name, figure(r.price), figure(r.credit), count(r.calls)]));
+  // [name, price, amount, calls] rows; `k`: the amount, owed or credit.
+  const tableRows = (list, k) => {
+    const prices = amounts(list.map((r) => r.price));
+    const money = amounts(list.map((r) => r[k]));
+    return list.map((r, i) => [r.name, prices[i], money[i], count(r.calls)]);
+  };
+  const pendingTable = table(['Buyer', 'Price', 'Owed', 'Calls'], tableRows(pending, 'owed'));
+  const paidTable = table(['Buyer', 'Price', 'Credit', 'Calls'], tableRows(paid, 'credit'));
 
   // Pending comes first and gets the room it needs, leaving at least a few rows' worth for Paid.
-  const top = head.join('\n').length + 80; // the head and both group titles
+  const top = head.join('\n').length + 120; // the head and both group titles
   const keepForPaid = Math.min(paidTable.join('\n').length + MORE, 800);
-  const section = (name, list, text) => (list.length ? ['', `<b>${name} (${list.length})</b>`, text] : ['', `<b>${name}:</b> none`]);
+  // `calls`: what the Calls column counts in that group.
+  const section = (name, list, calls, text) => (list.length ? ['', `<b>${name} (${list.length})</b> · ${calls}`, text] : ['', `<b>${name}:</b> none`]);
   const pendingText = pending.length ? block(pendingTable, TELEGRAM_BUDGET - top - keepForPaid) : '';
   const paidText = paid.length ? block(paidTable, TELEGRAM_BUDGET - top - pendingText.length) : '';
-  return [...head, ...section('Pending', pending, pendingText), ...section('Paid', paid, paidText)].join('\n');
+  return [
+    ...head,
+    ...section('Pending', pending, 'calls not paid for', pendingText),
+    ...section('Paid', paid, 'calls left on credit', paidText),
+  ].join('\n');
 }
 
 // The summary as of `now`, with every buyer who is billed and can still log in.
