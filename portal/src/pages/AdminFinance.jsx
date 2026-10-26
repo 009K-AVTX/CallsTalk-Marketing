@@ -23,6 +23,22 @@ const signed = (v) => (n(v) > 0 ? `+${money(v)}` : money(v));
 const tone = (v) => (n(v) < 0 ? 'is-neg' : n(v) > 0 ? 'is-pos' : '');
 const plural = (k, word) => `${count(k)} ${word}${n(k) === 1 ? '' : 's'}`;
 
+// Where a customer stands today. Paid: nothing owed, and how many more calls their credit covers at their price.
+// Pending: a balance due, the calls it stands for, and whether a payment is already on its way.
+function payState(c) {
+  const price = n(c.price_per_call);
+  const due = n(c.amount_due_now);
+  if (due > 0) {
+    const calls = price ? Math.ceil(due / price) : null;
+    return {
+      key: 'pending', label: 'Pending', tone: 'warn', calls: calls === null ? null : -calls,
+      sub: [calls !== null && `${plural(calls, 'call')} unpaid`, n(c.pending) > 0 && `${money(c.pending)} confirming`].filter(Boolean).join(' · '),
+    };
+  }
+  const calls = price ? Math.floor(n(c.balance_now) / price) : null;
+  return { key: 'paid', label: 'Paid', tone: 'ok', calls, sub: calls === null ? '' : `Covers ${plural(calls, 'more call')}` };
+}
+
 // Running totals: what the period had billed and collected by each day.
 const running = (days, key) => {
   let sum = 0;
@@ -90,10 +106,13 @@ export default function AdminFinance({ onSignedOut }) {
   // Payments: a page of PAYMENTS from the server. The customer table: CUSTOMERS rows at a time on screen.
   const [paid, setPaid] = useState(0);
   const [rowsFrom, setRowsFrom] = useState(0);
+  // The customer table: everyone, or only those with a payment pending, or only those paid up.
+  const [show, setShow] = useState('');
   useEffect(() => {
     setPaid(0);
     setRowsFrom(0);
   }, [range.from, range.to, customer]);
+  useEffect(() => setRowsFrom(0), [show]);
   const people = useLoad(signedIn(onSignedOut, listUserOptions), []);
   const report = useLoad(signedIn(onSignedOut, () => (range.invalid
     ? Promise.reject(new Error('Choose a start date on or before the end date.'))
@@ -107,14 +126,19 @@ export default function AdminFinance({ onSignedOut }) {
   const labels = days.map((d) => d.date);
   const span = r ? `${dayLabel(r.from)} to ${dayLabel(r.to)}` : '';
   const owed = (r?.customers || []).filter((c) => n(c.amount_due_now) > 0);
+  const states = new Map((r?.customers || []).map((c) => [c.id, payState(c)]));
+  const listed = (r?.customers || []).filter((c) => !show || states.get(c.id).key === show);
 
   // Downloads: asked of the server again with export=..., so the download is in the audit log.
   const fresh = (format) => fetchFinance({ from: r.from, to: r.to, customer }, format);
   const csvByCustomer = async () => {
     const f = await fresh('csv');
     downloadCsv(`${fileStem(f, name)}-by-customer.csv`,
-      ['Customer', 'Login', 'Price per Call', 'Calls', 'Replaced', 'Charged Calls', 'Opening Balance', 'Billed', 'Collected', 'Pending', 'Closing Balance', 'Owed Now'],
-      f.customers.map((c) => [c.customer, c.email, n(c.price_per_call), c.calls, c.replacements, c.billable_calls, n(c.opening_balance), n(c.charges), n(c.received), n(c.pending), n(c.closing_balance), n(c.amount_due_now)]));
+      ['Customer', 'Login', 'Price per Call', 'Calls', 'Replaced', 'Charged Calls', 'Opening Balance', 'Billed', 'Collected', 'Pending', 'Closing Balance', 'Owed Now', 'Status', 'Calls Left'],
+      f.customers.map((c) => {
+        const s = payState(c);
+        return [c.customer, c.email, n(c.price_per_call), c.calls, c.replacements, c.billable_calls, n(c.opening_balance), n(c.charges), n(c.received), n(c.pending), n(c.closing_balance), n(c.amount_due_now), s.label, s.calls ?? ''];
+      }));
   };
   const csvDaily = async () => {
     const f = await fresh('csv');
@@ -202,6 +226,7 @@ export default function AdminFinance({ onSignedOut }) {
           <Statement totals={r.totals} />
           <p className="p-ledger__notes">
             <span><b>{money(r.totals.amount_due_now)}</b> owed to us now</span>
+            {r.customers.length > 1 && <span><b>{count(owed.length)}</b> pending, <b>{count(r.customers.length - owed.length)}</b> paid</span>}
             {n(r.totals.credit_now) > 0 && <span><b>{money(r.totals.credit_now)}</b> held in credit</span>}
             {n(r.totals.pending) > 0 && <span><b>{money(r.totals.pending)}</b> in payments still pending</span>}
             {r.totals.average_price && <span>Average <b>{money(r.totals.average_price)}</b> per charged call</span>}
@@ -297,20 +322,34 @@ export default function AdminFinance({ onSignedOut }) {
           </div>
 
           <section className="p-card p-card--flush">
-            <header className="p-card__head"><div><h2>By Customer</h2><p>Who owes most comes first. Open a customer to enter calls or payments.</p></div></header>
+            <header className="p-card__head">
+              <div><h2>By Customer</h2><p>Who owes most comes first. Status is as of today. Open a customer to enter calls or payments.</p></div>
+              {r.customers.length > 1 && (
+                <div className="p-ranges" role="radiogroup" aria-label="Show">
+                  {[['', 'Everyone'], ['pending', 'Pending'], ['paid', 'Paid']].map(([key, label]) => (
+                    <button key={key || 'all'} type="button" role="radio" aria-checked={show === key} className={show === key ? 'is-on' : ''} onClick={() => setShow(key)}>
+                      {label}<span className="p-ranges__count">{key ? [...states.values()].filter((s) => s.key === key).length : r.customers.length}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </header>
             <div className="p-tablewrap">
               <table className="p-table p-table--figures">
                 <thead>
                   <tr>
-                    <th scope="col">Customer</th><th scope="col" className="is-num">Calls</th><th scope="col" className="is-num">Opening</th>
+                    <th scope="col">Customer</th><th scope="col">Status</th><th scope="col" className="is-num">Calls</th><th scope="col" className="is-num">Opening</th>
                     <th scope="col" className="is-num">Billed</th><th scope="col" className="is-num">Collected</th><th scope="col" className="is-num">Closing</th>
                     <th scope="col" className="is-num">Owed Now</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {r.customers.slice(rowsFrom, rowsFrom + CUSTOMERS).map((c) => (
+                  {listed.slice(rowsFrom, rowsFrom + CUSTOMERS).map((c) => {
+                    const s = states.get(c.id);
+                    return (
                     <tr key={c.id}>
                       <th scope="row"><Link to={`/admin/users/${c.id}`}>{c.customer}</Link><small className="p-up__file">{money(c.price_per_call)} per call{c.status === 'disabled' ? ' · turned off' : ''}</small></th>
+                      <td><span className="p-status"><span className={`p-pill is-${s.tone}`}>{s.label}</span>{s.sub && <small>{s.sub}</small>}</span></td>
                       <td className="is-num" title={c.replacements ? `${c.replacements} replaced, not charged` : undefined}>{count(c.billable_calls)}{c.replacements ? <small className="p-muted"> +{count(c.replacements)}</small> : null}</td>
                       <td className={`is-num ${tone(c.opening_balance)}`}>{money(c.opening_balance)}</td>
                       <td className="is-num">{money(c.charges)}</td>
@@ -318,12 +357,14 @@ export default function AdminFinance({ onSignedOut }) {
                       <td className={`is-num ${tone(c.closing_balance)}`}>{money(c.closing_balance)}</td>
                       <td className="is-num"><b className={n(c.amount_due_now) ? 'is-neg' : ''}>{money(c.amount_due_now)}</b></td>
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
                 {r.customers.length > 1 && (
                   <tfoot>
                     <tr>
-                      <th scope="row">All Customers</th><td className="is-num">{count(r.totals.billable_calls)}</td>
+                      <th scope="row">All Customers</th><td />
+                      <td className="is-num">{count(r.totals.billable_calls)}</td>
                       <td className={`is-num ${tone(r.totals.opening_balance)}`}>{money(r.totals.opening_balance)}</td>
                       <td className="is-num">{money(r.totals.charges)}</td><td className="is-num">{money(r.totals.received)}</td>
                       <td className={`is-num ${tone(r.totals.closing_balance)}`}>{money(r.totals.closing_balance)}</td>
@@ -333,13 +374,14 @@ export default function AdminFinance({ onSignedOut }) {
                 )}
               </table>
               {!r.customers.length && <p className="p-empty">No customers have billing set up yet. Open a customer under Logins to set their terms.</p>}
+              {r.customers.length > 0 && !listed.length && <p className="p-empty">{show === 'pending' ? 'Every customer is paid up.' : 'No customer is paid up right now.'}</p>}
             </div>
-            {r.customers.length > CUSTOMERS && (
+            {listed.length > CUSTOMERS && (
               <div className="p-pager">
-                <span>{rowsFrom + 1}–{Math.min(rowsFrom + CUSTOMERS, r.customers.length)} of {r.customers.length} customers (totals are for all)</span>
+                <span>{rowsFrom + 1}–{Math.min(rowsFrom + CUSTOMERS, listed.length)} of {listed.length} customers (totals are for all)</span>
                 <div>
                   <button type="button" className="btn btn--quiet btn--sm" disabled={!rowsFrom} onClick={() => setRowsFrom(Math.max(0, rowsFrom - CUSTOMERS))}>Previous</button>
-                  <button type="button" className="btn btn--quiet btn--sm" disabled={rowsFrom + CUSTOMERS >= r.customers.length} onClick={() => setRowsFrom(rowsFrom + CUSTOMERS)}>Next</button>
+                  <button type="button" className="btn btn--quiet btn--sm" disabled={rowsFrom + CUSTOMERS >= listed.length} onClick={() => setRowsFrom(rowsFrom + CUSTOMERS)}>Next</button>
                 </div>
               </div>
             )}

@@ -127,12 +127,14 @@ export async function uploadReport({ customer, title, note, periodFrom, periodTo
   return report;
 }
 
-// One email to the customer's login ID about the reports just uploaded: { emailed, email } or { emailed: false, reason }.
-// Only on our server; the demo and local stores have no email.
+// Tells the customer about the reports just uploaded, once for the whole upload: an email to their login ID and/or
+// "Your report has been updated." in their Telegram chat with our bot (if they connected it in Settings).
+// -> { emailed, email | reason, telegram: { sent, username | reason } }. Only on our server; the demo and local
+// stores have neither.
 export const canNotify = MODE === 'api';
-export async function notifyReports(customer, reportIds) {
-  if (MODE !== 'api') return { emailed: false, reason: 'email is not available in this demo' };
-  return api('/staff/reports/notify', 'POST', { customer, reports: reportIds });
+export async function notifyReports(customer, reportIds, { email = true, telegram = false } = {}) {
+  if (MODE !== 'api') return { emailed: false, reason: 'email is not available in this demo', telegram: { sent: false, reason: 'Telegram is not available in this demo' } };
+  return api('/staff/reports/notify', 'POST', { customer, reports: reportIds, email, telegram });
 }
 
 export async function deleteReport(id) {
@@ -157,6 +159,28 @@ export async function fetchFile(report) {
   }
   if (!res.ok) throw new Error('The report file could not be opened.');
   return res.arrayBuffer();
+}
+
+// ── reports the customer has not looked at yet ───────────────────────────────
+
+// When this customer last saw their reports, in this browser: uploads after it are pointed out in the portal.
+// Never seen here (a new browser, cleared storage): the last 3 days' uploads count as new.
+const SEEN_STORE = 'callstalk.reportsSeen';
+const myLogin = () => (loadSession()?.email || '').toLowerCase();
+const uploadedAt = (r) => new Date(r.uploaded_at).getTime() || 0;
+
+export const reportsSeenAt = () => read(localStorage, SEEN_STORE)?.[myLogin()] || null;
+
+export function unseenReports(reports, seenAt) {
+  const after = seenAt ?? Date.now() - 3 * 24 * 3600 * 1000;
+  return (reports || []).filter((r) => uploadedAt(r) > after);
+}
+
+// Marks everything up to the newest report as seen; returns the new mark.
+export function markReportsSeen(reports) {
+  const newest = Math.max(reportsSeenAt() || 0, ...(reports || []).map(uploadedAt));
+  write(localStorage, SEEN_STORE, { ...read(localStorage, SEEN_STORE), [myLogin()]: newest });
+  return newest;
 }
 
 export const localKeyHint = MODE === 'local' ? LOCAL_KEY : '';

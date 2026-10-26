@@ -36,6 +36,12 @@ export const config = {
     topicPerChat: env('TELEGRAM_TOPIC_PER_CHAT') === 'true',
     // false on a local copy, so it does not take the live server's updates from the same bot.
     polling: env('TELEGRAM_POLLING', 'true') !== 'false',
+    // Billing notices for the team (each payment, the daily paid/pending summary): their own chat or topic, so
+    // they stay apart from website chats. Empty: the support chat (and TELEGRAM_THREAD_ID).
+    billingChatId: env('TELEGRAM_BILLING_CHAT_ID'),
+    billingThreadId: env('TELEGRAM_BILLING_THREAD_ID') ? Number(env('TELEGRAM_BILLING_THREAD_ID')) : undefined,
+    // How long the Connect Telegram link in a customer's Settings works.
+    linkMinutes: Number(env('TELEGRAM_LINK_MINUTES', '15')),
   },
 
   // Optional: email every visitor message, with a link to answer it from the browser.

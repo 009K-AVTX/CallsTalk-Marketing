@@ -21,7 +21,7 @@ const { token, chatId, threadId: sharedThreadId, topicPerChat } = config.telegra
 const MAX_TEXT = 4096;
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-async function api(method, params = {}, timeoutMs = 15000) {
+export async function api(method, params = {}, timeoutMs = 15000) {
   const res = await fetch(`https://api.telegram.org/bot${token}/${method}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -39,6 +39,26 @@ async function api(method, params = {}, timeoutMs = 15000) {
 }
 
 const escape = escapeHtml;
+
+// The bot's @username, for t.me links. Learned once (startBot, or here when this copy does not poll).
+let username = null;
+export async function botUsername() {
+  username ||= (await api('getMe')).username;
+  return username;
+}
+
+// A message to any chat: a customer's own chat with the bot, or the team's billing chat. Telegram's error code is
+// on the error (403: the person blocked the bot or never started it).
+export function sendTo(chat, text, { threadId, ...extra } = {}) {
+  return api('sendMessage', {
+    chat_id: chat,
+    message_thread_id: threadId,
+    text: clip(text, MAX_TEXT),
+    parse_mode: 'HTML',
+    link_preview_options: { is_disabled: true },
+    ...extra,
+  });
+}
 
 function send(text, threadId, extra = {}) {
   return api('sendMessage', {
@@ -157,6 +177,13 @@ async function handleMessage(msg) {
     const topic = msg.is_topic_message ? `\n<b>Topic ID:</b> <code>${msg.message_thread_id}</code>` : '';
     return replyTo(msg, `<b>Chat ID:</b> <code>${msg.chat.id}</code>${topic}`);
   }
+  // A customer's own chat with the bot (Connect Telegram in the portal), never part of the support chat.
+  // Loaded when needed: telegram-link.js uses this file to send, so a static import would be circular.
+  if (msg.chat.type === 'private' && String(msg.chat.id) !== chatId) {
+    if (!await claimTelegramUpdate(`${msg.chat.id}:${msg.message_id}`)) return;
+    const { handlePrivateMessage } = await import('./telegram-link.js');
+    return handlePrivateMessage(msg, command);
+  }
   if (String(msg.chat.id) !== chatId) {
     console.warn(`[telegram] ignored a message from chat ${msg.chat.id}; only TELEGRAM_CHAT_ID=${chatId} is accepted`);
     return;
@@ -259,6 +286,7 @@ export async function startBot() {
       if (!ready) {
         await api('deleteWebhook'); // polling and webhooks cannot be used together
         const me = await api('getMe');
+        username = me.username;
         console.log(`[telegram] listening for replies as @${me.username}`);
         ready = true;
       }

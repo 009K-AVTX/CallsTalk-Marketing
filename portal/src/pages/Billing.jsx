@@ -4,16 +4,14 @@ import Icon from '../components/Icons.jsx';
 import { ErrorNote, PageHead } from '../components/Shell.jsx';
 import SheetViewer from '../components/SheetViewer.jsx';
 import { clock } from '../format.js';
-import { listMine, showUploadLink, UPLOAD_PATH } from '../reports.js';
+import { showUploadLink, UPLOAD_PATH } from '../reports.js';
 import { Link } from '../router.jsx';
-import useLoad from '../useLoad.js';
-import { ReportRow } from './Reports.jsx';
+import { ReportNotice, ReportRow } from './Reports.jsx';
 
 // The portal's home: the latest billing reports, then the same bills as the website's Buyer Dashboard
 // (wallet, today, last three days, history since September, payments).
-export default function Billing({ statement }) {
+export default function Billing({ statement, reports, unseen = [], onSeen }) {
   const { data, error, loading, load } = statement;
-  const reports = useLoad(listMine, []);
   const [open, setOpen] = useState(null);
   const [fileError, setFileError] = useState('');
   const close = useCallback(() => setOpen(null), []);
@@ -25,6 +23,7 @@ export default function Billing({ statement }) {
         <button type="button" className="btn btn--quiet btn--sm" onClick={() => { load(); reports.reload(); }} disabled={loading}><Icon name="refresh" />Refresh</button>
       </PageHead>
       <ErrorNote error={error || fileError} onRetry={error ? load : null} />
+      <ReportNotice reports={unseen} toReports onDismiss={onSeen} />
 
       {latest.length > 0 && (
         <section className="p-card p-latest">

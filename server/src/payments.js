@@ -13,6 +13,7 @@ import QRCode from 'qrcode';
 import { config } from './config.js';
 import { findWalletOwners, getUser, getWallet, saveProviderPayment, saveWallet } from './portal-db.js';
 import { recordAudit } from './audit.js';
+import { paymentReceived } from './billing-notices.js';
 
 const PROVIDER = 'wellwallet';
 const NETWORK = 'trx';
@@ -148,6 +149,8 @@ export async function syncDeposits({ search } = {}) {
     });
     if (changed) {
       saved++;
+      // The team's billing chat hears of it once it completes (billing-notices.js); a pending one is shown in the summary.
+      if (STATUS[t.status] === 'completed') paymentReceived(userId, { amount: Number(t.amount).toFixed(2), method: 'USDT (TRC-20)' });
       console.log(`[payments] ${t.amount} USDT ${STATUS[t.status] || t.status} for customer ${userId} (${t.hash.slice(0, 12)}…)`);
       // In the audit trail as the system's doing: no one in the team entered it.
       const owner = await getUser(userId);
