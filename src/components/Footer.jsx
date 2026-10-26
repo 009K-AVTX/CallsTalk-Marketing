@@ -10,7 +10,7 @@ export default function Footer() {
         <div className="footer__card">
           <div className="footer__card-copy">
             <h2>Get in Touch</h2>
-            <p>Questions or setup help? Message us on Telegram, send an email or start a chat, and our team will get back to you.</p>
+            <p>Questions or setup help? Message us on Telegram, SimpleX or Zangi, send an email or start a chat, and our team will get back to you.</p>
           </div>
           <div className="footer__card-actions">
             <ContactLinks />
