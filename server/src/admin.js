@@ -16,10 +16,13 @@
 //   DELETE /api/admin/users/:id/payments/:paymentId
 //   GET    /api/admin/audit...                   the audit trail (audit.js)
 //   GET    /api/admin/finance                    billed, collected and owed across customers (finance.js)
+//   GET    /api/admin/notifications              the team's billing notices on Telegram (billing-notices.js)
 
 import { Router } from 'express';
 import { auditRouter } from './audit.js';
 import { financeRouter } from './finance.js';
+import { billingNoticesRouter, paymentReceived } from './billing-notices.js';
+import { telegramOf } from './telegram-link.js';
 import { config } from './config.js';
 import { hashToken, newToken, newTotpSecret } from './auth-crypto.js';
 import { requireUser } from './accounts.js';
@@ -121,15 +124,15 @@ async function loadCustomer(req) {
 
 async function billingView(user) {
   const account = await getAccount(user.id);
-  const contacts = await contactsOf(user.id);
-  if (!account) return { account: null, statement: null, contacts };
+  const [contacts, telegram] = await Promise.all([contactsOf(user.id), telegramOf(user.id)]);
+  if (!account) return { account: null, statement: null, contacts, telegram };
   const today = localDate(new Date(), account.timezone);
   const from = [addDays(today, -30), account.start_date].sort().pop();
   const days = await listDays(user.id, today);
   const result = statement({ user, account, days, payments: await listPayments(user.id), from });
   // Each shown day's version, sent back with a change to it (concurrency control).
   const dayVersions = Object.fromEntries(days.filter((d) => d.date >= from).map((d) => [d.date, d.version]));
-  return { account, statement: result, contacts, day_versions: dayVersions };
+  return { account, statement: result, contacts, telegram, day_versions: dayVersions };
 }
 
 const userView = ({ password_hash: _p, totp_secret: _t, totp_last_step: _s, session_id: _i, ...u }) => u;
@@ -138,6 +141,7 @@ export const adminRouter = Router();
 adminRouter.use(requireUser('admin'));
 adminRouter.use('/audit', auditRouter);
 adminRouter.use('/finance', financeRouter);
+adminRouter.use('/notifications', billingNoticesRouter);
 
 // A page of logins: ?q= (name, email or company), ?role=, ?limit= (50, at most 200), ?offset=.
 // -> { results, total, counts: { customer, staff, admin }, waiting, limit, offset }
@@ -273,14 +277,17 @@ adminRouter.post('/users/:id/payments', async (req, res) => {
   const date = day(body.date || localDate(new Date(), account.timezone));
   if (date > localDate(new Date(), account.timezone)) throw new HttpError(400, 'Payments can only be recorded for today or earlier.');
   const status = ['completed', 'pending', 'failed'].includes(body.status) ? body.status : 'completed';
+  const paid = amount(body.amount, 'amount', { min: 0.01 });
   await addPayment(user.id, {
-    amount: amount(body.amount, 'amount', { min: 0.01 }),
+    amount: paid,
     currency: account.currency,
     status,
     reference: str(body.reference, 120),
     note: str(body.note, 200),
     paid_at: onDay(date, account.timezone),
   });
+  // The team's billing chat hears of every completed payment, whoever recorded it (billing-notices.js).
+  if (status === 'completed') paymentReceived(user.id, { amount: paid, method: `Recorded by ${req.user.name || req.user.email}`, note: str(body.note, 200) });
   res.status(201).json({ user: userView(user), ...await billingView(user) });
 });
 

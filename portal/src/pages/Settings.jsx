@@ -8,6 +8,8 @@ import { ErrorNote, logOut, PageHead } from '../components/Shell.jsx';
 import { dayLabel, money } from '../format.js';
 import useLoad from '../useLoad.js';
 import { AvatarEditor } from '../avatar.jsx';
+import TelegramConnect from '../components/TelegramConnect.jsx';
+import BillingNotices from '../components/BillingNotices.jsx';
 
 // Two steps: the passwords, then the code from the authenticator app. Nothing changes until the code is right.
 function PasswordForm() {
@@ -166,6 +168,8 @@ export default function Settings({ statement, team }) {
         )}
         {team && <PasswordForm />}
       </div>
+      {team === 'admin' && <BillingNotices />}
+      {!team && <TelegramConnect />}
       {!team && <ContactsForm />}
       {!team && <div className="p-grid">
         <PasswordForm />

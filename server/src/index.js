@@ -20,6 +20,8 @@ import { adminRouter } from './admin.js';
 import { portalRouter } from './portal.js';
 import { paymentsRouter, startPaymentSync } from './payments.js';
 import { contactsRouter } from './contacts.js';
+import { telegramLinkRouter } from './telegram-link.js';
+import { startBillingNotices } from './billing-notices.js';
 import { auditTrail } from './audit.js';
 import { requireUser } from './accounts.js';
 import { apiHeaders, sameOriginOnly } from './security.js';
@@ -76,6 +78,7 @@ app.use('/reply', replyRouter);
 // Every signed-in change in the portal is written to the audit trail once its reply has gone out.
 app.use('/api', auditTrail);
 app.use('/api/accounts/contacts', contactsRouter);
+app.use('/api/accounts/telegram', telegramLinkRouter);
 app.use('/api/accounts', accountsRouter);
 app.use('/api/admin', adminRouter);
 app.use('/api/payments', paymentsRouter);
@@ -117,6 +120,7 @@ const server = app.listen(config.port, config.host, () => {
   startExpiry();
   startSessionCleanup();
   startPaymentSync();
+  startBillingNotices();
 });
 
 // Slow clients cannot hold a connection open for long: whole headers within 15 s, the whole request (a 5 MB upload

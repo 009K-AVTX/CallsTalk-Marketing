@@ -127,12 +127,14 @@ export async function uploadReport({ customer, title, note, periodFrom, periodTo
   return report;
 }
 
-// One email to the customer's login ID about the reports just uploaded: { emailed, email } or { emailed: false, reason }.
-// Only on our server; the demo and local stores have no email.
+// Tells the customer about the reports just uploaded, once for the whole upload: an email to their login ID and/or
+// "Your report has been updated." in their Telegram chat with our bot (if they connected it in Settings).
+// -> { emailed, email | reason, telegram: { sent, username | reason } }. Only on our server; the demo and local
+// stores have neither.
 export const canNotify = MODE === 'api';
-export async function notifyReports(customer, reportIds) {
-  if (MODE !== 'api') return { emailed: false, reason: 'email is not available in this demo' };
-  return api('/staff/reports/notify', 'POST', { customer, reports: reportIds });
+export async function notifyReports(customer, reportIds, { email = true, telegram = false } = {}) {
+  if (MODE !== 'api') return { emailed: false, reason: 'email is not available in this demo', telegram: { sent: false, reason: 'Telegram is not available in this demo' } };
+  return api('/staff/reports/notify', 'POST', { customer, reports: reportIds, email, telegram });
 }
 
 export async function deleteReport(id) {

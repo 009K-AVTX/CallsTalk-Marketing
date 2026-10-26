@@ -83,14 +83,18 @@ function Gate({ onIn }) {
 function UploadForm({ customers, onDone }) {
   const yesterday = addDays(today(), -1);
   const [form, setForm] = useState({ customer: '', title: '', note: '', periodFrom: yesterday, periodTo: yesterday });
-  // Email the customer about the upload (on by default; untick e.g. when re-uploading a corrected file).
+  // Tell the customer about the upload (on by default; untick e.g. when re-uploading a corrected file).
   const [notify, setNotify] = useState(true);
+  const [byTelegram, setByTelegram] = useState(true);
   const [files, setFiles] = useState([]);
   const [drag, setDrag] = useState(false);
   const [status, setStatus] = useState('idle'); // idle | sending | done | error
   const [message, setMessage] = useState('');
   const input = useRef(null);
   const set = (k) => (e) => setForm({ ...form, [k]: e.target.value });
+  // Whether the chosen customer has connected Telegram in their Settings (only they can turn it on).
+  const chosen = customers.find((c) => c.id === form.customer);
+  const telegramReady = Boolean(chosen?.telegram);
 
   const pick = (list) => {
     const ok = [...list].filter((f) => /\.(xlsx|xls|csv)$/i.test(f.name));
@@ -112,14 +116,21 @@ function UploadForm({ customers, onDone }) {
         uploaded.push(await uploadReport({ ...form, title: files.length === 1 ? form.title : '', file }));
       }
       const who = customers.find((c) => c.id === form.customer)?.login || form.customer.trim().toLowerCase();
-      let emailNote = '';
-      if (notify && canNotify) {
-        // One email for the whole upload. A failed email never undoes the upload.
-        const sent = await notifyReports(form.customer, uploaded.map((r) => r.id)).catch((err) => ({ emailed: false, reason: err.message }));
-        emailNote = sent.emailed ? ` An email has been sent to ${sent.email}.` : ` The customer was not emailed: ${sent.reason}.`;
+      let notes = '';
+      const telegram = byTelegram && telegramReady;
+      if ((notify || telegram) && canNotify) {
+        // One notice per channel for the whole upload. A failed notice never undoes the upload.
+        const sent = await notifyReports(form.customer, uploaded.map((r) => r.id), { email: notify, telegram })
+          .catch((err) => ({ emailed: false, reason: err.message, telegram: { sent: false, reason: err.message } }));
+        if (notify) notes += sent.emailed ? ` An email has been sent to ${sent.email}.` : ` The customer was not emailed: ${sent.reason}.`;
+        if (telegram) {
+          notes += sent.telegram?.sent
+            ? ` A Telegram message has been sent${sent.telegram.username ? ` to @${sent.telegram.username}` : ''}.`
+            : ` No Telegram message was sent: ${sent.telegram?.reason || 'unknown error'}.`;
+        }
       }
       setStatus('done');
-      setMessage(`${files.length} report${files.length === 1 ? '' : 's'} uploaded for ${who}. They can see ${files.length === 1 ? 'it' : 'them'} in their portal now.${emailNote}`);
+      setMessage(`${files.length} report${files.length === 1 ? '' : 's'} uploaded for ${who}. They can see ${files.length === 1 ? 'it' : 'them'} in their portal now.${notes}`);
       setFiles([]);
       setForm({ ...form, title: '', note: '' });
       if (input.current) input.current.value = '';
@@ -140,7 +151,7 @@ function UploadForm({ customers, onDone }) {
         {customers.some((c) => c.id !== c.login) ? (
           <select required value={form.customer} onChange={set('customer')}>
             <option value="">Choose a customer</option>
-            {customers.map((c) => <option key={c.id} value={c.id}>{c.name} ({c.login})</option>)}
+            {customers.map((c) => <option key={c.id} value={c.id}>{c.name} ({c.login}){c.telegram ? ' · Telegram' : ''}</option>)}
           </select>
         ) : (
           <>
@@ -170,10 +181,23 @@ function UploadForm({ customers, onDone }) {
         )}
       </label>
       {canNotify && (
-        <label className="p-check">
-          <input type="checkbox" checked={notify} onChange={(e) => setNotify(e.target.checked)} />
-          <span><b>Email the customer</b><small>One email to their login ID saying the report is ready. The file itself is not attached.</small></span>
-        </label>
+        <>
+          <label className="p-check">
+            <input type="checkbox" checked={notify} onChange={(e) => setNotify(e.target.checked)} />
+            <span><b>Email the customer</b><small>One email to their login ID saying the report is ready. The file itself is not attached.</small></span>
+          </label>
+          <label className={`p-check${chosen && !telegramReady ? ' is-off' : ''}`}>
+            <input type="checkbox" checked={byTelegram && telegramReady} onChange={(e) => setByTelegram(e.target.checked)} disabled={!telegramReady} />
+            <span>
+              <b>Send on Telegram</b>
+              <small>
+                {!chosen ? '“Your report has been updated. You can now download it from your portal.” Sent to the customer’s Telegram if they have connected it.'
+                  : telegramReady ? '“Your report has been updated. You can now download it from your portal.” With a button that opens the report.'
+                    : 'This customer has not connected Telegram yet. They can do it under Settings in their portal.'}
+              </small>
+            </span>
+          </label>
+        </>
       )}
       {message &&<p className={status === 'done' ? 'p-ok' : 'access-card__error'} role={status === 'done' ? 'status' : 'alert'}>{status === 'done' && <Icon name="check" />}{message}</p>}
       <button type="submit" className="btn btn--light" disabled={status === 'sending'}>{status === 'sending' ? 'Uploading…' : `Upload${files.length > 1 ? ` ${files.length} Reports` : ''}`}</button>

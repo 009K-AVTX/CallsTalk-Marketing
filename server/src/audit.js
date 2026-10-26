@@ -91,6 +91,15 @@ const ROUTES = [
   ['POST', /^\/accounts\/change-password$/, 'password.change', null, (reply) => reply?.code_required],
   ['POST', /^\/accounts\/logout$/, 'auth.logout'],
   ['POST', /^\/billing\/statement\/pay$/, 'payment.address'],
+  // Telegram: a customer disconnecting it in Settings (connecting happens in the bot: telegram-link.js), telling a
+  // customer about new reports, and the team's billing notices.
+  ['DELETE', /^\/accounts\/telegram$/, 'telegram.disconnect'],
+  ['POST', /^\/staff\/reports\/notify$/, 'report.notify', async (m, body) => {
+    const user = UUID.test(body?.customer) ? await getUser(body.customer) : null;
+    return user && { id: user.id, label: label(user), email: user.email };
+  }],
+  ['PUT', /^\/admin\/notifications$/, 'notify.settings'],
+  ['POST', /^\/admin\/notifications\/test$/, 'notify.test'],
 ];
 
 const requestInfo = (req) => ({
@@ -159,6 +168,7 @@ export async function auditTrail(req, res, next) {
       if (action === 'login.create' && reply?.user) about = { id: reply.user.id, label: label(reply.user), email: reply.user.email };
       else if (action === 'login.link' && reply) details.emailed = reply.emailed;
       else if (action === 'report.upload' && reply?.id) details.report_id = reply.id;
+      else if (action === 'report.notify' && reply) Object.assign(details, { emailed: reply.emailed, telegram_sent: reply.telegram?.sent });
       else if (!about && /^\/(accounts|billing)\//.test(path)) about = { id: user.id, label: label(user), email: user.email };
       if (about?.email && about.email !== about.label) details.target_email = about.email;
 
@@ -174,7 +184,7 @@ export async function auditTrail(req, res, next) {
 // ── the admin's view ─────────────────────────────────────────────────────────
 
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
-const KINDS = ['auth', 'login', 'password', 'contacts', 'photo', 'billing', 'calls', 'payment', 'report', 'audit', 'finance'];
+const KINDS = ['auth', 'login', 'password', 'contacts', 'telegram', 'photo', 'billing', 'calls', 'payment', 'notify', 'report', 'audit', 'finance'];
 
 export function auditFilters(query) {
   const tz = typeof query.tz === 'string' && validTimeZone(query.tz) ? query.tz : 'UTC';

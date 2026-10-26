@@ -733,3 +733,22 @@ html { font-size: 15px; }
 }
 .p-status { display: grid; justify-items: start; gap: 3px; }
 .p-status small { color: var(--slate); font-size: .76rem; white-space: nowrap; }
+
+/* Telegram: a customer's Connect Telegram card (Settings) and the admins' Billing Notifications card */
+.p-telegram h2, .p-notices h2 { display: flex; align-items: center; gap: 10px; }
+.p-telegram h2 .contact__icon, .p-notices h2 .contact__icon { flex-basis: 26px; width: 26px; height: 26px; }
+.p-telegram .btn .contact__icon { flex-basis: 18px; width: 18px; height: 18px; margin-right: 2px; }
+.p-telegram .btn .contact__icon circle { fill: none; }
+.p-telegram .btn .contact__icon path { fill: currentColor; }
+.p-telegram .p-facts { margin-bottom: 14px; }
+.p-telegram .p-ok { margin-bottom: 10px; }
+.p-telegram__wait > p:first-child { display: flex; align-items: center; gap: 10px; margin: 0 0 8px; color: var(--white); }
+.p-notices { display: grid; gap: 12px; }
+.p-notices .p-card__head { margin-bottom: 4px; }
+.p-notices__time { display: grid; gap: 6px; max-width: 260px; }
+.p-notices__clock { display: flex; align-items: center; gap: 10px; }
+.p-notices__clock input { flex: 1; }
+.p-notices__clock small { color: var(--slate); font-weight: 600; }
+.p-check.is-off { opacity: .6; }
+.p-check input:disabled { cursor: not-allowed; }
+.p-contacts__bot { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 16px 0 0; }
