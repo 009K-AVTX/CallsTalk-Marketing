@@ -758,6 +758,15 @@ Customers log in at **https://portal.callstalk.com** (the website's Log In goes 
   (they land on `/upload`; no billing, payments or logins). **Admin** can do everything.
 - **Billing:** open a customer → enter each day's **billable calls** and **payments** received. Customers see
   their balance and the last five days; older days go to them as Excel reports (Reports → upload).
+- **Calls from a report:** a report itself never changes the balance. When an admin uploads one in the **Excel
+  Template** format (a **Daily Bills** sheet, or any sheet with **Date** and **Total Calls** columns), the upload
+  form lists its days (calls, replacements, price) beside what the customer's billing has now: **New**,
+  **Changes**, **Same**, or **Skipped** with the reason (before billing started, a future day, a row that is not a
+  date). Tick **Enter these calls in the customer's billing** to save the new and changed days once the report has
+  uploaded. Each is saved as if entered on the customer's page, so it is in the Audit Log, and a day someone
+  changed meanwhile is left alone and named in the result. Payments in the file are never read (deposits come in
+  on their own; record others as usual). An empty or 0 price keeps the day's price. The file's days also set the
+  report's period. Staff upload as before and do not see this.
 - **Lost phone or forgotten password:** open the login → **Reset Login and Send Link**. Their old password and
   code app stop working at once.
 - **Someone leaves:** **Turn Login Off** signs them out everywhere and blocks logging in.
