@@ -197,33 +197,32 @@ export function summaryText(customers, now = new Date(), { title = 'Daily Billin
   ];
   if (!rows.length) return [...head, '', 'No buyers yet.'].join('\n');
 
-  // Whole rows only, within Telegram's limit; whatever does not fit is counted and pointed to Finance.
-  const MORE = 60; // room kept for an "…and N more" line
-  const block = ([header, ...body], room) => {
-    const { shown, rest } = fitLines(body.map(escape), room - MORE - header.length - 15);
-    return `<pre>${[escape(header), ...shown].join('\n')}</pre>` + (rest ? `\n…and ${rest} more in Finance` : '');
-  };
-  // [name, price, amount, calls] rows; `k`: the amount, owed or credit.
-  const tableRows = (list, k) => {
-    const prices = amounts(list.map((r) => r.price));
-    const money = amounts(list.map((r) => r[k]));
-    return list.map((r, i) => [r.name, prices[i], money[i], count(r.calls)]);
-  };
-  const pendingTable = table(['Buyer', 'Price', 'Owed', 'Calls'], tableRows(pending, 'owed'));
-  const paidTable = table(['Buyer', 'Price', 'Credit', 'Calls'], tableRows(paid, 'credit'));
+  // A block per buyer: Buyer, Price and Balance (negative when they owe) as a table, then in bold the calls their
+  // balance stands for: Remaining Calls on credit, or Unpaid Calls. Every block shares one set of column widths, so
+  // they line up down the message.
+  const listed = [...pending, ...paid];
+  const prices = amounts(listed.map((r) => r.price));
+  const balances = amounts(listed.map((r) => (r.paid ? r.credit : -r.owed)));
+  const [header, ...lines] = table(['Buyer', 'Price', 'Balance'], listed.map((r, i) => [r.name, prices[i], balances[i]]));
+  const blocks = listed.map((r, i) => `<pre>${escape(header)}\n${escape(lines[i])}</pre>\n`
+    + `<b>${r.paid ? 'Remaining Calls' : 'Unpaid Calls'}</b> - ${r.calls === null ? 'no price set' : count(r.calls)}`);
 
-  // Pending comes first and gets the room it needs, leaving at least a few rows' worth for Paid.
-  const top = head.join('\n').length + 120; // the head and both group titles
-  const keepForPaid = Math.min(paidTable.join('\n').length + MORE, 800);
-  // `calls`: what the Calls column counts in that group.
-  const section = (name, list, calls, text) => (list.length ? ['', `<b>${name} (${list.length})</b> · ${calls}`, text] : ['', `<b>${name}:</b> none`]);
-  const pendingText = pending.length ? block(pendingTable, TELEGRAM_BUDGET - top - keepForPaid) : '';
-  const paidText = paid.length ? block(paidTable, TELEGRAM_BUDGET - top - pendingText.length) : '';
-  return [
-    ...head,
-    ...section('Pending', pending, 'calls not paid for', pendingText),
-    ...section('Paid', paid, 'calls left on credit', paidText),
-  ].join('\n');
+  // Whole blocks only, within Telegram's limit; whatever does not fit is counted and pointed to Finance.
+  const MORE = 60; // room kept for an "…and N more" line
+  const group = (list, room) => {
+    const { shown, rest } = fitLines(list.map((b) => `${b}\n`), room - MORE); // "\n": the blank line between blocks
+    return [...shown.map((b) => b.trimEnd()), ...(rest ? [`…and ${rest} more in Finance`] : [])].join('\n\n');
+  };
+  const pendingBlocks = blocks.slice(0, pending.length);
+  const paidBlocks = blocks.slice(pending.length);
+
+  // Pending comes first and gets the room it needs, leaving at least a few buyers' worth for Paid.
+  const top = head.join('\n').length + 60; // the head and both group titles
+  const keepForPaid = Math.min(paidBlocks.join('\n\n').length + MORE, 800);
+  const section = (name, list, text) => (list.length ? ['', `<b>${name} (${list.length})</b>`, '', text] : ['', `<b>${name}:</b> none`]);
+  const pendingText = pending.length ? group(pendingBlocks, TELEGRAM_BUDGET - top - keepForPaid) : '';
+  const paidText = paid.length ? group(paidBlocks, TELEGRAM_BUDGET - top - pendingText.length) : '';
+  return [...head, ...section('Pending', pending, pendingText), ...section('Paid', paid, paidText)].join('\n');
 }
 
 // The summary as of `now`, with every buyer who is billed and can still log in.
