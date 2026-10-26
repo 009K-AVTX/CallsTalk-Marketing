@@ -42,8 +42,10 @@ async function api(method, path, { query, body } = {}) {
     data = null;
   }
   // A bare body (e.g. "403") comes from Well Wallet's edge: this server's IP is not on their allowlist.
-  if (!res.ok && (!data || typeof data !== 'object')) {
-    throw new Error(`${method} ${path}: blocked (HTTP ${res.status}), is this server's IP on Well Wallet's allowlist?`);
+  if (!data || typeof data !== 'object') {
+    throw new Error(res.ok
+      ? `${method} ${path}: the reply was not JSON (HTTP ${res.status})`
+      : `${method} ${path}: blocked (HTTP ${res.status}), is this server's IP on Well Wallet's allowlist?`);
   }
   // The live API answers errors in camelCase (errorMessage/errorCode), the docs in snake_case: read both.
   const code = data.errorCode ?? data.error_code;
@@ -98,18 +100,35 @@ function when(s) {
   return Number.isNaN(d.getTime()) ? new Date() : d;
 }
 
+const PAGE = 300; // the largest page the API gives
+// At most 3,000 transfers per check, to stay well inside the account's 10,000 requests a day.
+const MAX_PAGES = 10;
+
+// All incoming USDT transfers that match, page by page. The account may be shared with other bots (TOPUP),
+// so there can be more than one page. A transfer that arrives meanwhile only repeats one, which is harmless.
+async function incomingTransfers(search) {
+  const list = [];
+  for (let page = 0; page < MAX_PAGES; page++) {
+    const data = await api('GET', '/transactions', {
+      query: {
+        direction: 'in', network: NETWORK, currency: CURRENCY, search,
+        created_from: search ? undefined : new Date(Date.now() - 3 * 86_400_000).toISOString(),
+        sort_by: 'created_at', sort_direction: 'desc', limit: PAGE, offset: page * PAGE,
+      },
+    });
+    const batch = Array.isArray(data) ? data : data?.transactions ?? data?.items ?? [];
+    list.push(...batch);
+    if (batch.length < PAGE || (data?.count != null && list.length >= Number(data.count))) return list;
+  }
+  console.warn(`[payments] more than ${MAX_PAGES * PAGE} incoming transfers in 3 days: only the newest were checked`);
+  return list;
+}
+
 // Reads incoming USDT transfers from the API and records the ones sent to a customer's address.
 // `search` narrows it to one transaction hash (a webhook); without it, the last few days are checked.
 export async function syncDeposits({ search } = {}) {
   if (!paymentsEnabled) return 0;
-  const data = await api('GET', '/transactions', {
-    query: {
-      direction: 'in', network: NETWORK, currency: CURRENCY, search,
-      created_from: search ? undefined : new Date(Date.now() - 3 * 86_400_000).toISOString(),
-      sort_by: 'created_at', sort_direction: 'desc', limit: 300,
-    },
-  });
-  const list = Array.isArray(data) ? data : data?.transactions ?? data?.items ?? [];
+  const list = await incomingTransfers(search);
   const deposits = list.filter((t) => t.direction === 'in' && t.currency === CURRENCY && t.hash && Number(t.amount) > 0);
   if (!deposits.length) return 0;
 
@@ -143,7 +162,15 @@ export async function syncDeposits({ search } = {}) {
 
 export function startPaymentSync() {
   if (!paymentsEnabled) return console.log('[payments] WELLWALLET_API_TOKEN is not set: online payment is off');
-  const run = () => syncDeposits().catch((err) => console.error('[payments] could not check deposits:', err.message));
+  // A lasting failure (a missing permission, say) is logged once, not on every check, and so is the recovery.
+  let failing = '';
+  const run = () => syncDeposits().then(() => {
+    if (failing) console.log('[payments] deposit checks work again');
+    failing = '';
+  }, (err) => {
+    if (err.message !== failing) console.error('[payments] could not check deposits:', err.message, '(logged again only if this changes)');
+    failing = err.message;
+  });
   run();
   setInterval(run, pollSeconds * 1000).unref();
 }
