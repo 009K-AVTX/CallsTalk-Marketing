@@ -4,7 +4,7 @@ import {
   addPayment, clearDay, fetchAudit, fetchBilling, getUser, isConflict, removePayment, removeUser, saveDay, saveTerms, sendLink, signedIn,
   TIME_ZONES, updateUser,
 } from '../admin.js';
-import { actor, describe, failed, groupOf, stamp } from '../audit-text.js';
+import { actor, describe, failed, groupOf, outcome, stamp } from '../audit-text.js';
 import Icon from '../components/Icons.jsx';
 import { CONTACT_METHODS, contactLink } from '../contacts.js';
 import { ErrorNote, PageHead } from '../components/Shell.jsx';
@@ -309,7 +309,7 @@ function Activity({ id, onSignedOut, watch }) {
             <li key={r.id} className={failed(r) ? 'is-bad' : ''}>
               <span className={`p-audit__dot is-${groupOf(r.action)}`} aria-hidden="true" />
               <span className="p-activity__what">{describe(r)}<small>{actor(r)} · {stamp(r.created_at)}</small></span>
-              {failed(r) && <span className="p-pill is-off">Refused</span>}
+              {failed(r) && <span className={`p-pill is-${outcome(r).tone}`}>{outcome(r).label}</span>}
             </li>
           ))}
         </ol>

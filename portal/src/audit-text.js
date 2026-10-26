@@ -51,6 +51,17 @@ export const roleName = (role) => ROLE[role] || '';
 
 export const failed = (row) => row.status_code >= 400 || row.action.endsWith('_failed');
 
+// The result of an entry in plain terms: Successful, or why it did not go through.
+const UNSUCCESSFUL = {
+  400: 'Invalid Request', 401: 'Not Signed In', 403: 'Access Denied', 404: 'Not Found', 409: 'Conflicting Change',
+  413: 'File Too Large', 429: 'Too Many Attempts', 503: 'Service Unavailable',
+};
+export function outcome(row) {
+  if (!failed(row)) return { label: 'Successful', tone: 'ok' };
+  if (row.action.endsWith('_failed')) return { label: row.status_code === 429 ? 'Too Many Attempts' : 'Failed', tone: 'off' };
+  return { label: UNSUCCESSFUL[row.status_code] || (row.status_code >= 500 ? 'Server Error' : 'Unsuccessful'), tone: 'warn' };
+}
+
 // Who did it: a person, or the system for deposits the payment check credited.
 export const actor = (row) => row.user_email || (row.action === 'payment.deposit' ? 'System' : 'Unknown');
 
