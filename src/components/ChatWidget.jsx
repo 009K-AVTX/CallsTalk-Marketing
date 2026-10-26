@@ -15,7 +15,6 @@ const startedAt = (time) => new Date(time).toLocaleTimeString([], { hour: 'numer
 
 function HandoffForm({ initialMessage, onStart, onCancel }) {
   const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
   const [message, setMessage] = useState(initialMessage);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -25,7 +24,7 @@ function HandoffForm({ initialMessage, onStart, onCancel }) {
     setBusy(true);
     setError('');
     try {
-      await onStart({ name: name.trim(), email: email.trim(), message: message.trim() });
+      await onStart({ name: name.trim(), message: message.trim() });
     } catch (err) {
       setError(err.message);
       setBusy(false);
@@ -34,9 +33,8 @@ function HandoffForm({ initialMessage, onStart, onCancel }) {
 
   return (
     <form className="handoff" onSubmit={submit}>
-      <p>Please share your details and our team will respond in this chat and by email.</p>
+      <p>Please share your name and our team will respond in this chat.</p>
       <label>Name<input value={name} onChange={(e) => setName(e.target.value)} required autoComplete="name" /></label>
-      <label>Email<input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="email" /></label>
       <label>Message<textarea rows="3" value={message} onChange={(e) => setMessage(e.target.value)} required /></label>
       {error && <p className="chat__error" role="alert">{error}</p>}
       <div className="handoff__actions">
