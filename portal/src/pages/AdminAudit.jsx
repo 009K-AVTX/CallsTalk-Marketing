@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useState } from 'react';
 import { fetchAudit, fetchAuditSummary, listUserOptions, signedIn } from '../admin.js';
 import {
-  actionName, actor, changes, describe, device, failed, GROUPS, groupOf, roleName, stamp, timeOnly,
+  actionName, actor, changes, describe, device, failed, GROUPS, groupOf, outcome, roleName, stamp, timeOnly,
 } from '../audit-text.js';
 import { BarList, ColumnChart, Legend } from '../components/Charts.jsx';
 import { DownloadMenu, period, Period } from '../components/Filters.jsx';
@@ -41,9 +41,9 @@ function perDay(summary, from, to) {
 }
 
 function Result({ row }) {
-  if (row.action === 'auth.login_failed') return <span className="p-pill is-off">Refused</span>;
-  if (row.status_code >= 400) return <span className="p-pill is-warn" title={row.details?.error}>Refused · {row.status_code}</span>;
-  return <span className="p-pill is-ok">Done</span>;
+  const o = outcome(row);
+  const why = [row.status_code >= 400 && `HTTP ${row.status_code}`, row.details?.error].filter(Boolean).join(': ');
+  return <span className={`p-pill is-${o.tone}`} title={why || undefined}>{o.label}</span>;
 }
 
 function Detail({ row }) {
@@ -122,7 +122,7 @@ function Entry({ row, open, onToggle }) {
 
 const csvRows = (rows) => rows.map((r) => [
   new Date(r.created_at).toISOString(), actor(r), roleName(r.user_role), actionName(r.action), describe(r), r.target_label,
-  failed(r) ? 'Refused' : 'Done', r.status_code ?? '', r.ip ?? '', device(r.user_agent), r.method ?? '', r.path ?? '',
+  outcome(r).label, r.status_code ?? '', r.ip ?? '', device(r.user_agent), r.method ?? '', r.path ?? '',
   r.details ? JSON.stringify(r.details) : '',
 ]);
 
@@ -187,7 +187,7 @@ export default function AdminAudit({ onSignedOut }) {
   }
 
   const scope = [GROUPS.find((g) => g.key === group)?.label, person && people.data?.find((u) => u.id === person)?.email,
-    about && `about ${aboutName}`, onlyFailed && 'refused only', q && `matching "${q}"`].filter(Boolean).join(' · ');
+    about && `about ${aboutName}`, onlyFailed && 'unsuccessful only', q && `matching "${q}"`].filter(Boolean).join(' · ');
   const stem = `callstalk-audit-log-${range.from}-to-${range.to}`;
   const everything = async (format) => {
     const all = await fetchAudit(filters, {}, format);
@@ -204,7 +204,7 @@ export default function AdminAudit({ onSignedOut }) {
       filename: `${stem}.pdf`,
       title: 'Audit Log',
       subtitle: `${span}${scope ? ` · ${scope}` : ''} · times in ${Intl.DateTimeFormat().resolvedOptions().timeZone}${all.total > all.rows.length ? ` · latest ${all.rows.length} of ${all.total}` : ''}`,
-      figures: t ? [['Events', t.events.toLocaleString('en-US')], ['People', String(t.people)], ['Sign-Ins', String(t.sign_ins)], ['Failed Sign-Ins', String(t.failed_sign_ins)], ['Refused Changes', String(t.refused)]] : [],
+      figures: t ? [['Events', t.events.toLocaleString('en-US')], ['People', String(t.people)], ['Sign-Ins', String(t.sign_ins)], ['Failed Sign-Ins', String(t.failed_sign_ins)], ['Unsuccessful Actions', String(t.refused)]] : [],
       chart: chart.labels.length > 1 ? {
         title: 'Activity per Day', labels: chart.labels, stacked: true,
         series: GROUPS.map((g, i) => ({ label: g.label, color: HEX[i], values: chart.values[i] })),
@@ -212,7 +212,7 @@ export default function AdminAudit({ onSignedOut }) {
       tables: [{
         title: 'Entries',
         head: ['When', 'By', 'What Happened', 'Result', 'IP Address'],
-        body: all.rows.map((r) => [stamp(r.created_at), actor(r), describe(r), failed(r) ? `Refused${r.status_code ? ` (${r.status_code})` : ''}` : 'Done', r.ip || '']),
+        body: all.rows.map((r) => [stamp(r.created_at), actor(r), describe(r), outcome(r).label, r.ip || '']),
         columns: { 0: { cellWidth: 118 }, 1: { cellWidth: 140 }, 3: { cellWidth: 70 }, 4: { cellWidth: 90 } },
       }],
     });
@@ -246,7 +246,7 @@ export default function AdminAudit({ onSignedOut }) {
         </label>
         <label className={`p-toggle${onlyFailed ? ' is-on' : ''}`}>
           <input type="checkbox" checked={onlyFailed} onChange={(e) => setOnlyFailed(e.target.checked)} />
-          <Icon name="alert" />Refused Only
+          <Icon name="alert" />Unsuccessful Only
         </label>
         <label className="p-search p-filters__search"><span className="sr-only">Search</span>
           <input type="search" placeholder="Search email, name, action or IP" value={typed} onChange={(e) => setTyped(e.target.value)} />
@@ -265,7 +265,7 @@ export default function AdminAudit({ onSignedOut }) {
           <span><b>{t.people}</b> {t.people === 1 ? 'person' : 'people'}</span>
           <span><b>{t.sign_ins}</b> sign-ins</span>
           <span className={t.failed_sign_ins ? 'is-alert' : ''}>{t.failed_sign_ins > 0 && <Icon name="alert" />}<b>{t.failed_sign_ins}</b> failed sign-ins</span>
-          <span className={t.refused ? 'is-alert' : ''}><b>{t.refused}</b> refused changes</span>
+          <span className={t.refused ? 'is-alert' : ''}><b>{t.refused}</b> unsuccessful {t.refused === 1 ? 'action' : 'actions'}</span>
         </p>
       )}
 
