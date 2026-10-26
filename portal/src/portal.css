@@ -717,3 +717,19 @@ html { font-size: 15px; }
 .p-check span { display: grid; gap: 2px; font-weight: 400; }
 .p-check b { color: var(--white); font-weight: 600; }
 .p-check small { color: var(--slate); font-size: .82rem; }
+
+/* New reports: the count on the Reports tab and the notice on Billing and Reports */
+.p-nav__badge { display: inline-grid; place-items: center; min-width: 18px; height: 18px; margin-left: -2px; padding: 0 5px; border-radius: 999px; font: 700 .66rem/1 var(--sans); font-variant-numeric: tabular-nums; color: #120c18; background: var(--accent); }
+.p-notice { display: flex; align-items: center; gap: 14px; margin-bottom: 18px; padding: 14px 16px; border-radius: 14px; border: 1px solid rgba(94, 224, 160, .35); background: rgba(94, 224, 160, .05); }
+.p-notice__icon { display: grid; place-items: center; flex: none; width: 40px; height: 40px; border-radius: 10px; color: var(--pos); background: rgba(94, 224, 160, .1); }
+.p-notice__text { flex: 1; min-width: 0; }
+.p-notice__text b { color: var(--white); }
+.p-notice__text p { margin: 2px 0 0; font-size: .88rem; color: var(--on-dark-soft); overflow-wrap: anywhere; }
+.p-notice__text i { font-style: normal; color: var(--on-dark); }
+.p-notice__tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+@media (max-width: 640px) {
+  .p-notice { flex-wrap: wrap; }
+  .p-notice__tools { flex-basis: 100%; }
+}
+.p-status { display: grid; justify-items: start; gap: 3px; }
+.p-status small { color: var(--slate); font-size: .76rem; white-space: nowrap; }

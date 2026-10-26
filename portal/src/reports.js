@@ -159,6 +159,28 @@ export async function fetchFile(report) {
   return res.arrayBuffer();
 }
 
+// ── reports the customer has not looked at yet ───────────────────────────────
+
+// When this customer last saw their reports, in this browser: uploads after it are pointed out in the portal.
+// Never seen here (a new browser, cleared storage): the last 3 days' uploads count as new.
+const SEEN_STORE = 'callstalk.reportsSeen';
+const myLogin = () => (loadSession()?.email || '').toLowerCase();
+const uploadedAt = (r) => new Date(r.uploaded_at).getTime() || 0;
+
+export const reportsSeenAt = () => read(localStorage, SEEN_STORE)?.[myLogin()] || null;
+
+export function unseenReports(reports, seenAt) {
+  const after = seenAt ?? Date.now() - 3 * 24 * 3600 * 1000;
+  return (reports || []).filter((r) => uploadedAt(r) > after);
+}
+
+// Marks everything up to the newest report as seen; returns the new mark.
+export function markReportsSeen(reports) {
+  const newest = Math.max(reportsSeenAt() || 0, ...(reports || []).map(uploadedAt));
+  write(localStorage, SEEN_STORE, { ...read(localStorage, SEEN_STORE), [myLogin()]: newest });
+  return newest;
+}
+
 export const localKeyHint = MODE === 'local' ? LOCAL_KEY : '';
 
 // Where the billing team uploads. Shown inside the portal in the demo and locally, and to anyone signed in
