@@ -5,7 +5,7 @@ import useLoad from '../useLoad.js';
 import Icon from './Icons.jsx';
 import { ErrorNote } from './Shell.jsx';
 
-// Admin Settings: which billing notices the bot posts to the team (server/src/billing-notices.js).
+// Admin Settings: which billing notices go to the team and to buyers (server/src/billing-notices.js).
 export default function BillingNotices() {
   const loaded = useLoad(fetchNotices, []);
   const [form, setForm] = useState(null);
@@ -13,7 +13,7 @@ export default function BillingNotices() {
   const [message, setMessage] = useState('');
   const saved = loaded.data?.settings;
   const values = form ?? saved;
-  const dirty = Boolean(form && saved && ['payments', 'summary', 'summary_time'].some((k) => form[k] !== saved[k]));
+  const dirty = Boolean(form && saved && ['payments', 'payment_email', 'buyer_payments', 'summary', 'summary_time'].some((k) => form[k] !== saved[k]));
 
   const set = (k, v) => {
     setForm({ ...values, [k]: v });
@@ -39,7 +39,7 @@ export default function BillingNotices() {
       await saveNotices(values);
       setForm(null);
       loaded.reload();
-    }, 'Saved. The bot will follow these settings from now on.');
+    }, 'Saved. These settings apply from now on.');
   };
 
   const test = () => run('sending', sendSummaryNow, 'The summary has been posted to the billing chat.');
@@ -49,7 +49,7 @@ export default function BillingNotices() {
       <header className="p-card__head">
         <div>
           <h2><TelegramIcon />Billing Notifications</h2>
-          <p>What the bot posts to the team on Telegram about buyers' payments.</p>
+          <p>Who is told about buyers' payments, on Telegram and by email.</p>
         </div>
       </header>
       <ErrorNote error={loaded.error} onRetry={loaded.reload} />
@@ -63,6 +63,22 @@ export default function BillingNotices() {
             <span>
               <b>Each Payment Received</b>
               <small>When a USDT deposit completes or someone records a payment: the buyer, the amount, their new balance, and whether they are now Paid or still Pending.</small>
+            </span>
+          </label>
+          <label className="p-check">
+            <input type="checkbox" checked={values.payment_email} onChange={(e) => set('payment_email', e.target.checked)} />
+            <span>
+              <b>Email Each Payment to the Team</b>
+              <small>{loaded.data.team_email
+                ? `The same details by email to ${loaded.data.team_email}.`
+                : 'Email is not set up on the server (EMAIL_TO), so nothing will be emailed.'}</small>
+            </span>
+          </label>
+          <label className="p-check">
+            <input type="checkbox" checked={values.buyer_payments} onChange={(e) => set('buyer_payments', e.target.checked)} />
+            <span>
+              <b>Confirm Each Payment to the Buyer</b>
+              <small>An email to the buyer, and a Telegram message if they connected Telegram: the amount, how it was paid, and their new balance. Only buyers with an active login are told.</small>
             </span>
           </label>
           <label className="p-check">

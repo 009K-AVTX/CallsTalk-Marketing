@@ -1,30 +1,36 @@
-// Billing notices for the team on Telegram, apart from the website chats (TELEGRAM_BILLING_CHAT_ID / _THREAD_ID):
+// Billing notices, for the team on Telegram apart from the website chats (TELEGRAM_BILLING_CHAT_ID / _THREAD_ID),
+// the team's inbox and the buyer:
 //  - Payment Received: each payment that completes, a USDT deposit found by the payment check or one an admin
-//    records, with where that buyer now stands.
+//    records, with where that buyer now stands. Posted in the billing chat, emailed to EMAIL_TO, and confirmed to
+//    the buyer by email and, if they connected it, on Telegram.
 //  - Daily Billing Summary: every buyer as Paid (in credit, and how many more calls it covers at their price) or
-//    Pending (what they owe, the calls it stands for, and any payment still confirming).
+//    Pending (what they owe, the calls it stands for, and any payment still confirming), in aligned monospace
+//    tables. /buyers in the support chat or the billing chat posts the same, as of that moment.
 // Both follow the same rules as each buyer's own bill and the admin's Finance page, so the figures always agree.
 // Admins switch each one on or off and set the summary's time in portal Settings.
 //
-//   GET  /api/admin/notifications        -> { settings, time_zone, separate_chat, available }
-//   PUT  /api/admin/notifications        { payments, summary, summary_time: "HH:MM" } -> as GET
+//   GET  /api/admin/notifications        -> { settings, time_zone, separate_chat, available, team_email }
+//   PUT  /api/admin/notifications        { payments, payment_email, buyer_payments, summary, summary_time: "HH:MM" } -> as GET
 //   POST /api/admin/notifications/test   sends the daily summary now -> { sent: true }
 
 import { Router } from 'express';
-import { config } from './config.js';
+import { config, emailEnabled } from './config.js';
 import { addDays, localDate, statement } from './billing.js';
 import { getValue, setValue } from './db.js';
+import { emailPaymentReceived, emailPaymentToTeam } from './email.js';
 import { financeReport } from './finance.js';
 import { clip, escapeHtml as escape, fitLines, formatClock, TELEGRAM_BUDGET } from './format.js';
 import { getAccount, getUser, listDays, listPayments } from './portal-db.js';
 import { rateLimit } from './rate-limit.js';
 import { HttpError } from './routes.js';
 import { sendTo } from './telegram.js';
+import { paymentReceivedToTelegram } from './telegram-link.js';
 
 const SETTINGS = 'billing_notices';
 const SENT = 'billing_summary_sent';
 const TZ = config.timezone; // the team's clock (EST), as in every other Telegram message
-const DEFAULTS = { payments: true, summary: true, summary_time: '09:00' };
+const DEFAULTS = { payments: true, payment_email: true, buyer_payments: true, summary: true, summary_time: '09:00' };
+const SWITCHES = ['payments', 'payment_email', 'buyer_payments', 'summary'];
 const TIME = /^([01]\d|2[0-3]):[0-5]\d$/;
 
 const cents = (v) => Math.round(Number(v || 0) * 100);
@@ -68,36 +74,110 @@ function standingText(s, price) {
 
 // ── Payment Received ─────────────────────────────────────────────────────────
 
-export function paymentReceivedText({ buyer, amount, method, note, balance, price, at = new Date() }) {
-  const s = standing(balance, price);
-  return '<b>Payment Received</b>\n\n'
-    + [
-      ['Buyer', escape(buyer)],
-      ['Amount', usd(cents(amount))],
-      ['Method', escape(method)],
-      ...(note ? [['Note', escape(clip(note, 200))]] : []),
-      ['Balance', usd(balance)],
-      ['Status', standingText(s, price)],
-      ['Time', formatClock(at)],
-    ].map(([k, v]) => `<b>${k}:</b> ${v}`).join('\n');
+// What identifies a payment: a deposit's wallet and blockchain hash, or the reference an admin entered. Marked "code"
+// so Telegram shows them in monospace (tap to copy) and emails in a fixed-width font.
+const idRows = ({ sender, hash, reference }) => [
+  ...(sender ? [['From Wallet', sender, 'code']] : []),
+  ...(hash ? [['Transaction Hash', hash, 'code']] : []),
+  ...(reference && !hash ? [['Reference', reference, 'code']] : []),
+];
+
+// The team's view of a payment as [label, plain text, kind] rows: the billing chat's notice and the team's email.
+function teamRows({ buyer, amount, method, note, balance, price, at = new Date(), ...ids }) {
+  return [
+    ['Buyer', buyer],
+    ['Amount', usd(cents(amount))],
+    ['Method', method],
+    ...idRows(ids),
+    ...(note ? [['Note', clip(note, 200)]] : []),
+    ['Balance', usd(balance)],
+    ['Status', standingText(standing(balance, price), price)],
+    ['Time', formatClock(at)],
+  ];
 }
 
-// Called once a payment is completed. Never throws: a notice must not get in the way of recording the payment.
-export function paymentReceived(userId, { amount, method, note = '' }) {
+export function paymentReceivedText(payment) {
+  return '<b>Payment Received</b>\n\n' + teamRows(payment).map(([k, v, kind]) => `<b>${k}:</b> ${kind === 'code' ? `<code>${escape(v)}</code>` : escape(v)}`).join('\n');
+}
+
+// The buyer's view: how it was paid, when (in their own time zone) and where their account now stands.
+// `at`: when a deposit arrived; `on`: the day ("YYYY-MM-DD") an admin recorded a payment for, shown without a time.
+export function buyerRows({ method, note, balance, at = new Date(), on, timeZone, ...ids }) {
+  const when = on
+    ? new Date(`${on}T12:00:00Z`).toLocaleDateString('en-US', { timeZone: 'UTC', month: 'long', day: 'numeric', year: 'numeric' })
+    : at.toLocaleString('en-US', { timeZone, month: 'long', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', timeZoneName: 'short' });
+  return [
+    ['Method', method],
+    ['Received', when],
+    ...idRows(ids),
+    ['Account Balance', balance < 0 ? `${usd(-balance)} still due` : balance > 0 ? `${usd(balance)} in credit` : 'Paid in full'],
+    ...(note ? [['Note', clip(note, 200)]] : []),
+  ];
+}
+
+// Called once a payment is completed. Tells whoever Settings has switched on: the billing chat, the team's inbox,
+// and the buyer (by email, and on Telegram if they connected it). `buyerMethod`: how it was paid, in the buyer's words;
+// `sender` and `hash`: a deposit's wallet and blockchain hash; `reference`: what an admin entered for one they record.
+// Never throws: a notice must not get in the way of recording the payment, and one channel failing leaves the others.
+export function paymentReceived(userId, { amount, method, buyerMethod = method, note = '', at, on, sender, hash, reference }) {
   return (async () => {
-    if (!live || !(await noticeSettings()).payments) return;
+    if (!live) return;
+    const settings = await noticeSettings();
+    if (!settings.payments && !settings.payment_email && !settings.buyer_payments) return;
     const [user, account] = await Promise.all([getUser(userId), getAccount(userId)]);
     if (!user || !account) return;
     const today = localDate(new Date(), account.timezone);
     const bill = statement({ user, account, days: await listDays(userId, today), payments: await listPayments(userId), from: today });
-    await post(paymentReceivedText({ buyer: nameOf(user), amount, method, note, balance: cents(bill.balance), price: cents(account.price_per_call) }));
-  })().catch((err) => console.error('[billing] could not post the payment notice:', err.message));
+    const ids = { sender, hash, reference };
+    const payment = { buyer: nameOf(user), amount, method, note, balance: cents(bill.balance), price: cents(account.price_per_call), ...ids };
+    const paid = usd(cents(amount));
+
+    const sends = [];
+    if (settings.payments) sends.push(['the billing chat', post(paymentReceivedText(payment))]);
+    if (settings.payment_email) {
+      const details = teamRows(payment).filter(([k]) => k !== 'Buyer');
+      sends.push(['the team by email', emailPaymentToTeam({ buyer: payment.buyer, user, amount: paid, details, link: `${config.portalUrl}/admin/users/${user.id}` })]);
+    }
+    // As with report notices, only buyers who can log in are told: the button opens their portal.
+    if (settings.buyer_payments && user.status === 'active') {
+      const notice = {
+        name: user.name, email: user.email, amount: paid, link: `${config.portalUrl}/`,
+        details: buyerRows({ method: buyerMethod, note, balance: payment.balance, at, on, timeZone: account.timezone, ...ids }),
+      };
+      sends.push(['the buyer by email', emailPaymentReceived(notice)]);
+      sends.push(['the buyer on Telegram', paymentReceivedToTelegram(user.id, notice)]);
+    }
+    const results = await Promise.allSettled(sends.map(([, sending]) => sending));
+    results.forEach((r, i) => r.status === 'rejected' && console.error(`[billing] could not tell ${sends[i][0]} about a payment from ${user.email}:`, r.reason?.message));
+  })().catch((err) => console.error('[billing] could not send the payment notices:', err.message));
 }
 
 // ── Daily Billing Summary ────────────────────────────────────────────────────
 
+// Telegram shows <pre> in a fixed-width font, so the figures line up in columns. A table stays within TABLE_WIDTH
+// characters, what a narrow phone (an iPhone held upright) shows without wrapping; a wider row would push the Calls
+// column onto a line of its own. The buyer's name gets the room the figures leave (at least 8 characters, cut with
+// "…"). Amounts are in US dollars, without the "$", and without cents when every amount in the column is whole.
+const TABLE_WIDTH = 32;
+const amounts = (list) => {
+  const whole = list.every((c) => c % 100 === 0);
+  return list.map((c) => (whole ? (c / 100).toLocaleString('en-US') : usd(c).replace('$', '')));
+};
+const count = (k) => (k === null ? '-' : k.toLocaleString('en-US'));
+const cut = (s, n) => (s.length > n ? `${s.slice(0, n - 1).trimEnd()}…` : s);
+
+// `header` and each row: [name, ...figures] as plain text. -> [header line, ...row lines], unescaped.
+function table(header, rows) {
+  const widths = header.map((h, i) => Math.max(h.length, ...rows.map((r) => r[i].length)));
+  const figures = widths.slice(1).reduce((t, w) => t + w + 2, 0);
+  widths[0] = Math.min(widths[0], Math.max(TABLE_WIDTH - figures, 8));
+  const line = (r) => r.map((v, i) => (i ? v.padStart(widths[i]) : cut(v, widths[0]).padEnd(widths[0]))).join('  ');
+  return [header, ...rows].map(line);
+}
+
 // `customers`: rows from financeReport (finance.js). Pure, so it can be checked without a database.
-export function summaryText(customers, now = new Date()) {
+// `title`: "Daily Billing Summary" for the scheduled post; /buyers in the team's chat asks for one now.
+export function summaryText(customers, now = new Date(), { title = 'Daily Billing Summary' } = {}) {
   const rows = customers.map((c) => ({
     name: c.customer, price: cents(c.price_per_call), confirming: cents(c.pending), ...standing(cents(c.balance_now), cents(c.price_per_call)),
   }));
@@ -105,47 +185,65 @@ export function summaryText(customers, now = new Date()) {
   // Paid buyers closest to running out of credit first.
   const paid = rows.filter((r) => r.paid).sort((a, b) => (a.calls ?? Infinity) - (b.calls ?? Infinity) || a.name.localeCompare(b.name));
   const sum = (list, k) => list.reduce((t, r) => t + (r[k] || 0), 0);
-  const day = new Intl.DateTimeFormat('en-US', { timeZone: TZ, weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }).format(now);
-
-  // Whole lines only, within Telegram's limit; whatever does not fit is counted and pointed to Finance.
-  const MORE = 60; // room kept for an "…and N more" line
-  const list = (lines, room) => {
-    const { shown, rest } = fitLines(lines, room - MORE);
-    return [...shown, ...(rest ? [`…and ${rest} more (Finance in the portal)`] : [])].join('\n');
-  };
-  const pendingLine = (r) => `• <b>${escape(r.name)}</b> · owes ${usd(r.owed)}${r.calls !== null ? ` · ${calls(r.calls)} unpaid` : ''}`
-    + (r.confirming ? ` · ${usd(r.confirming)} confirming` : '');
-  const paidLine = (r) => `• <b>${escape(r.name)}</b> · ${r.credit ? `${usd(r.credit)} credit` : 'settled'}`
-    + (r.calls !== null ? ` · covers ${calls(r.calls)}` : '') + (r.confirming ? ` · ${usd(r.confirming)} confirming` : '');
+  const day = new Intl.DateTimeFormat('en-US', { timeZone: TZ, weekday: 'short', month: 'short', day: 'numeric' }).format(now);
+  const when = title === 'Daily Billing Summary' ? day : `${day}, ${formatClock(now)}`;
 
   const head = [
-    `<b>Daily Billing Summary</b> · ${day}`,
+    `<b>${title}</b> · ${when}`,
     '',
-    `<b>Owed now:</b> ${usd(sum(pending, 'owed'))} by ${pending.length} buyer${pending.length === 1 ? '' : 's'}`,
-    `<b>Held in credit:</b> ${usd(sum(paid, 'credit'))}`,
+    `<b>Owed:</b> ${usd(sum(pending, 'owed'))}`,
+    `<b>Credit:</b> ${usd(sum(paid, 'credit'))}`,
     ...(sum(rows, 'confirming') ? [`<b>Confirming:</b> ${usd(sum(rows, 'confirming'))}`] : []),
   ];
-  if (!rows.length) return [...head, '', 'No buyers have billing set up yet.'].join('\n');
-  // Pending comes first and gets the room it needs, leaving at least a few paid lines' worth for Paid.
-  const paidLines = paid.map(paidLine);
-  const pendingLines = pending.map(pendingLine);
-  const top = head.join('\n').length + 80; // the head and both group titles
-  const keepForPaid = Math.min(paidLines.join('\n').length + MORE, 800);
-  const pendingText = pending.length ? list(pendingLines, TELEGRAM_BUDGET - top - keepForPaid) : 'None. Every buyer is paid up.';
-  const paidText = paid.length ? list(paidLines, TELEGRAM_BUDGET - top - pendingText.length) : 'None.';
-  return [
-    ...head,
-    '', `<b>Pending (${pending.length})</b>`, pendingText,
-    '', `<b>Paid (${paid.length})</b>`, paidText,
-  ].join('\n');
+  if (!rows.length) return [...head, '', 'No buyers yet.'].join('\n');
+
+  // A block per buyer, all in one monospace box per group: Buyer, Price and Balance (negative when they owe) as a
+  // table, then the calls that balance stands for: Remaining Calls on credit, or Unpaid Calls. Buyers are set apart
+  // by a dotted line with a blank line either side. Every block shares one set of column widths, so they line up.
+  const listed = [...pending, ...paid];
+  const prices = amounts(listed.map((r) => r.price));
+  const balances = amounts(listed.map((r) => (r.paid ? r.credit : -r.owed)));
+  const [header, ...lines] = table(['Buyer', 'Price', 'Balance'], listed.map((r, i) => [r.name, prices[i], balances[i]]));
+  const blocks = listed.map((r, i) => escape([
+    header, lines[i], `${r.paid ? 'Remaining Calls' : 'Unpaid Calls'} - ${r.calls === null ? 'no price set' : count(r.calls)}`,
+  ].join('\n')));
+  const between = `\n\n${'.'.repeat(header.length)}\n\n`;
+
+  // Whole blocks only, within Telegram's limit; whatever does not fit is counted and pointed to Finance.
+  const MORE = 60; // room kept for an "…and N more" line
+  const group = (list, room) => {
+    const { shown, rest } = fitLines(list.map((b) => `${b}${between}`), room - MORE - 11); // 11: <pre></pre>
+    return `<pre>${list.slice(0, shown.length).join(between)}</pre>` + (rest ? `\n…and ${rest} more in Finance` : '');
+  };
+  const pendingBlocks = blocks.slice(0, pending.length);
+  const paidBlocks = blocks.slice(pending.length);
+
+  // Pending comes first and gets the room it needs, leaving at least a few buyers' worth for Paid.
+  const top = head.join('\n').length + 60; // the head and both group titles
+  const keepForPaid = Math.min(paidBlocks.join(between).length + MORE, 800);
+  const section = (name, list, text) => (list.length ? ['', `<b>${name} (${list.length})</b>`, '', text] : ['', `<b>${name}:</b> none`]);
+  const pendingText = pending.length ? group(pendingBlocks, TELEGRAM_BUDGET - top - keepForPaid) : '';
+  const paidText = paid.length ? group(paidBlocks, TELEGRAM_BUDGET - top - pendingText.length) : '';
+  return [...head, ...section('Pending', pending, pendingText), ...section('Paid', paid, paidText)].join('\n');
 }
 
-export async function sendSummary(now = new Date()) {
+// The summary as of `now`, with every buyer who is billed and can still log in.
+export async function billingSummary(now = new Date(), options = {}) {
   const today = localDate(now, 'UTC');
   // Payments still confirming are counted over the last 60 days; balances always run from each buyer's start.
   const report = await financeReport({ from: addDays(today, -60), to: addDays(today, 1), now });
-  const live = report.customers.filter((c) => c.status !== 'disabled' && c.billing_since <= localDate(now, 'UTC'));
-  await post(summaryText(live, now));
+  const live = report.customers.filter((c) => c.status !== 'disabled' && c.billing_since <= today);
+  return summaryText(live, now, options);
+}
+
+export async function sendSummary(now = new Date()) {
+  await post(await billingSummary(now));
+}
+
+// /buyers in the support chat or the billing chat: the same summary, as of now, as a reply.
+export async function buyersReply() {
+  const text = await billingSummary(new Date(), { title: 'Billing Summary' });
+  return live ? text : `<b>Local test</b>\n\n${text}`;
 }
 
 const clock = (now) => new Intl.DateTimeFormat('en-GB', { timeZone: TZ, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(now);
@@ -163,7 +261,7 @@ async function summaryIfDue(now = new Date()) {
 }
 
 export function startBillingNotices() {
-  if (!live) return console.log('[billing] not the live server (TELEGRAM_POLLING=false or development): no daily summary or payment notices');
+  if (!live) return console.log('[billing] not the live server (TELEGRAM_POLLING=false or development): no daily summary or payment notices to the team or buyers');
   const tick = () => summaryIfDue().catch((err) => console.error('[billing] could not post the daily summary:', err.message));
   setInterval(tick, 60_000).unref();
   tick();
@@ -176,6 +274,7 @@ const settingsView = async () => ({
   time_zone: TZ,
   separate_chat: Boolean(config.telegram.billingChatId || config.telegram.billingThreadId),
   available: Boolean(config.telegram.token),
+  team_email: emailEnabled ? config.email.to.join(', ') : '', // where payment emails go; empty when EMAIL_TO is not set
 });
 
 export const billingNoticesRouter = Router(); // under /api/admin, so admins only
@@ -186,8 +285,7 @@ billingNoticesRouter.put('/', async (req, res) => {
   const body = req.body || {};
   const now = await noticeSettings();
   const next = {
-    payments: typeof body.payments === 'boolean' ? body.payments : now.payments,
-    summary: typeof body.summary === 'boolean' ? body.summary : now.summary,
+    ...Object.fromEntries(SWITCHES.map((k) => [k, typeof body[k] === 'boolean' ? body[k] : now[k]])),
     summary_time: body.summary_time === undefined ? now.summary_time : String(body.summary_time),
   };
   if (!TIME.test(next.summary_time)) throw new HttpError(400, 'Please choose a time for the daily summary, such as 09:00.');

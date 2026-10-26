@@ -1,10 +1,12 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { LogoMark } from '../../../src/components/Logo.jsx';
 import { isAdmin } from '../../../src/lib/portal.js';
+import { fetchBilling } from '../admin.js';
 import { Avatar } from '../avatar.jsx';
+import { enterBillingDays, planBillingDays, readBillingDays, toEnter } from '../billing-import.js';
 import Icon from '../components/Icons.jsx';
 import { ErrorNote } from '../components/Shell.jsx';
-import { addDays, today } from '../format.js';
+import { addDays, dayLabel, money, today } from '../format.js';
 import {
   canNotify, deleteReport, listAll, listCustomers, localKeyHint, MAX_MB, notifyReports, staffSession, staffSignIn, staffSignOut, staffSignInKind, uploadReport,
 } from '../reports.js';
@@ -80,6 +82,57 @@ function Gate({ onIn }) {
   );
 }
 
+// "117 - 4 at $35.00": calls less replacements, and the price when there is one.
+const callsText = ({ calls, replacements, price }) => `${calls}${replacements ? ` - ${replacements}` : ''}${price ? ` at ${money(price)}` : ''}`;
+const ACTION = { new: ['New', 'is-wait'], change: ['Changes', 'is-warn'], same: ['Same', ''], skip: ['Skipped', 'is-off'] };
+
+// Admins: the days read from the chosen report, set against what the buyer's billing has, and the choice to enter
+// them (billing-import.js). Nothing is saved unless it is ticked, and only once the report has uploaded.
+function CallsFromFile({ read, billing, plan, enter, onEnter }) {
+  const todo = plan ? toEnter(plan) : [];
+  const changed = todo.filter((d) => d.action === 'change').length;
+  const unread = read.skipped;
+  let note;
+  if (billing?.error) note = `The customer's billing could not be loaded: ${billing.error}`;
+  else if (billing?.data && !billing.data.account) note = 'This customer has no billing terms yet. Set them on their page first.';
+  else if (!plan) note = 'Checking the customer\'s billing…';
+  else if (!todo.length) note = 'Nothing to change: the billing already has these figures.';
+  else note = `${todo.length} day${todo.length === 1 ? '' : 's'} to enter${changed ? `, ${changed} of them changing what is there` : ''}. Saved after the report uploads; each one is in the Audit Log.`;
+
+  return (
+    <div className="p-import">
+      <label className={`p-check${todo.length ? '' : ' is-off'}`}>
+        <input type="checkbox" checked={enter && todo.length > 0} onChange={(e) => onEnter(e.target.checked)} disabled={!todo.length} />
+        <span><b>Enter these calls in the customer's billing</b><small>{note}</small></span>
+      </label>
+      {plan && (
+        <div className="p-tablewrap p-tablewrap--inset p-import__table">
+          <table className="p-table p-table--sheet">
+            <thead><tr><th scope="col">Day</th><th scope="col">In the File</th><th scope="col">In Billing Now</th></tr></thead>
+            <tbody>
+              {plan.map((d) => (
+                <tr key={d.date} className={`is-${d.action}`}>
+                  <th scope="row">{dayLabel(d.date)}</th>
+                  <td>{callsText(d)}</td>
+                  <td>
+                    {d.now ? callsText(d.now) : '-'} <span className={`p-pill ${ACTION[d.action][1]}`}>{ACTION[d.action][0]}</span>
+                    {d.reason && <small className="p-import__why">{d.reason}</small>}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      {unread.length > 0 && (
+        <small className="p-import__why">
+          Not read: {unread.map((s) => (s.row ? `row ${s.row}${s.file ? ` of ${s.file}` : ''}` : dayLabel(s.date)) + ` (${s.reason})`).join('; ')}.
+        </small>
+      )}
+    </div>
+  );
+}
+
 function UploadForm({ customers, onDone }) {
   const yesterday = addDays(today(), -1);
   const [form, setForm] = useState({ customer: '', title: '', note: '', periodFrom: yesterday, periodTo: yesterday });
@@ -95,6 +148,35 @@ function UploadForm({ customers, onDone }) {
   // Whether the chosen customer has connected Telegram in their Settings (only they can turn it on).
   const chosen = customers.find((c) => c.id === form.customer);
   const telegramReady = Boolean(chosen?.telegram);
+
+  // The days in the chosen files (Excel template format): they set the report's period, and admins can enter them
+  // in the buyer's billing with the upload. Only admins change billing; staff upload as before.
+  const canEnterCalls = canNotify && isAdmin();
+  const [read, setRead] = useState(null); // { days, skipped } or null
+  const [billing, setBilling] = useState(null); // { data } | { error } for the chosen buyer
+  const [enterCalls, setEnterCalls] = useState(false);
+  useEffect(() => {
+    let gone = false;
+    setRead(null);
+    if (files.length) {
+      readBillingDays(files).then((r) => {
+        if (gone || !r) return;
+        setRead(r);
+        if (r.days.length) setForm((f) => ({ ...f, periodFrom: r.days[0].date, periodTo: r.days.at(-1).date }));
+      });
+    }
+    return () => { gone = true; };
+  }, [files]);
+  useEffect(() => {
+    let gone = false;
+    setBilling(null);
+    if (canEnterCalls && chosen && read?.days.length) {
+      fetchBilling(chosen.id).then((data) => !gone && setBilling({ data }), (err) => !gone && setBilling({ error: err.message }));
+    }
+    return () => { gone = true; };
+  }, [canEnterCalls, chosen?.id, read]);
+  const plan = useMemo(() => (read && billing?.data?.account ? planBillingDays(read.days, billing.data) : null), [read, billing]);
+  useEffect(() => setEnterCalls(false), [plan]); // a new file or buyer: ticked again only after a look at the days
 
   const pick = (list) => {
     const ok = [...list].filter((f) => /\.(xlsx|xls|csv)$/i.test(f.name));
@@ -117,6 +199,11 @@ function UploadForm({ customers, onDone }) {
       }
       const who = customers.find((c) => c.id === form.customer)?.login || form.customer.trim().toLowerCase();
       let notes = '';
+      if (enterCalls && plan && toEnter(plan).length) {
+        const { saved, failed } = await enterBillingDays(form.customer, plan, dayLabel);
+        notes += saved ? ` Calls for ${saved} day${saved === 1 ? '' : 's'} entered in their billing.` : '';
+        if (failed.length) notes += ` Not entered: ${failed.join('; ')}.`;
+      }
       const telegram = byTelegram && telegramReady;
       if ((notify || telegram) && canNotify) {
         // One notice per channel for the whole upload. A failed notice never undoes the upload.
@@ -180,19 +267,22 @@ function UploadForm({ customers, onDone }) {
           <span><b>Drop Excel files here</b> or click to choose</span>
         )}
       </label>
+      {canEnterCalls && chosen && read?.days.length > 0 && (
+        <CallsFromFile read={read} billing={billing} plan={plan} enter={enterCalls} onEnter={setEnterCalls} />
+      )}
       {canNotify && (
         <>
           <label className="p-check">
             <input type="checkbox" checked={notify} onChange={(e) => setNotify(e.target.checked)} />
-            <span><b>Email the customer</b><small>One email to their login ID saying the report is ready. The file itself is not attached.</small></span>
+            <span><b>Email the customer</b><small>“Your report has been updated for (the report’s dates). You can now download it from your portal.” One email to their login ID, with a button that opens the report. The file itself is not attached.</small></span>
           </label>
           <label className={`p-check${chosen && !telegramReady ? ' is-off' : ''}`}>
             <input type="checkbox" checked={byTelegram && telegramReady} onChange={(e) => setByTelegram(e.target.checked)} disabled={!telegramReady} />
             <span>
               <b>Send on Telegram</b>
               <small>
-                {!chosen ? '“Your report has been updated. You can now download it from your portal.” Sent to the customer’s Telegram if they have connected it.'
-                  : telegramReady ? '“Your report has been updated. You can now download it from your portal.” With a button that opens the report.'
+                {!chosen ? 'The same message, sent to the customer’s Telegram if they have connected it.'
+                  : telegramReady ? 'The same message, with a button that opens the report.'
                     : 'This customer has not connected Telegram yet. They can do it under Settings in their portal.'}
               </small>
             </span>

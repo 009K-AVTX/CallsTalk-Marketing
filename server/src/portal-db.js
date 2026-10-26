@@ -505,6 +505,10 @@ export const deleteReport = (id) => pool.query('DELETE FROM portal_reports WHERE
 export const getReportInfo = (id) => one(`SELECT ${REPORT_FIELDS} FROM portal_reports r JOIN portal_users u ON u.id = r.user_id WHERE r.id = $1`, [id]);
 export const getPayment = (userId, id) =>
   one('SELECT id, amount, status, reference, note, paid_at FROM billing_payments WHERE user_id = $1 AND id = $2', [userId, id]);
+// reference -> status now, for a provider's payments (a deposit's audit entries show where it stands).
+export const paymentStatuses = async (provider, references) => new Map(
+  (await all('SELECT reference, status FROM billing_payments WHERE provider = $1 AND reference = ANY($2)', [provider, references]))
+    .map((r) => [r.reference, r.status]));
 
 // ── audit trail ──────────────────────────────────────────────────────────────
 

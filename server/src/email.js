@@ -115,14 +115,28 @@ const messagePanel = (label, text) => `<tr><td class="px" style="padding:0 28px"
 const sectionHeading = (text) => `<p style="margin:0 0 6px;font:600 14px/1.3 ${HEAD};letter-spacing:-.01em;color:${c.ink}">${text}</p>`;
 
 // Visitor details as a two-column grid of label-over-value cells (one column on phones).
+// A third item "code" (wallet addresses, transaction hashes) gets a row of its own in a fixed-width font.
+const MONO = "ui-monospace,Menlo,Consolas,'Courier New',monospace";
 function detailGrid(details) {
-  const cell = ([label, value]) => `<td class="stack" width="50%" valign="top" style="padding:8px 12px 8px 0;border-top:1px solid ${c.rule}">
+  const cell = ([label, value, kind]) => `<td class="stack" ${kind === 'code' ? 'colspan="2" width="100%"' : 'width="50%"'} valign="top" style="padding:8px 12px 8px 0;border-top:1px solid ${c.rule}">
 <p style="margin:0;font:400 12px/1.4 ${BODY};color:${c.muted}">${label}</p>
-<p style="margin:0;font:500 14px/1.45 ${BODY};color:${c.ink};overflow-wrap:anywhere">${label === 'Email'
+<p style="margin:0;font:500 ${kind === 'code' ? `12px/1.5 ${MONO}` : `14px/1.45 ${BODY}`};color:${c.ink};overflow-wrap:anywhere">${label === 'Email'
     ? `<a href="mailto:${escapeHtml(value)}" style="color:${c.accentDeep};text-decoration:none">${html(value)}</a>`
     : html(value)}</p></td>`;
+  const pair = (a, b) => `<tr>${cell(a)}${b ? cell(b) : '<td class="stack"></td>'}</tr>`;
   const rows = [];
-  for (let i = 0; i < details.length; i += 2) rows.push(`<tr>${cell(details[i])}${details[i + 1] ? cell(details[i + 1]) : '<td class="stack"></td>'}</tr>`);
+  let waiting = null; // a half-width cell still looking for its neighbour
+  for (const d of details) {
+    if (d[2] === 'code') {
+      if (waiting) rows.push(pair(waiting));
+      waiting = null;
+      rows.push(`<tr>${cell(d)}</tr>`);
+    } else if (waiting) {
+      rows.push(pair(waiting, d));
+      waiting = null;
+    } else waiting = d;
+  }
+  if (waiting) rows.push(pair(waiting));
   return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0">${rows.join('')}</table>`;
 }
 
@@ -365,26 +379,73 @@ export function reportReadyMail({ name, reports, link }) {
   const body = `<tr><td class="px" style="padding:0 28px 22px">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>${head(one ? 'Report' : 'Reports')}${head('Period')}</tr>${rows}</table>
 </td></tr>`;
+  // "Your report has been updated for <the days it covers>. You can now download it from your portal."
+  const updated = one ? 'your report has been updated' : 'your reports have been updated';
   return {
-    subject: one ? `New Billing Report Available: ${periodText(reports[0])}` : `New Billing Reports Available: ${span}`,
-    preview: one ? `A new billing report covering ${periodText(reports[0])} is now available in your CallsTalk Portal.` : `${reports.length} new billing reports are now available in your CallsTalk Portal.`,
-    heading: one ? 'Your Billing Report Is Ready' : 'Your Billing Reports Are Ready',
+    subject: `${one ? 'Your Report Has Been Updated' : 'Your Reports Have Been Updated'} for ${span}`,
+    preview: `${updated.charAt(0).toUpperCase()}${updated.slice(1)} for ${span}. You can now download ${one ? 'it' : 'them'} from your portal.`,
+    heading: one ? 'Your Report Has Been Updated' : 'Your Reports Have Been Updated',
     sub: (() => {
-      const news = one
-        ? `a new billing report covering <b>${escapeHtml(periodText(reports[0]))}</b> is now available in your CallsTalk Portal.`
-        : `<b>${reports.length} new billing reports</b> covering <b>${escapeHtml(span)}</b> are now available in your CallsTalk Portal.`;
+      const news = `${updated} for <b>${escapeHtml(span)}</b>. You can now download ${one ? 'it' : 'them'} from your portal.`;
       return name ? `Dear ${escapeHtml(name)}, ${news}` : news.charAt(0).toUpperCase() + news.slice(1);
     })(),
     body,
     cta: { href: link, label: one ? 'View Report' : 'View Reports' },
     footer: '<b style="color:#fff">For your security,</b> reports are not attached to emails. They are available only through your secure portal login.',
     footnote: '',
-    text: `${one ? 'Your billing report is ready' : 'Your billing reports are ready'}\n\n`
-      + `${one ? `A new billing report covering ${periodText(reports[0])} is` : `${reports.length} new billing reports covering ${span} are`} now available in your CallsTalk Portal.\n\n`
+    text: `${one ? 'Your report has been updated' : 'Your reports have been updated'}\n\n`
+      + `${updated.charAt(0).toUpperCase()}${updated.slice(1)} for ${span}. You can now download ${one ? 'it' : 'them'} from your portal.\n\n`
       + reports.map((r) => `- ${r.title} (${periodText(r)})${r.note ? `\n  Note from our team: ${r.note}` : ''}`).join('\n')
       + `\n\nView ${one ? 'it' : 'them'} here: ${link}\n\n`
       + 'For your security, reports are not attached to emails. They are available only through your secure portal login.\n',
   };
+}
+
+// A completed payment, for the buyer. `amount` and `details` ([label, value] pairs) come worked out from
+// billing-notices.js, so the figures match their bill.
+export function paymentReceivedMail({ name, amount, details, link }) {
+  return {
+    subject: `Payment Received: ${amount}`,
+    preview: `We have received your payment of ${amount}. Thank you.`,
+    heading: 'Payment Received',
+    sub: `${name ? `Dear ${escapeHtml(name)}, w` : 'W'}e have received your payment of <b>${escapeHtml(amount)}</b>. Thank you.`,
+    body: `<tr><td class="px" style="padding:0 28px 22px">${detailGrid(details)}</td></tr>`,
+    cta: { href: link, label: 'View My Billing' },
+    footer: '<b style="color:#fff">Questions about this payment?</b> Please contact our support team through the chat in your portal.',
+    footnote: '',
+    text: `Payment received\n\nWe have received your payment of ${amount}. Thank you.\n\n`
+      + `${details.map(([l, v]) => `${l}: ${v}`).join('\n')}\n\nView your billing: ${link}\n`,
+  };
+}
+
+// The same payment for the team's inbox (EMAIL_TO), with the figures from the billing chat's notice.
+export function paymentTeamMail({ buyer, amount, details, link }) {
+  return {
+    subject: `${config.isDev ? '[Local test] ' : ''}Payment received: ${buyer} (${amount})`,
+    preview: `${buyer} paid ${amount}.`,
+    heading: `Payment from ${escapeHtml(buyer)}`,
+    sub: `<b>${escapeHtml(amount)}</b> received and added to their balance.`,
+    body: `<tr><td class="px" style="padding:0 28px 22px">${detailGrid(details)}</td></tr>`,
+    cta: { href: link, label: 'Open Customer' },
+    footnote: '',
+    text: `Payment received from ${buyer}\n\n${details.map(([l, v]) => `${l}: ${v}`).join('\n')}\n\nOpen the customer: ${link}\n`,
+  };
+}
+
+// Returns false when email is turned off (EMAIL_TO empty).
+export async function emailPaymentToTeam(notice) {
+  if (!transport) return false;
+  const { subject: subjectLine, text, ...content } = paymentTeamMail(notice);
+  const { user } = notice;
+  await send(transport, {
+    from,
+    to,
+    replyTo: { name: user.name || user.email, address: user.email },
+    subject: subjectLine,
+    html: layout({ ...content, name: user.name || user.email, email: user.email }),
+    text,
+  });
+  return true;
 }
 
 // Customer security emails. Return false when SMTP is not set up.
@@ -397,6 +458,7 @@ async function sendCustomerMail(to, mail) {
 export const emailPasswordReset = (reset) => sendCustomerMail(reset.email, passwordResetMail(reset));
 export const emailPasswordChanged = (change) => sendCustomerMail(change.email, passwordChangedMail(change));
 export const emailReportReady = (notice) => sendCustomerMail(notice.email, reportReadyMail(notice));
+export const emailPaymentReceived = (notice) => sendCustomerMail(notice.email, paymentReceivedMail(notice));
 
 // For previewing the design (layout without sending).
 export const renderMail = ({ session, ...mail }) => layout({ ...mail, name: session.name, email: session.email });

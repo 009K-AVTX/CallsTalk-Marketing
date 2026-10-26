@@ -758,6 +758,15 @@ Customers log in at **https://portal.callstalk.com** (the website's Log In goes 
   (they land on `/upload`; no billing, payments or logins). **Admin** can do everything.
 - **Billing:** open a customer → enter each day's **billable calls** and **payments** received. Customers see
   their balance and the last five days; older days go to them as Excel reports (Reports → upload).
+- **Calls from a report:** a report itself never changes the balance. When an admin uploads one in the **Excel
+  Template** format (a **Daily Bills** sheet, or any sheet with **Date** and **Total Calls** columns), the upload
+  form lists its days (calls, replacements, price) beside what the customer's billing has now: **New**,
+  **Changes**, **Same**, or **Skipped** with the reason (before billing started, a future day, a row that is not a
+  date). Tick **Enter these calls in the customer's billing** to save the new and changed days once the report has
+  uploaded. Each is saved as if entered on the customer's page, so it is in the Audit Log, and a day someone
+  changed meanwhile is left alone and named in the result. Payments in the file are never read (deposits come in
+  on their own; record others as usual). An empty or 0 price keeps the day's price. The file's days also set the
+  report's period. Staff upload as before and do not see this.
 - **Lost phone or forgotten password:** open the login → **Reset Login and Send Link**. Their old password and
   code app stop working at once.
 - **Someone leaves:** **Turn Login Off** signs them out everywhere and blocks logging in.
@@ -812,10 +821,11 @@ The same bot (`@CTLKMBOT`) also sends billing notices. Nothing new to install; t
 1. The buyer opens **Settings** in the portal and presses **Connect Telegram**. Telegram opens the bot with a one-use
    link (it works for `TELEGRAM_LINK_MINUTES`, 15 by default); they press **Start** and the portal shows
    **Connected**. Only the buyer can do this: the team cannot connect someone's Telegram for them.
-2. When staff or an admin uploads a report, **Send on Telegram** (next to **Email the customer**) sends the buyer
-   "Your report has been updated. You can now download it from your portal." with the report's name, period and an
-   **Open Report** button. It is greyed out for buyers who have not connected; the customer list marks the ones who
-   have with "· Telegram".
+2. When staff or an admin uploads a report, **Email the customer** and **Send on Telegram** (both ticked by
+   default) send the buyer "Your report has been updated for Oct 17, 2026 to Oct 23, 2026. You can now download it
+   from your portal." (the days the report covers), with the report's name and note and a **View Report** (email) or
+   **Open Report** (Telegram) button that opens it in the portal. Send on Telegram is greyed out for buyers who have
+   not connected; the customer list marks the ones who have with "· Telegram".
 3. A buyer stops the messages with **Disconnect** in Settings or `/stop` in the bot. If they block the bot, the next
    message fails and they are disconnected automatically; the upload page says so.
 
@@ -827,8 +837,36 @@ disconnecting are in the Audit Log.
 - **Payment Received**: each payment that completes (a USDT deposit, or one an admin records), with the buyer's
   new balance and whether they are now **Paid** (and how many more calls their credit covers at their price) or
   still **Pending** (what they owe and how many calls that is).
+- **Email Each Payment to the Team**: the same details emailed to `EMAIL_TO`, with an **Open Customer** button.
+  Replying to it writes to the buyer.
+- **Confirm Each Payment to the Buyer**: the buyer gets a **Payment Received** email (amount, how it was paid, when,
+  and their new balance, with a **View My Billing** button) and the same as a Telegram message if they connected
+  Telegram. A payment an admin records shows as "Recorded by our team", never the admin's name. Only buyers with
+  an active login are told.
+- Every payment notice, the team's and the buyer's, shows a USDT deposit's **From Wallet** (the sender's address)
+  and **Transaction Hash**, or the **Reference** an admin entered for a payment they record. In Telegram they are
+  monospace, so a tap copies them.
 - **Daily Billing Summary**: every buyer, Pending first (largest debt first), then Paid (closest to running out
-  first), with totals owed, held in credit and still confirming. Deactivated logins are left out.
+  first), under the totals owed, held in credit and still confirming. Each group is one monospace box; in it each
+  buyer is a small table of Buyer, Price and Balance (negative when they owe) and the calls that balance stands
+  for: **Remaining Calls** for a buyer in credit, **Unpaid Calls** for one who owes. A dotted line, with a blank line
+  either side, separates one buyer from the next. Amounts are US dollars, shown without cents when every amount is
+  whole. Tables are 32 characters wide so they do not wrap on a narrow phone, and long names are cut with "…".
+  Deactivated logins are left out.
+
+  ```
+  Buyer          Price  Balance
+  Keystone & Co     35    5,600
+  Remaining Calls - 160
+
+  .............................
+
+  Buyer          Price  Balance
+  Summit Solar      45  125,000
+  Remaining Calls - 2,777
+  ```
+- **/buyers**: the same summary as of that moment, sent in the support chat or the billing chat. It answers even
+  when the daily summary is switched off.
 
 Admins switch each on or off and set the summary's time (EST) under **Settings → Billing Notifications**;
 **Post Summary Now** sends one straight away. The first summary goes out the day after this version is deployed.
@@ -838,8 +876,9 @@ Keep them out of the website-chat thread: either make a topic for billing in the
 and set `TELEGRAM_BILLING_CHAT_ID`. Then `pm2 restart callstalk-chat`. With neither set, they post in the support
 chat itself, and the Settings card says so.
 
-Only the live server posts these by itself. A copy started with `TELEGRAM_POLLING=false` or `NODE_ENV=development`
-(a local copy borrowing the live bot) posts nothing on its own, and its **Post Summary Now** is labelled **Local test**.
+Only the live server posts or emails these by itself. A copy started with `TELEGRAM_POLLING=false` or
+`NODE_ENV=development` (a local copy borrowing the live bot) sends nothing on its own, so buyers in a local database
+are never emailed, and its **Post Summary Now** is labelled **Local test**.
 
 Check: `pm2 logs callstalk-chat --lines 50 --nostream | grep -E "billing|connected Telegram"`.
 
@@ -848,6 +887,7 @@ Check: `pm2 logs callstalk-chat --lines 50 --nostream | grep -E "billing|connect
 | Buyer pressed Start but the portal still waits | The link expired or was used twice: press Connect Telegram again. The bot must be running (`listening for replies` in the log). |
 | Upload says "they blocked the bot" | The buyer blocked or deleted the chat. They reconnect from Settings. |
 | No payment or summary messages | Check the switches in Settings; `[billing] could not post` in the log means the bot is not in the billing chat or topic. |
+| A payment email did not arrive | `[billing] could not tell the team by email` or `the buyer by email` in the log, with the SMTP error. One failing never stops the others. |
 
 ### 16.4 If an admin is locked out
 

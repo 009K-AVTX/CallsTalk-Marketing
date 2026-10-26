@@ -139,6 +139,12 @@
 .p-up__grid { display: grid; grid-template-columns: minmax(0, 420px) minmax(0, 1fr); gap: 20px; align-items: start; }
 .p-up__form { margin-bottom: 0; }
 .p-up__file { display: block; font-size: .78rem; color: var(--slate); }
+/* Upload: the report's days, to enter in the buyer's billing (admins) */
+.p-import { display: grid; gap: 10px; }
+.p-import__table { max-height: 260px; border: 1px solid var(--line); border-radius: 12px; }
+.p-import__table td .p-pill { margin-left: 6px; }
+.p-import tr.is-same td, .p-import tr.is-skip td { color: var(--slate); }
+.p-import__why { display: block; font-size: .76rem; color: var(--slate); white-space: normal; }
 .p-form select, .p-form input:not([type="file"]), .p-search input { width: 100%; font: inherit; font-size: .9rem; padding: 10px 13px; border-radius: 11px; border: 1px solid #2c2632; background: #0a080c; color: var(--white); }
 .p-form input:focus, .p-form select:focus, .p-search input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(214, 163, 255, .18); }
 .p-form input:disabled { opacity: .55; }
