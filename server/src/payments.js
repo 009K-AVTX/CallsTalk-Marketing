@@ -20,6 +20,17 @@ const NETWORK = 'trx';
 const CURRENCY = 'USDT';
 // The transaction list says "completed"; webhooks say "confirmed".
 const STATUS = { in_progress: 'pending', pending: 'pending', completed: 'completed', confirmed: 'completed', error: 'failed', failed: 'failed' };
+// Any other word counts as pending, and is logged once so it can be added above: otherwise a completed deposit
+// would wait as pending with nothing to say why.
+const unknownStatuses = new Set();
+function statusOf(t) {
+  const status = STATUS[String(t.status ?? '').trim().toLowerCase()];
+  if (!status && !unknownStatuses.has(t.status)) {
+    unknownStatuses.add(t.status);
+    console.warn(`[payments] Well Wallet gave the unknown status "${t.status}" for ${t.hash.slice(0, 12)}…: counted as pending`);
+  }
+  return status || 'pending';
+}
 // Webhooks only come from these addresses (docs.wellwallet.io/webhook).
 const WEBHOOK_IPS = ['54.171.15.37', '108.128.68.222', '63.33.226.230'];
 
@@ -138,25 +149,31 @@ export async function syncDeposits({ search } = {}) {
   for (const t of deposits) {
     const userId = owners.get(t.recipient_wallet);
     if (!userId) continue; // a transfer to one of our own wallets that is not a customer's
+    const status = statusOf(t);
     const changed = await saveProviderPayment(userId, {
       provider: PROVIDER,
       reference: t.hash,
       amount: Number(t.amount).toFixed(2),
       currency: 'USD', // USDT is counted one to one in US dollars
-      status: STATUS[t.status] || 'pending',
+      status,
       note: 'USDT (TRC-20)',
       paid_at: when(t.created_at),
     });
     if (changed) {
       saved++;
-      // The team's billing chat hears of it once it completes (billing-notices.js); a pending one is shown in the summary.
-      if (STATUS[t.status] === 'completed') paymentReceived(userId, { amount: Number(t.amount).toFixed(2), method: 'USDT (TRC-20)' });
-      console.log(`[payments] ${t.amount} USDT ${STATUS[t.status] || t.status} for customer ${userId} (${t.hash.slice(0, 12)}…)`);
-      // In the audit trail as the system's doing: no one in the team entered it.
+      // The team and the buyer hear of it once it completes (billing-notices.js); a pending one is shown in the summary.
+      if (status === 'completed') {
+        paymentReceived(userId, {
+          amount: Number(t.amount).toFixed(2), method: 'USDT (TRC-20)', at: when(t.created_at), hash: t.hash, sender: t.sender_wallet,
+        });
+      }
+      console.log(`[payments] ${t.amount} USDT ${status} (Well Wallet: ${t.status}) for customer ${userId} (${t.hash.slice(0, 12)}…)`);
+      // In the audit trail as the system's doing: no one in the team entered it. Once when first seen and again when
+      // its status changes; the log shows older entries with the payment's status now (audit.js).
       const owner = await getUser(userId);
       await recordAudit('payment.deposit', {
         target: { id: userId, label: owner?.company || owner?.name || owner?.email || '' },
-        details: { amount: Number(t.amount).toFixed(2), status: STATUS[t.status] || 'pending', reference: t.hash, method: 'USDT (TRC-20)' },
+        details: { amount: Number(t.amount).toFixed(2), status, reference: t.hash, method: 'USDT (TRC-20)' },
       });
     }
   }

@@ -827,8 +827,29 @@ disconnecting are in the Audit Log.
 - **Payment Received**: each payment that completes (a USDT deposit, or one an admin records), with the buyer's
   new balance and whether they are now **Paid** (and how many more calls their credit covers at their price) or
   still **Pending** (what they owe and how many calls that is).
+- **Email Each Payment to the Team**: the same details emailed to `EMAIL_TO`, with an **Open Customer** button.
+  Replying to it writes to the buyer.
+- **Confirm Each Payment to the Buyer**: the buyer gets a **Payment Received** email (amount, how it was paid, when,
+  and their new balance, with a **View My Billing** button) and the same as a Telegram message if they connected
+  Telegram. A payment an admin records shows as "Recorded by our team", never the admin's name. Only buyers with
+  an active login are told.
+- Every payment notice, the team's and the buyer's, shows a USDT deposit's **From Wallet** (the sender's address)
+  and **Transaction Hash**, or the **Reference** an admin entered for a payment they record. In Telegram they are
+  monospace, so a tap copies them.
 - **Daily Billing Summary**: every buyer, Pending first (largest debt first), then Paid (closest to running out
-  first), with totals owed, held in credit and still confirming. Deactivated logins are left out.
+  first), under the totals owed, held in credit and still confirming. Each group is an aligned monospace table of the
+  buyer, their price per call, what they owe (or hold in credit) and the calls that stands for (or still covers).
+  Amounts are US dollars. Tables are 36 characters wide so they do not wrap on a phone, and long names are cut with
+  "…". Deactivated logins are left out.
+
+  ```
+  Pending (2)
+  Buyer           Price    Owed  Calls
+  Acme Leads       0.45  812.25  1,805
+  Blue Harbor I…   0.50  372.50    745
+  ```
+- **/buyers**: the same summary as of that moment, sent in the support chat or the billing chat. It answers even
+  when the daily summary is switched off.
 
 Admins switch each on or off and set the summary's time (EST) under **Settings → Billing Notifications**;
 **Post Summary Now** sends one straight away. The first summary goes out the day after this version is deployed.
@@ -838,8 +859,9 @@ Keep them out of the website-chat thread: either make a topic for billing in the
 and set `TELEGRAM_BILLING_CHAT_ID`. Then `pm2 restart callstalk-chat`. With neither set, they post in the support
 chat itself, and the Settings card says so.
 
-Only the live server posts these by itself. A copy started with `TELEGRAM_POLLING=false` or `NODE_ENV=development`
-(a local copy borrowing the live bot) posts nothing on its own, and its **Post Summary Now** is labelled **Local test**.
+Only the live server posts or emails these by itself. A copy started with `TELEGRAM_POLLING=false` or
+`NODE_ENV=development` (a local copy borrowing the live bot) sends nothing on its own, so buyers in a local database
+are never emailed, and its **Post Summary Now** is labelled **Local test**.
 
 Check: `pm2 logs callstalk-chat --lines 50 --nostream | grep -E "billing|connected Telegram"`.
 
@@ -848,6 +870,7 @@ Check: `pm2 logs callstalk-chat --lines 50 --nostream | grep -E "billing|connect
 | Buyer pressed Start but the portal still waits | The link expired or was used twice: press Connect Telegram again. The bot must be running (`listening for replies` in the log). |
 | Upload says "they blocked the bot" | The buyer blocked or deleted the chat. They reconnect from Settings. |
 | No payment or summary messages | Check the switches in Settings; `[billing] could not post` in the log means the bot is not in the billing chat or topic. |
+| A payment email did not arrive | `[billing] could not tell the team by email` or `the buyer by email` in the log, with the SMTP error. One failing never stops the others. |
 
 ### 16.4 If an admin is locked out
 

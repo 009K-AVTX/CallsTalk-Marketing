@@ -1,4 +1,4 @@
-// A customer's own Telegram chat with the bot, for the notices meant for them (a new report is ready).
+// A customer's own Telegram chat with the bot, for the notices meant for them (a new report is ready, a payment came in).
 //
 // Linking: Connect Telegram in portal Settings asks for a one-use code and opens t.me/<bot>?start=<code>. The
 // customer presses Start, Telegram sends the bot "/start <code>", and that chat is stored for their login. The
@@ -77,7 +77,7 @@ telegramLinkRouter.delete('/', async (req, res) => {
 // ── the bot's private chats ──────────────────────────────────────────────────
 
 const NOT_LINKED = '<b>CallsTalk Notifications</b>\n\n'
-  + 'This bot sends notices from your CallsTalk Portal, such as new billing reports.\n\n'
+  + 'This bot sends notices from your CallsTalk Portal, such as new billing reports and payment confirmations.\n\n'
   + 'To turn them on, log in to the portal, open <b>Settings</b> and press <b>Connect Telegram</b>.';
 
 const reply = (msg, text) => sendTo(msg.chat.id, text).catch((err) => console.error('[telegram] could not answer a private chat:', err.message));
@@ -101,7 +101,7 @@ export async function handlePrivateMessage(msg, command) {
     });
     return reply(msg, '<b>Telegram Connected</b>\n\n'
       + `This chat is now linked to your CallsTalk Portal login <b>${escape(user.email)}</b>. `
-      + 'We will message you here when a new billing report is ready.\n\n'
+      + 'We will message you here when a new billing report is ready or a payment is received.\n\n'
       + 'To stop these messages, send /stop or press <b>Disconnect</b> in your portal Settings.');
   }
 
@@ -159,8 +159,20 @@ export function reportReadyText(reports) {
   return '<b>Your report has been updated.</b>\nYou can now download it from your portal.\n\n' + shown.join('\n');
 }
 
+// Telegram only takes public https links on buttons (not a local http://localhost portal).
+const linkButton = (text, url) => (/^https:\/\//.test(url) ? { reply_markup: { inline_keyboard: [[{ text, url }]] } } : {});
+
 export function reportReadyToTelegram(userId, reports, link) {
-  // Telegram only takes public https links on buttons (not a local http://localhost portal).
-  const button = /^https:\/\//.test(link) ? { reply_markup: { inline_keyboard: [[{ text: reports.length === 1 ? 'Open Report' : 'Open Reports', url: link }]] } } : {};
-  return sendToCustomer(userId, reportReadyText(reports), button);
+  return sendToCustomer(userId, reportReadyText(reports), linkButton(reports.length === 1 ? 'Open Report' : 'Open Reports', link));
+}
+
+// A completed payment: `amount` and `details` ([label, value, kind] rows) as in the buyer's email (billing-notices.js).
+// Wallets and hashes ("code") are monospace, so a tap copies them.
+export function paymentReceivedCustomerText({ amount, details }) {
+  return `<b>Payment received.</b>\nThank you, we have received your payment of <b>${escape(amount)}</b>.\n\n`
+    + details.map(([k, v, kind]) => `<b>${escape(k)}:</b> ${kind === 'code' ? `<code>${escape(v)}</code>` : escape(v)}`).join('\n');
+}
+
+export function paymentReceivedToTelegram(userId, notice) {
+  return sendToCustomer(userId, paymentReceivedCustomerText(notice), linkButton('Open Billing', notice.link));
 }

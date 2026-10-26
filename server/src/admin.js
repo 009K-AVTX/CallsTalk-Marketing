@@ -286,8 +286,13 @@ adminRouter.post('/users/:id/payments', async (req, res) => {
     note: str(body.note, 200),
     paid_at: onDay(date, account.timezone),
   });
-  // The team's billing chat hears of every completed payment, whoever recorded it (billing-notices.js).
-  if (status === 'completed') paymentReceived(user.id, { amount: paid, method: `Recorded by ${req.user.name || req.user.email}`, note: str(body.note, 200) });
+  // The team and the buyer hear of every completed payment, whoever recorded it (billing-notices.js).
+  if (status === 'completed') {
+    paymentReceived(user.id, {
+      amount: paid, method: `Recorded by ${req.user.name || req.user.email}`, buyerMethod: 'Recorded by our team',
+      note: str(body.note, 200), reference: str(body.reference, 120), on: date,
+    });
+  }
   res.status(201).json({ user: userView(user), ...await billingView(user) });
 });
 

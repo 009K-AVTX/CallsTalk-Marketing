@@ -20,7 +20,7 @@ import { Router } from 'express';
 import { validTimeZone } from './billing.js';
 import { UUID } from './db.js';
 import {
-  addAuditEntry, auditActions, auditSummary, getAccount, getDay, getPayment, getReportInfo, getUser, listAudit,
+  addAuditEntry, auditActions, auditSummary, getAccount, getDay, getPayment, getReportInfo, getUser, listAudit, paymentStatuses,
 } from './portal-db.js';
 import { reportLimits } from './rate-limit.js';
 import { HttpError } from './routes.js';
@@ -217,7 +217,17 @@ async function listEntries(req, res) {
   const before = !format && /^\d{1,18}$/.test(req.query.before || '') ? req.query.before : null;
   const result = await listAudit(filters, { limit, before, count: !before });
   if (format) await recordAudit('audit.export', { req, user: req.user, details: { format, rows: result.rows.length, ...filterNote(filters) }, status: 200 });
-  res.json({ ...result, limit });
+  res.json({ ...result, rows: await withPaymentStatus(result.rows), limit });
+}
+
+// A deposit is logged when first seen (often still confirming) and again when it completes. An entry written
+// before it completed gets `payment_status`, where the payment stands now, so it never reads as still pending.
+async function withPaymentStatus(rows) {
+  const open = (r) => r.action === 'payment.deposit' && r.details?.reference && r.details.status !== 'completed';
+  const references = [...new Set(rows.filter(open).map((r) => r.details.reference))];
+  if (!references.length) return rows;
+  const now = await paymentStatuses('wellwallet', references);
+  return rows.map((r) => (open(r) && now.has(r.details.reference) ? { ...r, payment_status: now.get(r.details.reference) } : r));
 }
 const downloadsOnly = (req, res, next) => next(req.query.export ? undefined : 'route');
 auditRouter.get('/', downloadsOnly, ...reportLimits, listEntries);

@@ -125,7 +125,12 @@ export function describe(row) {
     case 'calls.clear': return `Cleared the calls of ${who}${on}${b.calls !== undefined ? ` (${b.calls})` : ''}`;
     case 'payment.create': return `Recorded ${d.amount ? money(d.amount) : 'a payment'}${d.status && d.status !== 'completed' ? ` (${d.status})` : ''} from ${who}${d.date ? ` on ${dayLabel(d.date)}` : ''}`;
     case 'payment.delete': return `Deleted ${b.amount ? `the ${money(b.amount)} payment` : 'a payment'} from ${who}`;
-    case 'payment.deposit': return `${d.amount ? money(d.amount) : 'A'} USDT deposit from ${who}, ${d.status || 'pending'}`;
+    case 'payment.deposit': {
+      // payment_status: where an entry written while it was confirming stands now (server/src/audit.js).
+      const then = d.status || 'pending';
+      const now = row.payment_status && row.payment_status !== then ? ` (now ${row.payment_status})` : '';
+      return `${d.amount ? money(d.amount) : 'A'} USDT deposit from ${who}, ${then}${now}`;
+    }
     case 'payment.address': return `Opened Pay${d.amount ? ` for ${money(d.amount)}` : ''}`;
     case 'report.upload': return `Uploaded "${d.title || d.filename || 'a report'}" for ${who}`;
     case 'report.delete': return `Deleted "${b.title || 'a report'}" from ${who}`;
