@@ -837,16 +837,23 @@ disconnecting are in the Audit Log.
   and **Transaction Hash**, or the **Reference** an admin entered for a payment they record. In Telegram they are
   monospace, so a tap copies them.
 - **Daily Billing Summary**: every buyer, Pending first (largest debt first), then Paid (closest to running out
-  first), under the totals owed, held in credit and still confirming. Each buyer is a small monospace table of
-  Buyer, Price and Balance (negative when they owe), with the calls that balance stands for in bold beneath:
-  **Remaining Calls** for a buyer in credit, **Unpaid Calls** for one who owes. Amounts are US dollars, shown without
-  cents when every amount is whole. Tables are 32 characters wide so they do not wrap on a narrow phone, and long
-  names are cut with "…". Deactivated logins are left out.
+  first), under the totals owed, held in credit and still confirming. Each group is one monospace box; in it each
+  buyer is a small table of Buyer, Price and Balance (negative when they owe) and the calls that balance stands
+  for: **Remaining Calls** for a buyer in credit, **Unpaid Calls** for one who owes. A dotted line, with a blank line
+  either side, separates one buyer from the next. Amounts are US dollars, shown without cents when every amount is
+  whole. Tables are 32 characters wide so they do not wrap on a narrow phone, and long names are cut with "…".
+  Deactivated logins are left out.
 
   ```
-  Buyer             Price  Balance
-  Keystone & Co        35    5,600
+  Buyer          Price  Balance
+  Keystone & Co     35    5,600
   Remaining Calls - 160
+
+  .............................
+
+  Buyer          Price  Balance
+  Summit Solar      45  125,000
+  Remaining Calls - 2,777
   ```
 - **/buyers**: the same summary as of that moment, sent in the support chat or the billing chat. It answers even
   when the daily summary is switched off.

@@ -197,28 +197,30 @@ export function summaryText(customers, now = new Date(), { title = 'Daily Billin
   ];
   if (!rows.length) return [...head, '', 'No buyers yet.'].join('\n');
 
-  // A block per buyer: Buyer, Price and Balance (negative when they owe) as a table, then in bold the calls their
-  // balance stands for: Remaining Calls on credit, or Unpaid Calls. Every block shares one set of column widths, so
-  // they line up down the message.
+  // A block per buyer, all in one monospace box per group: Buyer, Price and Balance (negative when they owe) as a
+  // table, then the calls that balance stands for: Remaining Calls on credit, or Unpaid Calls. Buyers are set apart
+  // by a dotted line with a blank line either side. Every block shares one set of column widths, so they line up.
   const listed = [...pending, ...paid];
   const prices = amounts(listed.map((r) => r.price));
   const balances = amounts(listed.map((r) => (r.paid ? r.credit : -r.owed)));
   const [header, ...lines] = table(['Buyer', 'Price', 'Balance'], listed.map((r, i) => [r.name, prices[i], balances[i]]));
-  const blocks = listed.map((r, i) => `<pre>${escape(header)}\n${escape(lines[i])}</pre>\n`
-    + `<b>${r.paid ? 'Remaining Calls' : 'Unpaid Calls'}</b> - ${r.calls === null ? 'no price set' : count(r.calls)}`);
+  const blocks = listed.map((r, i) => escape([
+    header, lines[i], `${r.paid ? 'Remaining Calls' : 'Unpaid Calls'} - ${r.calls === null ? 'no price set' : count(r.calls)}`,
+  ].join('\n')));
+  const between = `\n\n${'.'.repeat(header.length)}\n\n`;
 
   // Whole blocks only, within Telegram's limit; whatever does not fit is counted and pointed to Finance.
   const MORE = 60; // room kept for an "…and N more" line
   const group = (list, room) => {
-    const { shown, rest } = fitLines(list.map((b) => `${b}\n`), room - MORE); // "\n": the blank line between blocks
-    return [...shown.map((b) => b.trimEnd()), ...(rest ? [`…and ${rest} more in Finance`] : [])].join('\n\n');
+    const { shown, rest } = fitLines(list.map((b) => `${b}${between}`), room - MORE - 11); // 11: <pre></pre>
+    return `<pre>${list.slice(0, shown.length).join(between)}</pre>` + (rest ? `\n…and ${rest} more in Finance` : '');
   };
   const pendingBlocks = blocks.slice(0, pending.length);
   const paidBlocks = blocks.slice(pending.length);
 
   // Pending comes first and gets the room it needs, leaving at least a few buyers' worth for Paid.
   const top = head.join('\n').length + 60; // the head and both group titles
-  const keepForPaid = Math.min(paidBlocks.join('\n\n').length + MORE, 800);
+  const keepForPaid = Math.min(paidBlocks.join(between).length + MORE, 800);
   const section = (name, list, text) => (list.length ? ['', `<b>${name} (${list.length})</b>`, '', text] : ['', `<b>${name}:</b> none`]);
   const pendingText = pending.length ? group(pendingBlocks, TELEGRAM_BUDGET - top - keepForPaid) : '';
   const paidText = paid.length ? group(paidBlocks, TELEGRAM_BUDGET - top - pendingText.length) : '';
