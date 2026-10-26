@@ -184,15 +184,15 @@ function UploadForm({ customers, onDone }) {
         <>
           <label className="p-check">
             <input type="checkbox" checked={notify} onChange={(e) => setNotify(e.target.checked)} />
-            <span><b>Email the customer</b><small>One email to their login ID saying the report is ready. The file itself is not attached.</small></span>
+            <span><b>Email the customer</b><small>“Your report has been updated for (the report’s dates). You can now download it from your portal.” One email to their login ID, with a button that opens the report. The file itself is not attached.</small></span>
           </label>
           <label className={`p-check${chosen && !telegramReady ? ' is-off' : ''}`}>
             <input type="checkbox" checked={byTelegram && telegramReady} onChange={(e) => setByTelegram(e.target.checked)} disabled={!telegramReady} />
             <span>
               <b>Send on Telegram</b>
               <small>
-                {!chosen ? '“Your report has been updated. You can now download it from your portal.” Sent to the customer’s Telegram if they have connected it.'
-                  : telegramReady ? '“Your report has been updated. You can now download it from your portal.” With a button that opens the report.'
+                {!chosen ? 'The same message, sent to the customer’s Telegram if they have connected it.'
+                  : telegramReady ? 'The same message, with a button that opens the report.'
                     : 'This customer has not connected Telegram yet. They can do it under Settings in their portal.'}
               </small>
             </span>

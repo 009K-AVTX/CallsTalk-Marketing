@@ -812,10 +812,11 @@ The same bot (`@CTLKMBOT`) also sends billing notices. Nothing new to install; t
 1. The buyer opens **Settings** in the portal and presses **Connect Telegram**. Telegram opens the bot with a one-use
    link (it works for `TELEGRAM_LINK_MINUTES`, 15 by default); they press **Start** and the portal shows
    **Connected**. Only the buyer can do this: the team cannot connect someone's Telegram for them.
-2. When staff or an admin uploads a report, **Send on Telegram** (next to **Email the customer**) sends the buyer
-   "Your report has been updated. You can now download it from your portal." with the report's name, period and an
-   **Open Report** button. It is greyed out for buyers who have not connected; the customer list marks the ones who
-   have with "· Telegram".
+2. When staff or an admin uploads a report, **Email the customer** and **Send on Telegram** (both ticked by
+   default) send the buyer "Your report has been updated for Oct 17, 2026 to Oct 23, 2026. You can now download it
+   from your portal." (the days the report covers), with the report's name and note and a **View Report** (email) or
+   **Open Report** (Telegram) button that opens it in the portal. Send on Telegram is greyed out for buyers who have
+   not connected; the customer list marks the ones who have with "· Telegram".
 3. A buyer stops the messages with **Disconnect** in Settings or `/stop` in the bot. If they block the bot, the next
    message fails and they are disconnected automatically; the upload page says so.
 

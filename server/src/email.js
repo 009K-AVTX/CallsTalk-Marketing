@@ -379,22 +379,22 @@ export function reportReadyMail({ name, reports, link }) {
   const body = `<tr><td class="px" style="padding:0 28px 22px">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>${head(one ? 'Report' : 'Reports')}${head('Period')}</tr>${rows}</table>
 </td></tr>`;
+  // "Your report has been updated for <the days it covers>. You can now download it from your portal."
+  const updated = one ? 'your report has been updated' : 'your reports have been updated';
   return {
-    subject: one ? `New Billing Report Available: ${periodText(reports[0])}` : `New Billing Reports Available: ${span}`,
-    preview: one ? `A new billing report covering ${periodText(reports[0])} is now available in your CallsTalk Portal.` : `${reports.length} new billing reports are now available in your CallsTalk Portal.`,
-    heading: one ? 'Your Billing Report Is Ready' : 'Your Billing Reports Are Ready',
+    subject: `${one ? 'Your Report Has Been Updated' : 'Your Reports Have Been Updated'} for ${span}`,
+    preview: `${updated.charAt(0).toUpperCase()}${updated.slice(1)} for ${span}. You can now download ${one ? 'it' : 'them'} from your portal.`,
+    heading: one ? 'Your Report Has Been Updated' : 'Your Reports Have Been Updated',
     sub: (() => {
-      const news = one
-        ? `a new billing report covering <b>${escapeHtml(periodText(reports[0]))}</b> is now available in your CallsTalk Portal.`
-        : `<b>${reports.length} new billing reports</b> covering <b>${escapeHtml(span)}</b> are now available in your CallsTalk Portal.`;
+      const news = `${updated} for <b>${escapeHtml(span)}</b>. You can now download ${one ? 'it' : 'them'} from your portal.`;
       return name ? `Dear ${escapeHtml(name)}, ${news}` : news.charAt(0).toUpperCase() + news.slice(1);
     })(),
     body,
     cta: { href: link, label: one ? 'View Report' : 'View Reports' },
     footer: '<b style="color:#fff">For your security,</b> reports are not attached to emails. They are available only through your secure portal login.',
     footnote: '',
-    text: `${one ? 'Your billing report is ready' : 'Your billing reports are ready'}\n\n`
-      + `${one ? `A new billing report covering ${periodText(reports[0])} is` : `${reports.length} new billing reports covering ${span} are`} now available in your CallsTalk Portal.\n\n`
+    text: `${one ? 'Your report has been updated' : 'Your reports have been updated'}\n\n`
+      + `${updated.charAt(0).toUpperCase()}${updated.slice(1)} for ${span}. You can now download ${one ? 'it' : 'them'} from your portal.\n\n`
       + reports.map((r) => `- ${r.title} (${periodText(r)})${r.note ? `\n  Note from our team: ${r.note}` : ''}`).join('\n')
       + `\n\nView ${one ? 'it' : 'them'} here: ${link}\n\n`
       + 'For your security, reports are not attached to emails. They are available only through your secure portal login.\n',

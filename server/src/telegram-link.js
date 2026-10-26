@@ -144,19 +144,25 @@ export async function sendToCustomer(userId, text, extra = {}) {
 const dayText = (iso) => new Date(`${iso}T12:00:00Z`).toLocaleDateString('en-US', { timeZone: 'UTC', month: 'short', day: 'numeric', year: 'numeric' });
 const periodText = (r) => (r.period_from === r.period_to ? dayText(r.period_from) : `${dayText(r.period_from)} to ${dayText(r.period_to)}`);
 
-// "Your report has been updated." with the new report(s) and a button to the portal. `reports`: oldest first.
+// "Your report has been updated for <the days it covers>. You can now download it from your portal." with the new
+// report(s) and a button to the portal. `reports`: oldest first.
 export function reportReadyText(reports) {
-  const lines = reports.length === 1
+  const one = reports.length === 1;
+  const span = periodText({
+    period_from: reports.map((r) => r.period_from).sort()[0],
+    period_to: reports.map((r) => r.period_to).sort().at(-1),
+  });
+  const lines = one
     ? [
       `<b>Report:</b> ${escape(reports[0].title)}`,
-      `<b>Period:</b> ${escape(periodText(reports[0]))}`,
       ...(reports[0].note ? [`<b>Note:</b> ${escape(reports[0].note)}`] : []),
     ]
     : reports.map((r) => `• ${escape(r.title)} · ${escape(periodText(r))}`);
   // Whole lines within Telegram's limit (a long upload lists what fits, then how many more are in the portal).
-  const { shown, rest } = fitLines(lines, TELEGRAM_BUDGET - 200);
+  const { shown, rest } = fitLines(lines, TELEGRAM_BUDGET - 300);
   if (rest) shown.push(`…and ${rest} more in your portal`);
-  return '<b>Your report has been updated.</b>\nYou can now download it from your portal.\n\n' + shown.join('\n');
+  return `<b>${one ? 'Your report has been updated' : 'Your reports have been updated'} for ${escape(span)}.</b>\n`
+    + `You can now download ${one ? 'it' : 'them'} from your portal.\n\n` + shown.join('\n');
 }
 
 // Telegram only takes public https links on buttons (not a local http://localhost portal).
