@@ -1,4 +1,5 @@
-// Billing reports: Excel files the billing team uploads for a customer, shown in that customer's portal.
+// Reports: Excel files the team uploads for a customer, of two kinds (`kind`). Billing reports ('billing') are for the
+// team only. Call Summaries ('calls', call-summary.js) are shown in that customer's portal to view and download.
 //
 // Three backends behind one set of functions:
 //   VITE_PORTAL_API_URL set  -> our server (server/src/portal.js), per docs/portal-reports-api.md;
@@ -75,13 +76,15 @@ const LOCAL_KEY = 'local-upload-key';
 
 // ── the functions the pages use ──────────────────────────────────────────────
 
-// The signed-in customer's reports, newest first.
+export const KINDS = { billing: 'Billing Report', calls: 'Call Summary' };
+
+// The signed-in customer's Call Summaries, newest first.
 export async function listMine() {
   const session = loadSession();
   if (MODE === 'api') return (await api('/portal/reports')).results;
   const me = (session?.email || '').toLowerCase();
-  if (MODE === 'local') return localAll().filter((r) => r.customer === me);
-  return (await send(`/api/reports?customer=${encodeURIComponent(me)}`)).results;
+  if (MODE === 'local') return localAll().filter((r) => r.customer === me && r.kind === 'calls');
+  return (await send(`/api/reports?customer=${encodeURIComponent(me)}`)).results.filter((r) => r.kind === 'calls');
 }
 
 export async function listAll() {
@@ -107,15 +110,16 @@ export async function listCustomers() {
   return [...new Set((await listAll()).map((r) => r.customer))].map((c) => ({ id: c, name: c, login: c }));
 }
 
-export async function uploadReport({ customer, title, note, periodFrom, periodTo, file }) {
+// `kind`: 'billing' or 'calls'.
+export async function uploadReport({ customer, kind, title, note, periodFrom, periodTo, file }) {
   if (file.size > MAX_MB * 1024 * 1024) throw new Error(`Files must be ${MAX_MB} MB or smaller.`);
   const content = await toBase64(file);
-  const body = { customer, title, note, period_from: periodFrom, period_to: periodTo, filename: file.name, content_base64: content };
+  const body = { customer, kind, title, note, period_from: periodFrom, period_to: periodTo, filename: file.name, content_base64: content };
   if (MODE === 'api') return api('/staff/reports', 'POST', body);
   if (MODE === 'demo') return send('/api/reports', { method: 'POST', headers: staffHeaders(), body });
   await listAll();
   const report = {
-    id: crypto.randomUUID(), customer: customer.trim().toLowerCase(), title: title.trim() || file.name.replace(/\.[^.]+$/, ''), note: note.trim(),
+    id: crypto.randomUUID(), customer: customer.trim().toLowerCase(), kind, title: title.trim() || file.name.replace(/\.[^.]+$/, ''), note: note.trim(),
     period_from: periodFrom, period_to: periodTo, filename: file.name, size: file.size, uploaded_at: new Date().toISOString(),
     url: `data:application/octet-stream;base64,${content}`,
   };
@@ -127,8 +131,8 @@ export async function uploadReport({ customer, title, note, periodFrom, periodTo
   return report;
 }
 
-// Tells the customer about the reports just uploaded, once for the whole upload: an email to their login ID and/or
-// "Your report has been updated." in their Telegram chat with our bot (if they connected it in Settings).
+// Tells the customer about the Call Summaries just uploaded, once for the whole upload: an email to their login ID
+// and/or "Your report has been updated." in their Telegram chat with our bot (if they connected it in Settings).
 // -> { emailed, email | reason, telegram: { sent, username | reason } }. Only on our server; the demo and local
 // stores have neither.
 export const canNotify = MODE === 'api';

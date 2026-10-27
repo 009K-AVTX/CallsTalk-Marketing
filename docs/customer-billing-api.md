@@ -2,7 +2,7 @@
 
 Served by our own server (`server/src/accounts.js`, `server/src/portal.js`, `server/src/billing.js`, data in PostgreSQL, entered by admins in the portal). Every login also has a 6-digit authenticator code, so `/accounts/login` always answers `mfa_required`. Running it: [maintenance.md, section 16](maintenance.md#16-customer-portal-portalcallstalkcom).
 
-Customers log in to the **CallsTalk Portal** (portal.callstalk.com; the website's Log In links there) with the login we give them. Its **Billing** page shows their wallet balance, today's bill (live, refreshed every 30 s), the last three days' bills, a Billing History of the **last 5 days** (with a total) and their payments from those 5 days, and lets them pay online. Older bills reach customers as the Excel reports our team uploads.
+Customers log in to the **CallsTalk Portal** (portal.callstalk.com; the website's Log In links there) with the login we give them. Its **Billing** page shows their wallet balance, today's bill (live, refreshed every 30 s), the last three days' bills, a Billing History of the **last 5 days** (with a total) and their payments from those 5 days, and lets them pay online. Under Reports they open the Call Summaries (call logs) our team uploads as Excel files.
 
 The site calls `VITE_PORTAL_API_URL` (falls back to `VITE_SUPPORT_API_URL`), e.g. `https://api.example.com/api`. Add the CallsTalk site origin to `CORS_ALLOWED_ORIGINS`, with the `Authorization` header allowed.
 

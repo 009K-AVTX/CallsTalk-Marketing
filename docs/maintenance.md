@@ -754,11 +754,21 @@ Customers log in at **https://portal.callstalk.com** (the website's Log In goes 
 
 - **New login:** Logins → New Login. Customers also get their price per call, opening balance and start date.
   The setup link is emailed to them (it works once, for 7 days); the page also shows it to copy.
-- **Roles:** **Customer** sees their own billing and reports. **Staff** can only upload and remove customer reports
-  (they land on `/upload`; no billing, payments or logins). **Admin** can do everything.
+- **Roles:** **Customer** sees their own billing and Call Summaries. **Staff** can only upload and remove customer
+  reports (they land on `/upload`; no billing, payments or logins). **Admin** can do everything.
 - **Billing:** open a customer → enter each day's **billable calls** and **payments** received. Customers see
-  their balance and the last five days; older days go to them as Excel reports (Reports → upload).
-- **Calls from a report:** a report itself never changes the balance. When an admin uploads one in the **Excel
+  their balance and the last five days.
+- **Two kinds of report:** the upload form asks for the **Report Type**, and picks it from the file when it can.
+  - **Call Summary**: the day's call log as the dialer exports it, one call a row with no header (date and time,
+    caller, number called, duration, status, who hung up; e.g. `C4V - 72.xlsx`). This is the only report the
+    customer sees: under **Reports** and on their Billing page, to view (with column names added) or download. When
+    its rows start with each call's date and time, its calls set the period and, without a title, it is named
+    "Call Summary, 72 calls". Any other Excel or CSV layout is uploaded as it is, with the dates and title entered on
+    the form. The customer is told about it (below). Upload waits until the file has been read.
+  - **Billing Report**: for the team only. The customer never sees it and is not told about it. It is where an admin
+    can enter calls in the customer's billing (next point). Reports uploaded before this change count as billing
+    reports, so customers no longer see them.
+- **Calls from a billing report:** a report itself never changes the balance. When an admin uploads one in the **Excel
   Template** format (a **Daily Bills** sheet, or any sheet with **Date** and **Total Calls** columns) or the team's
   **Financial Overview** format (a box per day titled "Oct 22, 2026 · Financial Overview", on one sheet or several,
   whose **Total No.** is read as the calls: "125 - 2" is 125 calls, 2 replaced; it has no price, so each day keeps
@@ -824,10 +834,10 @@ The same bot (`@CTLKMBOT`) also sends billing notices. Nothing new to install; t
 1. The buyer opens **Settings** in the portal and presses **Connect Telegram**. Telegram opens the bot with a one-use
    link (it works for `TELEGRAM_LINK_MINUTES`, 15 by default); they press **Start** and the portal shows
    **Connected**. Only the buyer can do this: the team cannot connect someone's Telegram for them.
-2. When staff or an admin uploads a report, **Email the customer** and **Send on Telegram** (both ticked by
-   default) send the buyer "Your report has been updated for Oct 17, 2026 to Oct 23, 2026. You can now download it
-   from your portal." (the days the report covers), with the report's name and note and a **View Report** (email) or
-   **Open Report** (Telegram) button that opens it in the portal. Send on Telegram is greyed out for buyers who have
+2. When staff or an admin uploads a Call Summary, **Email the customer** and **Send on Telegram** (both ticked by
+   default) send the buyer "Your report has been updated for Oct 26, 2026. You can view your Call Summary report
+   from your portal: (link)" (the days it covers), with the report's name and note and a **View Report** (email) or
+   **Open Report** (Telegram) button that opens it in the portal. Billing reports are never announced. Send on Telegram is greyed out for buyers who have
    not connected; the customer list marks the ones who have with "· Telegram".
 3. A buyer stops the messages with **Disconnect** in Settings or `/stop` in the bot. If they block the bot, the next
    message fails and they are disconnected automatically; the upload page says so.
@@ -838,8 +848,9 @@ disconnecting are in the Audit Log.
 **Team: payments and the daily paid/pending summary**
 
 - **Payment Received**: each payment that completes (a USDT deposit, or one an admin records), with the buyer's
-  new balance and whether they are now **Paid** (and how many more calls their credit covers at their price) or
-  still **Pending** (what they owe and how many calls that is).
+  new balance, then **Status: Paid** and on the next line **Capacity: 29 calls** (how many more calls their credit
+  covers), or **Status: Pending** and **Unpaid Calls** (how many calls the debt stands for). No notice ever shows a
+  buyer's price per call.
 - **Email Each Payment to the Team**: the same details emailed to `EMAIL_TO`, with an **Open Customer** button.
   Replying to it writes to the buyer.
 - **Confirm Each Payment to the Buyer**: the buyer gets a **Payment Received** email (amount, how it was paid, when,
@@ -852,21 +863,21 @@ disconnecting are in the Audit Log.
 - **Daily Billing Summary** (also what /buyers posts): the title, the day ("Tue, Oct 27"), then the totals owed,
   held in credit and still confirming as bullets, then every buyer, Paid first (closest to running out first),
   then Pending (largest debt first). Each group is one monospace box; in it each
-  buyer is a small table of Buyer, Price and Balance (negative when they owe) and the calls that balance stands
+  buyer is a small table of Buyer and Balance (negative when they owe; no price) and the calls that balance stands
   for: **Remaining Calls** for a buyer in credit, **Unpaid Calls** for one who owes. A dotted line, with a blank line
   either side, separates one buyer from the next. Amounts are US dollars, shown without cents when every amount is
   whole. Tables are 32 characters wide so they do not wrap on a narrow phone, and long names are cut with "…".
   Deactivated logins are left out.
 
   ```
-  Buyer          Price  Balance
-  Keystone & Co     35    5,600
+  Buyer           Balance
+  Keystone & Co     5,600
   Remaining Calls - 160
 
-  .............................
+  .......................
 
-  Buyer          Price  Balance
-  Summit Solar      45  125,000
+  Buyer           Balance
+  Summit Solar    125,000
   Remaining Calls - 2,777
   ```
 - **/buyers**: the same summary as of that moment, sent in the support chat or the billing chat. It answers even

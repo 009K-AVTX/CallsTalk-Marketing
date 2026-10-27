@@ -38,7 +38,7 @@ export function ReportNotice({ reports, onOpen, onError, onDismiss, toReports })
       <span className="p-notice__icon" aria-hidden="true"><Icon name="reports" /></span>
       <div className="p-notice__text">
         <b>Your report has been updated.</b>
-        <p>You can now download it from your portal: <i>{newest.title}</i>, {period(newest)}{more > 0 && `, and ${more} more`}.</p>
+        <p>You can view your Call Summary report here: <i>{newest.title}</i>, {period(newest)}{more > 0 && `, and ${more} more`}.</p>
       </div>
       <div className="p-notice__tools">
         {toReports ? <Link to="/reports" className="btn btn--light btn--sm">Open Reports</Link> : (
@@ -53,7 +53,7 @@ export function ReportNotice({ reports, onOpen, onError, onDismiss, toReports })
   );
 }
 
-// Billing reports from our team, grouped by the month they cover.
+// Call Summary reports from our team, grouped by the month they cover.
 export default function Reports({ reports, unseen = [], onSeen }) {
   const { data, error, reload } = reports;
   const [open, setOpen] = useState(null);
@@ -84,7 +84,7 @@ export default function Reports({ reports, unseen = [], onSeen }) {
 
   return (
     <>
-      <PageHead title="Reports" sub="Billing reports from our team, as Excel files. Open one here or download it.">
+      <PageHead title="Reports" sub="Call Summary reports from our team, as Excel files. Open one here or download it.">
         <button type="button" className="btn btn--quiet btn--sm" onClick={reload}><Icon name="refresh" />Refresh</button>
         {showUploadLink() && <a href={UPLOAD_PATH} target="_blank" rel="noopener" className="btn btn--light btn--sm"><Icon name="download" className="p-icon p-icon--up" />Upload Reports</a>}
       </PageHead>
@@ -95,7 +95,7 @@ export default function Reports({ reports, unseen = [], onSeen }) {
         <section className="p-card p-empty-card">
           <span className="p-insights__icon"><Icon name="reports" /></span>
           <h2>No Reports Yet</h2>
-          <p>Billing reports issued by our team will appear here as soon as they are uploaded.</p>
+          <p>Call Summary reports from our team will appear here as soon as they are uploaded.</p>
           {showUploadLink() && <a href={UPLOAD_PATH} target="_blank" rel="noopener" className="btn btn--light btn--sm p-empty-card__cta"><Icon name="download" className="p-icon p-icon--up" />Upload a Report</a>}
         </section>
       )}

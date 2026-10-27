@@ -213,7 +213,7 @@ export function History({ days, currency }) {
           </tfoot>
         </table>
       </div>
-      <p className="billing__history-note">Statements for the last {HISTORY_DAYS} days. An entry such as “125 − 2” indicates 2 replaced calls, which are not charged. Statements for earlier dates are available as billing reports under Reports.</p>
+      <p className="billing__history-note">Statements for the last {HISTORY_DAYS} days. An entry such as “125 − 2” indicates 2 replaced calls, which are not charged. Your daily call logs are available as Call Summary reports under Reports.</p>
     </section>
   );
 }

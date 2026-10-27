@@ -360,7 +360,7 @@ export function passwordChangedMail({ name, email, when, how }) {
   };
 }
 
-// New billing report(s) in the customer's portal. The files are never attached: they are only in the portal.
+// New Call Summary report(s) in the customer's portal. The files are never attached: they are only in the portal.
 const dayText = (iso) => new Date(`${iso}T12:00:00Z`).toLocaleDateString('en-US', { timeZone: 'UTC', month: 'short', day: 'numeric', year: 'numeric' });
 const periodText = (r) => (r.period_from === r.period_to ? dayText(r.period_from) : `${dayText(r.period_from)} to ${dayText(r.period_to)}`);
 
@@ -379,14 +379,16 @@ export function reportReadyMail({ name, reports, link }) {
   const body = `<tr><td class="px" style="padding:0 28px 22px">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>${head(one ? 'Report' : 'Reports')}${head('Period')}</tr>${rows}</table>
 </td></tr>`;
-  // "Your report has been updated for <the days it covers>. You can now download it from your portal."
+  // "Your report has been updated for <the days it covers>. You can view your Call Summary report from your portal (link)."
   const updated = one ? 'your report has been updated' : 'your reports have been updated';
+  const where = `You can view your Call Summary report${one ? '' : 's'} from your portal`;
   return {
     subject: `${one ? 'Your Report Has Been Updated' : 'Your Reports Have Been Updated'} for ${span}`,
-    preview: `${updated.charAt(0).toUpperCase()}${updated.slice(1)} for ${span}. You can now download ${one ? 'it' : 'them'} from your portal.`,
+    preview: `${updated.charAt(0).toUpperCase()}${updated.slice(1)} for ${span}. ${where}.`,
     heading: one ? 'Your Report Has Been Updated' : 'Your Reports Have Been Updated',
     sub: (() => {
-      const news = `${updated} for <b>${escapeHtml(span)}</b>. You can now download ${one ? 'it' : 'them'} from your portal.`;
+      const portal = `<a href="${escapeHtml(link)}" style="color:${c.accentDeep};text-decoration:none">${escapeHtml(link)}</a>`;
+      const news = `${updated} for <b>${escapeHtml(span)}</b>. ${where}: ${portal}`;
       return name ? `Dear ${escapeHtml(name)}, ${news}` : news.charAt(0).toUpperCase() + news.slice(1);
     })(),
     body,
@@ -394,9 +396,9 @@ export function reportReadyMail({ name, reports, link }) {
     footer: '<b style="color:#fff">For your security,</b> reports are not attached to emails. They are available only through your secure portal login.',
     footnote: '',
     text: `${one ? 'Your report has been updated' : 'Your reports have been updated'}\n\n`
-      + `${updated.charAt(0).toUpperCase()}${updated.slice(1)} for ${span}. You can now download ${one ? 'it' : 'them'} from your portal.\n\n`
+      + `${updated.charAt(0).toUpperCase()}${updated.slice(1)} for ${span}. ${where}: ${link}\n\n`
       + reports.map((r) => `- ${r.title} (${periodText(r)})${r.note ? `\n  Note from our team: ${r.note}` : ''}`).join('\n')
-      + `\n\nView ${one ? 'it' : 'them'} here: ${link}\n\n`
+      + '\n\n'
       + 'For your security, reports are not attached to emails. They are available only through your secure portal login.\n',
   };
 }

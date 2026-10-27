@@ -4,11 +4,12 @@ import { isAdmin } from '../../../src/lib/portal.js';
 import { fetchBilling } from '../admin.js';
 import { Avatar } from '../avatar.jsx';
 import { enterBillingDays, planBillingDays, readBillingDays, toEnter } from '../billing-import.js';
+import { readCallSummary } from '../call-summary.js';
 import Icon from '../components/Icons.jsx';
 import { ErrorNote } from '../components/Shell.jsx';
 import { addDays, dayLabel, money, today } from '../format.js';
 import {
-  canNotify, deleteReport, listAll, listCustomers, localKeyHint, MAX_MB, notifyReports, staffSession, staffSignIn, staffSignOut, staffSignInKind, uploadReport,
+  canNotify, deleteReport, KINDS, listAll, listCustomers, localKeyHint, MAX_MB, notifyReports, staffSession, staffSignIn, staffSignOut, staffSignInKind, uploadReport,
 } from '../reports.js';
 import { fileSize, period } from './Reports.jsx';
 
@@ -133,9 +134,16 @@ function CallsFromFile({ read, billing, plan, enter, onEnter }) {
   );
 }
 
+// What each kind of report is for, under the choice.
+const KIND_NOTES = {
+  calls: 'The day\'s call log. The customer can view and download it in their portal, and is told about it.',
+  billing: 'For our team only: the customer does not see it. An admin can enter its calls in the customer\'s billing.',
+};
+
 function UploadForm({ customers, onDone }) {
   const yesterday = addDays(today(), -1);
   const [form, setForm] = useState({ customer: '', title: '', note: '', periodFrom: yesterday, periodTo: yesterday });
+  const [kind, setKind] = useState('calls');
   // Tell the customer about the upload (on by default; untick e.g. when re-uploading a corrected file).
   const [notify, setNotify] = useState(true);
   const [byTelegram, setByTelegram] = useState(true);
@@ -149,33 +157,47 @@ function UploadForm({ customers, onDone }) {
   const chosen = customers.find((c) => c.id === form.customer);
   const telegramReady = Boolean(chosen?.telegram);
 
-  // The days in the chosen files (Excel template or Financial Overview format): they set the report's period, and admins can enter them
-  // in the buyer's billing with the upload. Only admins change billing; staff upload as before.
+  // The chosen files, read both ways. A billing report's days (Excel template or Financial Overview format) set its
+  // period, and admins can enter them in the buyer's billing with the upload; only admins change billing. A Call
+  // Summary's calls, when it lists them as the dialer exports them, set its period and count; any other layout is
+  // uploaded as it is. The type follows what the files turn out to be. Upload waits until the files have been read
+  // (the first time, the spreadsheet reader itself has to load).
   const canEnterCalls = canNotify && isAdmin();
-  const [read, setRead] = useState(null); // { days, skipped } or null
+  const [read, setRead] = useState(null); // billing days: { days, skipped } or null
+  const [log, setLog] = useState(null); // calls: { calls, from, to, unread } or null
+  const [reading, setReading] = useState(false);
   const [billing, setBilling] = useState(null); // { data } | { error } for the chosen buyer
   const [enterCalls, setEnterCalls] = useState(false);
   useEffect(() => {
     let gone = false;
     setRead(null);
+    setLog(null);
+    setReading(files.length > 0);
     if (files.length) {
-      readBillingDays(files).then((r) => {
-        if (gone || !r) return;
-        setRead(r);
-        if (r.days.length) setForm((f) => ({ ...f, periodFrom: r.days[0].date, periodTo: r.days.at(-1).date }));
-      });
+      Promise.all([readBillingDays(files), readCallSummary(files)]).then(([days, calls]) => {
+        if (gone) return;
+        setRead(days);
+        setLog(calls);
+        setReading(false);
+        if (calls && !days?.days.length) setKind('calls');
+        else if (days?.days.length && !calls) setKind('billing');
+      }, () => !gone && setReading(false));
     }
     return () => { gone = true; };
   }, [files]);
   useEffect(() => {
+    const [from, to] = kind === 'calls' ? [log?.from, log?.to] : [read?.days[0]?.date, read?.days.at(-1)?.date];
+    if (from) setForm((f) => ({ ...f, periodFrom: from, periodTo: to }));
+  }, [kind, read, log]);
+  useEffect(() => {
     let gone = false;
     setBilling(null);
-    if (canEnterCalls && chosen && read?.days.length) {
+    if (canEnterCalls && kind === 'billing' && chosen && read?.days.length) {
       fetchBilling(chosen.id).then((data) => !gone && setBilling({ data }), (err) => !gone && setBilling({ error: err.message }));
     }
     return () => { gone = true; };
-  }, [canEnterCalls, chosen?.id, read]);
-  const plan = useMemo(() => (read && billing?.data?.account ? planBillingDays(read.days, billing.data) : null), [read, billing]);
+  }, [canEnterCalls, kind, chosen?.id, read]);
+  const plan = useMemo(() => (kind === 'billing' && read && billing?.data?.account ? planBillingDays(read.days, billing.data) : null), [kind, read, billing]);
   useEffect(() => setEnterCalls(false), [plan]); // a new file or buyer: ticked again only after a look at the days
 
   const pick = (list) => {
@@ -189,35 +211,34 @@ function UploadForm({ customers, onDone }) {
     e.preventDefault();
     if (!files.length) return setMessage('Choose a file to upload.');
     if (form.periodFrom > form.periodTo) return setMessage('The start date is after the end date.');
+    if (reading) return;
     setStatus('sending');
     setMessage('');
     try {
       const uploaded = [];
-      for (const file of files) {
-        // With several files, each takes its own name as the title unless one title was given for a single file.
-        uploaded.push(await uploadReport({ ...form, title: files.length === 1 ? form.title : '', file }));
-      }
+      // With several files, each takes its own name as the title unless one title was given for a single file. A
+      // single Call Summary without one is "Call Summary, 72 calls" when its calls could be counted.
+      const counted = kind === 'calls' && log && !log.unread.length ? `Call Summary, ${log.calls} call${log.calls === 1 ? '' : 's'}` : '';
+      const single = files.length === 1 && (form.title.trim() || counted);
+      for (const file of files) uploaded.push(await uploadReport({ ...form, kind, title: single || '', file }));
       const who = customers.find((c) => c.id === form.customer)?.login || form.customer.trim().toLowerCase();
+      // Only what went wrong is added to the message.
       let notes = '';
-      if (enterCalls && plan && toEnter(plan).length) {
-        const { saved, failed } = await enterBillingDays(form.customer, plan, dayLabel);
-        notes += saved ? ` Calls for ${saved} day${saved === 1 ? '' : 's'} entered in their billing.` : '';
-        if (failed.length) notes += ` Not entered: ${failed.join('; ')}.`;
+      if (kind === 'billing' && enterCalls && plan && toEnter(plan).length) {
+        const { failed } = await enterBillingDays(form.customer, plan, dayLabel);
+        if (failed.length) notes += ` Not entered in billing: ${failed.join('; ')}.`;
       }
       const telegram = byTelegram && telegramReady;
-      if ((notify || telegram) && canNotify) {
+      if (kind === 'calls' && (notify || telegram) && canNotify) {
         // One notice per channel for the whole upload. A failed notice never undoes the upload.
         const sent = await notifyReports(form.customer, uploaded.map((r) => r.id), { email: notify, telegram })
           .catch((err) => ({ emailed: false, reason: err.message, telegram: { sent: false, reason: err.message } }));
-        if (notify) notes += sent.emailed ? ` An email has been sent to ${sent.email}.` : ` The customer was not emailed: ${sent.reason}.`;
-        if (telegram) {
-          notes += sent.telegram?.sent
-            ? ` A Telegram message has been sent${sent.telegram.username ? ` to @${sent.telegram.username}` : ''}.`
-            : ` No Telegram message was sent: ${sent.telegram?.reason || 'unknown error'}.`;
-        }
+        if (notify && !sent.emailed) notes += ` Email not sent: ${sent.reason}.`;
+        if (telegram && !sent.telegram?.sent) notes += ` Telegram not sent: ${sent.telegram?.reason || 'unknown error'}.`;
       }
       setStatus('done');
-      setMessage(`${files.length} report${files.length === 1 ? '' : 's'} uploaded for ${who}. They can see ${files.length === 1 ? 'it' : 'them'} in their portal now.${notes}`);
+      const many = files.length > 1;
+      setMessage(`${kind === 'calls' ? `Call ${many ? 'summaries' : 'summary'}` : `Billing report${many ? 's' : ''}`} successfully uploaded for ${who}.${notes}`);
       setFiles([]);
       setForm({ ...form, title: '', note: '' });
       if (input.current) input.current.value = '';
@@ -232,8 +253,17 @@ function UploadForm({ customers, onDone }) {
     <form className="p-card p-form p-up__form" onSubmit={submit}>
       <header className="p-card__head">
         <div><h2>Upload a Report</h2><p>Excel or CSV, up to {MAX_MB} MB each.</p></div>
-        <button type="button" className="btn btn--quiet btn--sm" onClick={downloadTemplate}><Icon name="download" />Excel Template</button>
+        {kind === 'billing' && <button type="button" className="btn btn--quiet btn--sm" onClick={downloadTemplate}><Icon name="download" />Excel Template</button>}
       </header>
+      <div className="p-up__kind">
+        <span className="p-up__label">Report Type</span>
+        <div className="p-ranges" role="radiogroup" aria-label="Report type">
+          {Object.entries(KINDS).reverse().map(([k, name]) => (
+            <button key={k} type="button" role="radio" aria-checked={kind === k} className={kind === k ? 'is-on' : ''} onClick={() => setKind(k)}>{name}</button>
+          ))}
+        </div>
+        <small className="p-up__hint">{KIND_NOTES[kind]}</small>
+      </div>
       <label>Customer Login ID
         {customers.some((c) => c.id !== c.login) ? (
           <select required value={form.customer} onChange={set('customer')}>
@@ -251,8 +281,8 @@ function UploadForm({ customers, onDone }) {
         <label>From<input required type="date" value={form.periodFrom} max={today()} onChange={set('periodFrom')} /></label>
         <label>To<input required type="date" value={form.periodTo} max={today()} onChange={set('periodTo')} /></label>
       </div>
-      <label><span>Title <i className="p-optional">optional</i></span><input value={form.title} onChange={set('title')} maxLength={120} placeholder={files.length > 1 ? 'Each file keeps its own name' : 'e.g. Billing Report, Oct 23'} disabled={files.length > 1} /></label>
-      <label><span>Note for the Customer <i className="p-optional">optional</i></span><input value={form.note} onChange={set('note')} maxLength={300} placeholder="e.g. Includes the Oct 22 payment" /></label>
+      <label><span>Title <i className="p-optional">optional</i></span><input value={form.title} onChange={set('title')} maxLength={120} placeholder={files.length > 1 ? 'Each file keeps its own name' : kind === 'calls' ? `e.g. Call Summary, ${log?.calls ?? 72} calls` : 'e.g. Billing Report, Oct 23'} disabled={files.length > 1} /></label>
+      <label><span>{kind === 'calls' ? 'Note for the Customer' : 'Note'} <i className="p-optional">optional</i></span><input value={form.note} onChange={set('note')} maxLength={300} placeholder={kind === 'calls' ? 'e.g. Includes the evening calls' : 'e.g. Includes the Oct 22 payment'} /></label>
       <label
         className={`p-drop${drag ? ' is-over' : ''}${files.length ? ' has-files' : ''}`}
         onDragOver={(e) => { e.preventDefault(); setDrag(true); }}
@@ -262,19 +292,22 @@ function UploadForm({ customers, onDone }) {
         <input ref={input} type="file" accept={ACCEPT} multiple onChange={(e) => pick(e.target.files)} />
         <Icon name="download" className="p-icon p-drop__icon" />
         {files.length ? (
-          <span>{files.map((f) => <b key={f.name}>{f.name} <small>{fileSize(f.size)}</small></b>)}</span>
+          <span>
+            {files.map((f) => <b key={f.name}>{f.name} <small>{fileSize(f.size)}</small></b>)}
+            {kind === 'calls' && log && <small>{log.calls.toLocaleString('en-US')} call{log.calls === 1 ? '' : 's'}, {log.from === log.to ? dayLabel(log.from) : `${dayLabel(log.from)} to ${dayLabel(log.to)}`}</small>}
+          </span>
         ) : (
           <span><b>Drop Excel files here</b> or click to choose</span>
         )}
       </label>
-      {canEnterCalls && chosen && read?.days.length > 0 && (
+      {kind === 'billing' && canEnterCalls && chosen && read?.days.length > 0 && (
         <CallsFromFile read={read} billing={billing} plan={plan} enter={enterCalls} onEnter={setEnterCalls} />
       )}
-      {canNotify && (
+      {kind === 'calls' && canNotify && (
         <>
           <label className="p-check">
             <input type="checkbox" checked={notify} onChange={(e) => setNotify(e.target.checked)} />
-            <span><b>Email the customer</b><small>“Your report has been updated for (the report’s dates). You can now download it from your portal.” One email to their login ID, with a button that opens the report. The file itself is not attached.</small></span>
+            <span><b>Email the customer</b><small>“Your report has been updated for (the report’s dates). You can view your Call Summary report from your portal: (link)” One email to their login ID, with a button that opens the report. The file itself is not attached.</small></span>
           </label>
           <label className={`p-check${chosen && !telegramReady ? ' is-off' : ''}`}>
             <input type="checkbox" checked={byTelegram && telegramReady} onChange={(e) => setByTelegram(e.target.checked)} disabled={!telegramReady} />
@@ -290,7 +323,7 @@ function UploadForm({ customers, onDone }) {
         </>
       )}
       {message &&<p className={status === 'done' ? 'p-ok' : 'access-card__error'} role={status === 'done' ? 'status' : 'alert'}>{status === 'done' && <Icon name="check" />}{message}</p>}
-      <button type="submit" className="btn btn--light" disabled={status === 'sending'}>{status === 'sending' ? 'Uploading…' : `Upload${files.length > 1 ? ` ${files.length} Reports` : ''}`}</button>
+      <button type="submit" className="btn btn--light" disabled={status === 'sending' || reading}>{status === 'sending' ? 'Uploading…' : reading ? 'Reading the File…' : `Upload ${kind === 'calls' ? `Call Summar${files.length > 1 ? 'ies' : 'y'}` : `Billing Report${files.length > 1 ? 's' : ''}`}`}</button>
     </form>
   );
 }
@@ -318,7 +351,8 @@ export function ReportManager({ onSignedOut }) {
   useEffect(() => { load(); }, [load]);
 
   const remove = async (r) => {
-    if (!window.confirm(`Delete "${r.title}" for ${r.customer}? The customer will no longer be able to see it.`)) return;
+    const seen = r.kind === 'calls' ? ' The customer will no longer be able to see it.' : '';
+    if (!window.confirm(`Delete "${r.title}" for ${r.customer}?${seen}`)) return;
     try {
       await deleteReport(r.id);
       load();
@@ -331,7 +365,7 @@ export function ReportManager({ onSignedOut }) {
 
   return (
     <>
-      <div className="p-head"><div><h1>Customer Reports</h1><p>Upload a billing report, and it will appear in the customer's portal under Reports.</p></div></div>
+      <div className="p-head"><div><h1>Customer Reports</h1><p>Call Summaries appear in the customer's portal under Reports. Billing reports stay with our team.</p></div></div>
       <ErrorNote error={error} onRetry={load} />
       <div className="p-up__grid">
         <UploadForm customers={customers} onDone={load} />
@@ -352,7 +386,7 @@ export function ReportManager({ onSignedOut }) {
                         {r.customer}
                       </span>
                     </th>
-                    <td>{r.title}<small className="p-up__file">{r.filename} · {fileSize(r.size)}</small></td>
+                    <td>{r.title}<small className="p-up__file">{KINDS[r.kind] || KINDS.billing} · {r.filename} · {fileSize(r.size)}</small></td>
                     <td>{period(r)}</td>
                     <td>{new Date(r.uploaded_at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}</td>
                     <td><button type="button" className="p-iconbtn" aria-label={`Delete ${r.title}`} onClick={() => remove(r)}><Icon name="close" /></button></td>

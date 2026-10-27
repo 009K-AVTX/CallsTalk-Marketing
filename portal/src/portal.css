@@ -139,6 +139,10 @@
 .p-up__grid { display: grid; grid-template-columns: minmax(0, 420px) minmax(0, 1fr); gap: 20px; align-items: start; }
 .p-up__form { margin-bottom: 0; }
 .p-up__file { display: block; font-size: .78rem; color: var(--slate); }
+/* Upload: Call Summary or Billing Report */
+.p-up__kind { display: grid; gap: 6px; justify-items: start; }
+.p-up__label { font-size: .8rem; font-weight: 500; letter-spacing: .01em; }
+.p-up__kind .p-up__hint { font-size: .76rem; }
 /* Upload: the report's days, to enter in the buyer's billing (admins) */
 .p-import { display: grid; gap: 10px; }
 .p-import__table { max-height: 260px; border: 1px solid var(--line); border-radius: 12px; }

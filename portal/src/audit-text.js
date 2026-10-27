@@ -77,12 +77,14 @@ const FIELD = {
   outcome: 'Outcome', user: 'Person', target: 'About', about: 'By or About', action: 'Action', method: 'Method',
   paid_at: 'Paid', report_id: 'Report',
 };
+const REPORT_KINDS = { calls: 'Call Summary', billing: 'Billing Report' };
 const MONEY = new Set(['price_per_call', 'opening_balance', 'amount']);
 
 export function show(key, value) {
   if (value === null || value === undefined || value === '') return '—';
   if (MONEY.has(key) && !Number.isNaN(Number(value))) return money(value);
   if (key === 'role') return roleName(value) || value;
+  if (key === 'kind' && REPORT_KINDS[value]) return REPORT_KINDS[value];
   if (key === 'file_bytes') return value >= 1048576 ? `${(value / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(value / 1024))} KB`;
   if (key === 'emailed') return value ? 'Yes' : 'No';
   if (key === 'paid_at') return new Date(value).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
@@ -102,7 +104,7 @@ export function changes(row) {
   // The database keeps details as jsonb, which reorders keys: show them in FIELD's order instead.
   const rank = (k) => (k in FIELD ? Object.keys(FIELD).indexOf(k) : 999);
   const keys = [...new Set([...Object.keys(d).filter((k) => !SKIP.has(k)), ...Object.keys(before)])].sort((a, b) => rank(a) - rank(b));
-  const all = keys.map((k) => ({ key: k, field: fieldName(k), before: k in before ? show(k, before[k]) : null, after: k in d ? show(k, d[k]) : null }));
+  const all = keys.map((k) => ({ key: k, field: k === 'kind' && row.action.startsWith('report.') ? 'Type' : fieldName(k), before: k in before ? show(k, before[k]) : null, after: k in d ? show(k, d[k]) : null }));
   const changed = all.filter((c) => c.before === null || c.after === null || c.before !== c.after);
   if (!d.before) return all.filter((c) => c.after !== null);
   return changed.length ? changed : all.filter((c) => c.after !== null);
@@ -143,8 +145,8 @@ export function describe(row) {
       return `${d.amount ? money(d.amount) : 'A'} USDT deposit from ${who}, ${then}${now}`;
     }
     case 'payment.address': return `Opened Pay${d.amount ? ` for ${money(d.amount)}` : ''}`;
-    case 'report.upload': return `Uploaded "${d.title || d.filename || 'a report'}" for ${who}`;
-    case 'report.delete': return `Deleted "${b.title || 'a report'}" from ${who}`;
+    case 'report.upload': return `Uploaded ${d.kind === 'calls' ? 'the Call Summary' : 'the billing report'} "${d.title || d.filename || 'a report'}" for ${who}`;
+    case 'report.delete': return `Deleted ${b.kind === 'calls' ? 'the Call Summary' : 'the billing report'} "${b.title || 'a report'}" from ${who}`;
     case 'audit.export': return `Downloaded ${d.rows ?? ''} audit entr${d.rows === 1 ? 'y' : 'ies'} (${String(d.format || '').toUpperCase()})`;
     case 'finance.export': return `Downloaded the finance report for ${dayLabel(d.from)} to ${dayLabel(d.to)}${who ? `, ${who}` : ''} (${String(d.format || '').toUpperCase()})`;
     default: return `${actionName(row.action)}${who && !['auth', 'password', 'contacts', 'photo'].includes(row.action.split('.')[0]) ? `: ${who}` : ''}`;
