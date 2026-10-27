@@ -84,10 +84,10 @@ export default function Login() {
           <em>Portal</em>
         </a>
         <h1>Your CallsTalk Bill, Always Up to Date.</h1>
-        <p>See Your Balance and Daily Bills, Open the Billing Reports Our Team Sends You, and Settle Your Account Online.</p>
+        <p>See Your Balance and Daily Bills, Open the Call Summary Reports Our Team Sends You, and Settle Your Account Online.</p>
         <ul className="p-login__points">
           <li>Live Balance and Your Last 5 Days of Bills</li>
-          <li>Billing Reports from Our Team, in Excel</li>
+          <li>Call Summary Reports from Our Team, in Excel</li>
           <li>Pay in USDT (TRC-20) to Your Own Address</li>
         </ul>
       </div>

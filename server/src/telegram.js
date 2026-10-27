@@ -166,7 +166,7 @@ const HELP = `<b>Answering website chats</b>
 <b>Commands</b> (send as a reply or in the topic)
 /close: end the chat (the visitor sees your goodbye and can start a new chat)
 /close Your goodbye: end it with your own last message
-/buyers: every buyer, paid or pending, with their price, what they owe or hold in credit, and the calls it covers
+/buyers: every buyer, paid or pending, with what they owe or hold in credit, and the calls it covers
 /chatid: show this chat's id (for setup)`;
 
 async function handleMessage(msg) {

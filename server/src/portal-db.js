@@ -157,6 +157,9 @@ const SCHEMA = `
     uploaded_at   timestamptz NOT NULL DEFAULT now()
   );
   CREATE INDEX IF NOT EXISTS portal_reports_user ON portal_reports (user_id, uploaded_at);
+  -- 'billing': for the team only (an admin can enter its calls in billing). 'calls': a Call Summary, the buyer's to
+  -- view and download.
+  ALTER TABLE portal_reports ADD COLUMN IF NOT EXISTS kind text NOT NULL DEFAULT 'billing';
 
   -- Audit trail (audit.js): who did what, and when. One row per signed-in change, plus sign-ins, failed
   -- sign-ins and deposits. The person's email and role, and the target's name, are copied in when the row is
@@ -483,22 +486,23 @@ export const findWalletOwners = async (addresses) => new Map(
 
 // ── reports ──────────────────────────────────────────────────────────────────
 
-const REPORT_FIELDS = `r.id, u.email AS customer, r.user_id, r.title, r.note, r.period_from::text AS period_from,
+const REPORT_FIELDS = `r.id, u.email AS customer, r.user_id, r.kind, r.title, r.note, r.period_from::text AS period_from,
   r.period_to::text AS period_to, r.filename, r.size, r.uploaded_at`;
 
-export const listReports = (userId = null) => all(`
+// `kind`: 'billing' or 'calls' only, or null for both.
+export const listReports = (userId = null, kind = null) => all(`
   SELECT ${REPORT_FIELDS} FROM portal_reports r JOIN portal_users u ON u.id = r.user_id
-  WHERE $1::uuid IS NULL OR r.user_id = $1 ORDER BY r.uploaded_at DESC`, [userId]);
+  WHERE ($1::uuid IS NULL OR r.user_id = $1) AND ($2::text IS NULL OR r.kind = $2) ORDER BY r.uploaded_at DESC`, [userId, kind]);
 
 export const getReportFile = (id) =>
-  one('SELECT id, user_id, filename, content_type, content FROM portal_reports WHERE id = $1', [id]);
+  one('SELECT id, user_id, kind, filename, content_type, content FROM portal_reports WHERE id = $1', [id]);
 
 export const addReport = (r) => one(`
   WITH r AS (
-    INSERT INTO portal_reports (user_id, title, note, period_from, period_to, filename, content_type, size, content)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *)
+    INSERT INTO portal_reports (user_id, kind, title, note, period_from, period_to, filename, content_type, size, content)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *)
   SELECT ${REPORT_FIELDS} FROM r JOIN portal_users u ON u.id = r.user_id`,
-  [r.userId, r.title, r.note, r.periodFrom, r.periodTo, r.filename, r.contentType, r.content.length, r.content]);
+  [r.userId, r.kind, r.title, r.note, r.periodFrom, r.periodTo, r.filename, r.contentType, r.content.length, r.content]);
 
 export const deleteReport = (id) => pool.query('DELETE FROM portal_reports WHERE id = $1', [id]);
 

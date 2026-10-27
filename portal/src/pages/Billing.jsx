@@ -8,7 +8,7 @@ import { showUploadLink, UPLOAD_PATH } from '../reports.js';
 import { Link } from '../router.jsx';
 import { ReportNotice, ReportRow } from './Reports.jsx';
 
-// The portal's home: the latest billing reports, then the same bills as the website's Buyer Dashboard
+// The portal's home: the latest Call Summary reports, then the same bills as the website's Buyer Dashboard
 // (wallet, today, last three days, history since September, payments).
 export default function Billing({ statement, reports, unseen = [], onSeen }) {
   const { data, error, loading, load } = statement;
@@ -28,7 +28,7 @@ export default function Billing({ statement, reports, unseen = [], onSeen }) {
       {latest.length > 0 && (
         <section className="p-card p-latest">
           <header className="p-card__head">
-            <div><h2>Latest Reports</h2><p>Billing reports from our team.</p></div>
+            <div><h2>Latest Reports</h2><p>Call Summary reports from our team.</p></div>
             <div className="p-head__tools">
               {showUploadLink() && <a href={UPLOAD_PATH} target="_blank" rel="noopener" className="btn btn--quiet btn--sm"><Icon name="download" className="p-icon p-icon--up" />Upload</a>}
               <Link to="/reports" className="btn btn--quiet btn--sm">All Reports</Link>

@@ -3,9 +3,10 @@
 //  - Payment Received: each payment that completes, a USDT deposit found by the payment check or one an admin
 //    records, with where that buyer now stands. Posted in the billing chat, emailed to EMAIL_TO, and confirmed to
 //    the buyer by email and, if they connected it, on Telegram.
-//  - Daily Billing Summary: every buyer as Paid (in credit, and how many more calls it covers at their price) or
-//    Pending (what they owe, the calls it stands for, and any payment still confirming), in aligned monospace
-//    tables. /buyers in the support chat or the billing chat posts the same, as of that moment.
+//  - Daily Billing Summary: every buyer as Paid (in credit, and how many more calls it covers) or Pending (what
+//    they owe, the calls it stands for, and any payment still confirming), in aligned monospace tables. /buyers in
+//    the support chat or the billing chat posts the same, as of that moment.
+// No notice shows a buyer's price per call: the calls are worked out from it, but only the count is shown.
 // Both follow the same rules as each buyer's own bill and the admin's Finance page, so the figures always agree.
 // Admins switch each one on or off and set the summary's time in portal Settings.
 //
@@ -67,10 +68,12 @@ export function standing(balance, price) {
   return { paid: true, credit: balance, calls: price ? Math.floor(balance / price) : null };
 }
 
-function standingText(s, price) {
-  if (!s.paid) return `Pending · ${usd(s.owed)} still owed${s.calls !== null ? ` (${calls(s.calls)} at ${usd(price)})` : ''}`;
-  return `Paid · ${s.calls !== null ? `covers ${s.calls.toLocaleString('en-US')} more call${s.calls === 1 ? '' : 's'} at ${usd(price)}` : 'nothing owed'}`;
-}
+// "Status: Paid" then "Capacity: 29 calls" (what their credit covers), or "Status: Pending" then the calls they owe
+// for. The buyer's price is never shown in a notice; without one, only the status.
+const standingRows = (s) => [
+  ['Status', s.paid ? 'Paid' : 'Pending'],
+  ...(s.calls === null ? [] : [[s.paid ? 'Capacity' : 'Unpaid Calls', calls(s.calls)]]),
+];
 
 // ── Payment Received ─────────────────────────────────────────────────────────
 
@@ -91,7 +94,7 @@ function teamRows({ buyer, amount, method, note, balance, price, at = new Date()
     ...idRows(ids),
     ...(note ? [['Note', clip(note, 200)]] : []),
     ['Balance', usd(balance)],
-    ['Status', standingText(standing(balance, price), price)],
+    ...standingRows(standing(balance, price)),
     ['Time', formatClock(at)],
   ];
 }
@@ -179,7 +182,7 @@ function table(header, rows) {
 // The scheduled post and /buyers in the team's chat look the same.
 export function summaryText(customers, now = new Date()) {
   const rows = customers.map((c) => ({
-    name: c.customer, price: cents(c.price_per_call), confirming: cents(c.pending), ...standing(cents(c.balance_now), cents(c.price_per_call)),
+    name: c.customer, confirming: cents(c.pending), ...standing(cents(c.balance_now), cents(c.price_per_call)),
   }));
   const pending = rows.filter((r) => !r.paid).sort((a, b) => b.owed - a.owed || a.name.localeCompare(b.name));
   // Paid buyers closest to running out of credit first.
@@ -198,13 +201,12 @@ export function summaryText(customers, now = new Date()) {
   ];
   if (!rows.length) return [...head, '', 'No buyers yet.'].join('\n');
 
-  // A block per buyer, all in one monospace box per group: Buyer, Price and Balance (negative when they owe) as a
-  // table, then the calls that balance stands for: Remaining Calls on credit, or Unpaid Calls. Buyers are set apart
-  // by a dotted line with a blank line either side. Every block shares one set of column widths, so they line up.
+  // A block per buyer, all in one monospace box per group: Buyer and Balance (negative when they owe) as a table,
+  // then the calls that balance stands for: Remaining Calls on credit, or Unpaid Calls. Buyers are set apart by a
+  // dotted line with a blank line either side. Every block shares one set of column widths, so they line up.
   const listed = [...pending, ...paid];
-  const prices = amounts(listed.map((r) => r.price));
   const balances = amounts(listed.map((r) => (r.paid ? r.credit : -r.owed)));
-  const [header, ...lines] = table(['Buyer', 'Price', 'Balance'], listed.map((r, i) => [r.name, prices[i], balances[i]]));
+  const [header, ...lines] = table(['Buyer', 'Balance'], listed.map((r, i) => [r.name, balances[i]]));
   const blocks = listed.map((r, i) => escape([
     header, lines[i], `${r.paid ? 'Remaining Calls' : 'Unpaid Calls'} - ${r.calls === null ? 'no price set' : count(r.calls)}`,
   ].join('\n')));

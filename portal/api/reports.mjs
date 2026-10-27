@@ -3,7 +3,7 @@
 //
 //   GET    /api/reports?customer=<login id>          a customer's reports, newest first
 //   GET    /api/reports            (x-upload-key)    every report, for the staff upload page
-//   POST   /api/reports            (x-upload-key)    { customer, title, period_from, period_to, note, filename, content_base64 }
+//   POST   /api/reports            (x-upload-key)    { customer, kind, title, period_from, period_to, note, filename, content_base64 }
 //   DELETE /api/reports?id=<id>    (x-upload-key)
 //
 // Env: BLOB_READ_WRITE_TOKEN (from the connected Blob store), UPLOAD_KEY (shared with the billing team).
@@ -82,6 +82,7 @@ export default async function handler(req, res) {
       const report = {
         id,
         customer,
+        kind: b.kind === 'calls' ? 'calls' : 'billing',
         title: clean(b.title, 120) || filename.replace(/\.[^.]+$/, ''),
         note: clean(b.note, 300),
         period_from: b.period_from,

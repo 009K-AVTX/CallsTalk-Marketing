@@ -82,7 +82,7 @@ const ROUTES = [
   }],
   ['DELETE', /^\/staff\/reports\/(?<report>[^/]+)$/, 'report.delete', async (m) => {
     const r = UUID.test(m.report) ? await getReportInfo(m.report) : null;
-    return r && { id: r.user_id, label: r.customer, before: pick(r, ['title', 'filename', 'period_from', 'period_to']) };
+    return r && { id: r.user_id, label: r.customer, before: pick(r, ['kind', 'title', 'filename', 'period_from', 'period_to']) };
   }],
   ['PUT', /^\/accounts\/contacts$/, 'contacts.update'],
   ['PUT', /^\/accounts\/avatar$/, 'photo.update'],

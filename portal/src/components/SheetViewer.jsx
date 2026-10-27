@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { withCallHeader } from '../call-summary.js';
 import { fetchFile } from '../reports.js';
 import { dayLabel } from '../format.js';
 import Icon from './Icons.jsx';
@@ -25,7 +26,10 @@ export default function SheetViewer({ report, onClose }) {
       try {
         const [XLSX, data] = await Promise.all([import('xlsx'), fetchFile(report)]); // SheetJS loads only when a report is opened
         const wb = XLSX.read(data, { type: 'array', cellDates: true });
-        const sheets = wb.SheetNames.map((name) => ({ name, rows: XLSX.utils.sheet_to_json(wb.Sheets[name], { header: 1, raw: false, blankrows: false, defval: '' }) }));
+        const sheets = wb.SheetNames.map((name) => {
+          const rows = XLSX.utils.sheet_to_json(wb.Sheets[name], { header: 1, raw: false, blankrows: false, defval: '' });
+          return { name, rows: report.kind === 'calls' ? withCallHeader(rows) : rows }; // a call log has no header row
+        });
         if (live) setBook(sheets);
       } catch (err) {
         if (live) setError(err.message || 'This file could not be opened.');

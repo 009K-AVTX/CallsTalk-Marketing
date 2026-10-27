@@ -85,7 +85,7 @@ export default function TelegramConnect() {
       <header className="p-card__head">
         <div>
           <h2><TelegramIcon />Telegram Notifications</h2>
-          <p>Receive a Telegram message as soon as a new billing report is ready to download or a payment is received.</p>
+          <p>Receive a Telegram message as soon as a new Call Summary report is ready or a payment is received.</p>
         </div>
         {data && <span className={`p-pill ${data.connected ? 'is-ok' : link ? 'is-wait' : ''}`}>{data.connected ? 'Connected' : link ? 'Waiting' : 'Not Connected'}</span>}
       </header>

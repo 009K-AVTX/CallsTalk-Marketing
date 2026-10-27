@@ -77,7 +77,7 @@ telegramLinkRouter.delete('/', async (req, res) => {
 // ── the bot's private chats ──────────────────────────────────────────────────
 
 const NOT_LINKED = '<b>CallsTalk Notifications</b>\n\n'
-  + 'This bot sends notices from your CallsTalk Portal, such as new billing reports and payment confirmations.\n\n'
+  + 'This bot sends notices from your CallsTalk Portal, such as new Call Summary reports and payment confirmations.\n\n'
   + 'To turn them on, log in to the portal, open <b>Settings</b> and press <b>Connect Telegram</b>.';
 
 const reply = (msg, text) => sendTo(msg.chat.id, text).catch((err) => console.error('[telegram] could not answer a private chat:', err.message));
@@ -101,7 +101,7 @@ export async function handlePrivateMessage(msg, command) {
     });
     return reply(msg, '<b>Telegram Connected</b>\n\n'
       + `This chat is now linked to your CallsTalk Portal login <b>${escape(user.email)}</b>. `
-      + 'We will message you here when a new billing report is ready or a payment is received.\n\n'
+      + 'We will message you here when a new Call Summary report is ready or a payment is received.\n\n'
       + 'To stop these messages, send /stop or press <b>Disconnect</b> in your portal Settings.');
   }
 
@@ -144,9 +144,9 @@ export async function sendToCustomer(userId, text, extra = {}) {
 const dayText = (iso) => new Date(`${iso}T12:00:00Z`).toLocaleDateString('en-US', { timeZone: 'UTC', month: 'short', day: 'numeric', year: 'numeric' });
 const periodText = (r) => (r.period_from === r.period_to ? dayText(r.period_from) : `${dayText(r.period_from)} to ${dayText(r.period_to)}`);
 
-// "Your report has been updated for <the days it covers>. You can now download it from your portal." with the new
-// report(s) and a button to the portal. `reports`: oldest first.
-export function reportReadyText(reports) {
+// "Your report has been updated for <the days it covers>. You can view your Call Summary report from your portal (link)."
+// with the new report(s) and a button to the portal. `reports`: oldest first.
+export function reportReadyText(reports, link) {
   const one = reports.length === 1;
   const span = periodText({
     period_from: reports.map((r) => r.period_from).sort()[0],
@@ -162,14 +162,14 @@ export function reportReadyText(reports) {
   const { shown, rest } = fitLines(lines, TELEGRAM_BUDGET - 300);
   if (rest) shown.push(`…and ${rest} more in your portal`);
   return `<b>${one ? 'Your report has been updated' : 'Your reports have been updated'} for ${escape(span)}.</b>\n`
-    + `You can now download ${one ? 'it' : 'them'} from your portal.\n\n` + shown.join('\n');
+    + `You can view your Call Summary report${one ? '' : 's'} from your portal: ${escape(link)}\n\n` + shown.join('\n');
 }
 
 // Telegram only takes public https links on buttons (not a local http://localhost portal).
 const linkButton = (text, url) => (/^https:\/\//.test(url) ? { reply_markup: { inline_keyboard: [[{ text, url }]] } } : {});
 
 export function reportReadyToTelegram(userId, reports, link) {
-  return sendToCustomer(userId, reportReadyText(reports), linkButton(reports.length === 1 ? 'Open Report' : 'Open Reports', link));
+  return sendToCustomer(userId, reportReadyText(reports, link), linkButton(reports.length === 1 ? 'Open Report' : 'Open Reports', link));
 }
 
 // A completed payment: `amount` and `details` ([label, value, kind] rows) as in the buyer's email (billing-notices.js).

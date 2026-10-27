@@ -1,15 +1,19 @@
-// What the portal shows a signed-in customer, and the billing team's report uploads.
+// What the portal shows a signed-in customer, and the team's report uploads.
 // Same calls as docs/customer-billing-api.md and docs/portal-reports-api.md, served from our own database.
 //
 //   GET    /api/billing/statement?from=YYYY-MM-DD  (customer)  balance and the last five days' bills
 //   POST   /api/billing/statement/pay              (customer)  their USDT (TRC-20) payment address (payments.js)
-//   GET    /api/portal/reports                     (customer)  their reports, newest first
-//   GET    /api/portal/reports/:id/file            (customer, or staff/admin for any report)
+//   GET    /api/portal/reports                     (customer)  their Call Summary reports, newest first
+//   GET    /api/portal/reports/:id/file            (customer for their Call Summaries, or staff/admin for any report)
 //   GET    /api/staff/customers                    (staff, admin)  customers who have a login
-//   GET    /api/staff/reports                      (staff, admin)  every report
+//   GET    /api/staff/reports                      (staff, admin)  every report, of both kinds
 //   POST   /api/staff/reports                      (staff, admin)  upload a report for a customer
 //   POST   /api/staff/reports/notify               (staff, admin)  { customer, reports: [ids], email, telegram }: tell the customer
 //   DELETE /api/staff/reports/:id                  (staff, admin)
+//
+// A report is one of two kinds. A billing report ('billing') is for the team: an admin can enter its calls in the
+// buyer's billing with the upload (portal/src/billing-import.js), and the buyer never sees it. A Call Summary ('calls'),
+// the day's call log, is what the buyer views and downloads, and what they are told about.
 
 import { Router } from 'express';
 import { requireUser } from './accounts.js';
@@ -30,6 +34,7 @@ const TYPES = {
   csv: 'text/csv',
 };
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
+const KINDS = ['billing', 'calls'];
 
 export const portalRouter = Router();
 
@@ -60,12 +65,13 @@ portalRouter.post('/billing/statement/pay', requireUser('customer'), async (req,
 });
 
 portalRouter.get('/portal/reports', requireUser('customer'), async (req, res) => {
-  res.json({ results: await listReports(req.user.id) });
+  res.json({ results: await listReports(req.user.id, 'calls') });
 });
 
 portalRouter.get('/portal/reports/:id/file', requireUser('customer', 'staff', 'admin'), async (req, res) => {
   const report = UUID.test(req.params.id) && await getReportFile(req.params.id);
-  if (!report || (req.user.role === 'customer' && report.user_id !== req.user.id)) throw new HttpError(404, 'That report no longer exists.');
+  const theirs = report && report.user_id === req.user.id && report.kind === 'calls';
+  if (!report || (req.user.role === 'customer' && !theirs)) throw new HttpError(404, 'That report no longer exists.');
   res.setHeader('Content-Type', report.content_type);
   res.setHeader('Content-Disposition', `attachment; filename="${report.filename.replace(/["\\\r\n]/g, '_')}"`);
   res.send(report.content);
@@ -93,6 +99,7 @@ staff.post('/reports', async (req, res) => {
   const body = req.body || {};
   const customer = UUID.test(body.customer) && await getUser(body.customer);
   if (!customer || customer.role !== 'customer') throw new HttpError(400, 'Choose a customer.');
+  if (!KINDS.includes(body.kind)) throw new HttpError(400, 'Choose whether this is a billing report or a Call Summary.');
   const filename = typeof body.filename === 'string' ? body.filename.trim().slice(0, 200) : '';
   const ext = filename.split('.').pop().toLowerCase();
   if (!TYPES[ext] || !filename.includes('.')) throw new HttpError(400, 'Only Excel (.xlsx, .xls) and .csv files can be uploaded.');
@@ -105,11 +112,12 @@ staff.post('/reports', async (req, res) => {
   const title = (typeof body.title === 'string' ? body.title.trim().slice(0, 120) : '') || filename.replace(/\.[^.]+$/, '');
   const note = typeof body.note === 'string' ? body.note.trim().slice(0, 300) : '';
   res.status(201).json(await addReport({
-    userId: customer.id, title, note, periodFrom: body.period_from, periodTo: body.period_to, filename, contentType: TYPES[ext], content,
+    userId: customer.id, kind: body.kind, title, note, periodFrom: body.period_from, periodTo: body.period_to, filename, contentType: TYPES[ext], content,
   }));
 });
 
-// After an upload (one file or several): tell the customer about the new reports, once for the whole upload.
+// After an upload (one file or several): tell the customer about the new Call Summaries, once for the whole upload.
+// Billing reports are never announced: the customer cannot open them.
 // body: { customer, reports: [ids], email = true, telegram = false }
 // -> { emailed, email | reason, telegram: { sent, username | reason } }. Each channel's outcome is reported on its own,
 // and a failed notice never undoes the upload. Only customers who can log in are told.
@@ -118,8 +126,8 @@ staff.post('/reports/notify', rateLimit({ windowMs: 10 * 60_000, max: 30 }), asy
   const customer = UUID.test(body.customer) && await getUser(body.customer);
   if (!customer || customer.role !== 'customer') throw new HttpError(400, 'Choose a customer.');
   const ids = new Set((Array.isArray(body.reports) ? body.reports : []).filter((id) => UUID.test(id)));
-  const reports = (await listReports(customer.id)).filter((r) => ids.has(r.id)).reverse(); // oldest first
-  if (!reports.length) throw new HttpError(400, 'No reports to notify the customer about.');
+  const reports = (await listReports(customer.id, 'calls')).filter((r) => ids.has(r.id)).reverse(); // oldest first
+  if (!reports.length) throw new HttpError(400, 'No Call Summary reports to notify the customer about.');
   const wantEmail = body.email !== false;
   const wantTelegram = body.telegram === true;
 
