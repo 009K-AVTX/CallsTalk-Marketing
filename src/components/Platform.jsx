@@ -1,6 +1,10 @@
 import ChatButton from './ChatButton.jsx';
 import { useRef, useState } from 'react';
 import { features } from '../data.js';
+import { PORTAL_URL } from '../legal.js';
+
+// The address bar of the product mock-up shows the portal's own address.
+const PORTAL_HOST = PORTAL_URL.replace(/^https?:\/\//, '');
 
 const inquiries = [
   { type: 'Call', channel: 'Paid Search', detail: '“same-day plumbing”', meta: '3m 12s' },
@@ -152,7 +156,7 @@ export default function Platform() {
           <div className="app" aria-hidden="true">
             <div className="app__bar">
               <i /><i /><i />
-              <span className="app__url">app.callstalk.io/{['inquiries', 'leads/4821', 'reports/revenue'][active]}</span>
+              <span className="app__url">{PORTAL_HOST}/{['inquiries', 'leads/4821', 'reports/revenue'][active]}</span>
             </div>
             <div className="app__body">
               <nav className="app__side">
