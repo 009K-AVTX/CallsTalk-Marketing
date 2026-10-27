@@ -159,24 +159,29 @@ function UploadForm({ customers, onDone }) {
 
   // The chosen files, read both ways. A billing report's days (Excel template or Financial Overview format) set its
   // period, and admins can enter them in the buyer's billing with the upload; only admins change billing. A Call
-  // Summary's calls set its period. The type follows what the files turn out to be.
+  // Summary's calls, when it lists them as the dialer exports them, set its period and count; any other layout is
+  // uploaded as it is. The type follows what the files turn out to be. Upload waits until the files have been read
+  // (the first time, the spreadsheet reader itself has to load).
   const canEnterCalls = canNotify && isAdmin();
   const [read, setRead] = useState(null); // billing days: { days, skipped } or null
   const [log, setLog] = useState(null); // calls: { calls, from, to, unread } or null
+  const [reading, setReading] = useState(false);
   const [billing, setBilling] = useState(null); // { data } | { error } for the chosen buyer
   const [enterCalls, setEnterCalls] = useState(false);
   useEffect(() => {
     let gone = false;
     setRead(null);
     setLog(null);
+    setReading(files.length > 0);
     if (files.length) {
       Promise.all([readBillingDays(files), readCallSummary(files)]).then(([days, calls]) => {
         if (gone) return;
         setRead(days);
         setLog(calls);
+        setReading(false);
         if (calls && !days?.days.length) setKind('calls');
         else if (days?.days.length && !calls) setKind('billing');
-      });
+      }, () => !gone && setReading(false));
     }
     return () => { gone = true; };
   }, [files]);
@@ -206,18 +211,15 @@ function UploadForm({ customers, onDone }) {
     e.preventDefault();
     if (!files.length) return setMessage('Choose a file to upload.');
     if (form.periodFrom > form.periodTo) return setMessage('The start date is after the end date.');
-    // A billing report must never reach the customer, and a call log is no billing report.
-    if (kind === 'calls' && read?.days.length) return setMessage('This is a billing report, not a call log. Choose Billing Report: customers do not see those.');
-    if (kind === 'calls' && !log) return setMessage('This does not look like a Call Summary: no row starts with a call\'s date and time (e.g. 2026-10-26 15:22:51).');
-    if (kind === 'calls' && log.unread.length) return setMessage(`No calls were found in ${log.unread.join(', ')}. Upload Call Summaries only.`);
-    if (kind === 'billing' && log && !read) return setMessage(`This is a call log (${log.calls} calls). Choose Call Summary to share it with the customer.`);
+    if (reading) return;
     setStatus('sending');
     setMessage('');
     try {
       const uploaded = [];
       // With several files, each takes its own name as the title unless one title was given for a single file. A
-      // single Call Summary without one is "Call Summary, 72 calls".
-      const single = files.length === 1 && (form.title.trim() || (kind === 'calls' ? `Call Summary, ${log.calls} call${log.calls === 1 ? '' : 's'}` : ''));
+      // single Call Summary without one is "Call Summary, 72 calls" when its calls could be counted.
+      const counted = kind === 'calls' && log && !log.unread.length ? `Call Summary, ${log.calls} call${log.calls === 1 ? '' : 's'}` : '';
+      const single = files.length === 1 && (form.title.trim() || counted);
       for (const file of files) uploaded.push(await uploadReport({ ...form, kind, title: single || '', file }));
       const who = customers.find((c) => c.id === form.customer)?.login || form.customer.trim().toLowerCase();
       let notes = '';
@@ -327,7 +329,7 @@ function UploadForm({ customers, onDone }) {
         </>
       )}
       {message &&<p className={status === 'done' ? 'p-ok' : 'access-card__error'} role={status === 'done' ? 'status' : 'alert'}>{status === 'done' && <Icon name="check" />}{message}</p>}
-      <button type="submit" className="btn btn--light" disabled={status === 'sending'}>{status === 'sending' ? 'Uploading…' : `Upload ${kind === 'calls' ? `Call Summar${files.length > 1 ? 'ies' : 'y'}` : `Billing Report${files.length > 1 ? 's' : ''}`}`}</button>
+      <button type="submit" className="btn btn--light" disabled={status === 'sending' || reading}>{status === 'sending' ? 'Uploading…' : reading ? 'Reading the File…' : `Upload ${kind === 'calls' ? `Call Summar${files.length > 1 ? 'ies' : 'y'}` : `Billing Report${files.length > 1 ? 's' : ''}`}`}</button>
     </form>
   );
 }

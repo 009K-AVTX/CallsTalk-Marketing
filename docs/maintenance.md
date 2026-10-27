@@ -761,9 +761,10 @@ Customers log in at **https://portal.callstalk.com** (the website's Log In goes 
 - **Two kinds of report:** the upload form asks for the **Report Type**, and picks it from the file when it can.
   - **Call Summary**: the day's call log as the dialer exports it, one call a row with no header (date and time,
     caller, number called, duration, status, who hung up; e.g. `C4V - 72.xlsx`). This is the only report the
-    customer sees: under **Reports** and on their Billing page, to view (with column names added) or download. Its
-    calls set the period, and without a title it is named "Call Summary, 72 calls". The customer is told about it
-    (below). A file in which no row starts with a call's date and time is refused, and so is a billing report.
+    customer sees: under **Reports** and on their Billing page, to view (with column names added) or download. When
+    its rows start with each call's date and time, its calls set the period and, without a title, it is named
+    "Call Summary, 72 calls". Any other Excel or CSV layout is uploaded as it is, with the dates and title entered on
+    the form. The customer is told about it (below). Upload waits until the file has been read.
   - **Billing Report**: for the team only. The customer never sees it and is not told about it. It is where an admin
     can enter calls in the customer's billing (next point). Reports uploaded before this change count as billing
     reports, so customers no longer see them.
