@@ -447,14 +447,6 @@ h3 { font-size: 1.5rem; }
 .answer__result { padding: 14px 16px; border-radius: 14px; background: rgba(214, 163, 255, .08); border: 1px solid rgba(214, 163, 255, .28); }
 .answer__result b { display: block; font: 600 1.02rem var(--serif); color: var(--accent); }
 .answer__result span { font-size: .9rem; color: var(--on-dark-soft); }
-.reviews { display: grid; grid-template-columns: 1fr 1fr; gap: 72px 64px; margin-top: 72px; }
-.review { margin: 0; }
-.review blockquote { margin: 0 0 24px; font-family: var(--serif); font-weight: 600; font-size: 1.45rem; line-height: 1.4; }
-.review--featured { grid-column: 1 / -1; padding-bottom: 72px; border-bottom: 1px solid var(--rule); }
-.review--featured blockquote { font-size: clamp(2rem, 3.6vw, 3rem); line-height: 1.2; letter-spacing: -.02em; max-width: 26ch; }
-.review figcaption { display: flex; align-items: center; gap: 14px; font-size: .95rem; color: var(--slate); }
-.review figcaption b { display: block; color: var(--graphite); font-weight: 500; }
-.avatar { flex: none; width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; font-family: var(--serif); font-size: 1.15rem; color: var(--graphite); border: 1px solid var(--accent); }
 
 /* Updates */
 .updates__inner { display: grid; grid-template-columns: 4fr 8fr; gap: 64px; }
@@ -840,7 +832,7 @@ h3 { font-size: 1.5rem; }
   .feed__meta { display: none; }
   .lead-card { flex-direction: column; align-items: flex-start; }
   .lead-facts dd { font-size: 1.2rem; }
-  .capabilities, .steps, .reviews { grid-template-columns: 1fr; }
+  .capabilities, .steps { grid-template-columns: 1fr; }
   .footer__cols { grid-template-columns: 1fr 1fr; row-gap: 28px; }
   .footer__cols > div:first-child { grid-column: 1 / -1; }
   /* Plans stay a 2 x 2 grid on phones, tightened to fit. */
