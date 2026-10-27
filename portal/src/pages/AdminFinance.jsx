@@ -8,6 +8,7 @@ import { downloadCsv, downloadPdf } from '../exports.js';
 import { dayLabel, money } from '../format.js';
 import { Link } from '../router.jsx';
 import useLoad from '../useLoad.js';
+import Select from '../../../src/components/Select.jsx';
 
 const PAYMENTS = 15;
 const CUSTOMERS = 25;
@@ -212,10 +213,10 @@ export default function AdminFinance({ onSignedOut }) {
         <Period value={range} onChange={setRange} />
         <label className="p-select">
           <span className="sr-only">Customer</span>
-          <select value={customer} onChange={(e) => setCustomer(e.target.value)}>
+          <Select value={customer} onChange={(e) => setCustomer(e.target.value)}>
             <option value="">All Customers</option>
             {customers.map((c) => <option key={c.id} value={c.id}>{c.company || c.name || c.email}</option>)}
-          </select>
+          </Select>
         </label>
       </div>
       <ErrorNote error={report.error} onRetry={range.invalid ? null : report.reload} />

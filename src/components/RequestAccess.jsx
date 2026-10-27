@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import Select from './Select.jsx';
 
 const VOLUMES = ['Under 100', '100–1,000', '1,000–10,000', 'Over 10,000'];
 const EMPTY = { name: '', email: '', company: '', phone: '', volume: '', message: '', website: '' };
@@ -52,10 +53,10 @@ export default function RequestAccess() {
         <label>Company<input required value={form.company} onChange={set('company')} autoComplete="organization" maxLength={120} /></label>
         <label><span className="access-card__name">Phone <i>optional</i></span><input type="tel" value={form.phone} onChange={set('phone')} autoComplete="tel" maxLength={40} /></label>
         <label className="access-card__wide">Calls per Month
-          <select value={form.volume} onChange={set('volume')}>
+          <Select value={form.volume} onChange={set('volume')}>
             <option value="">Select a Range</option>
             {VOLUMES.map((v) => <option key={v} value={v}>{v}</option>)}
-          </select>
+          </Select>
         </label>
         <label className="access-card__wide"><span className="access-card__name">What would you like to track? <i>optional</i></span>
           <textarea rows="3" value={form.message} onChange={set('message')} maxLength={1000} />

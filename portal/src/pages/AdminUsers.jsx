@@ -6,6 +6,7 @@ import { ErrorNote, PageHead } from '../components/Shell.jsx';
 import { money, today } from '../format.js';
 import { navigate } from '../router.jsx';
 import useLoad from '../useLoad.js';
+import Select from '../../../src/components/Select.jsx';
 
 export const ROLE_LABEL = { customer: 'Customer', staff: 'Staff', admin: 'Admin' };
 
@@ -92,7 +93,7 @@ function NewLogin({ onCreated }) {
           </div>
           <div className="p-form__row">
             <label>Billing Starts<input required type="date" value={form.start_date} max={today()} onChange={set('start_date')} /></label>
-            <label>Days Counted In<select value={form.timezone} onChange={set('timezone')}>{TIME_ZONES.map((z) => <option key={z} value={z}>{z.replace(/_/g, ' ')}</option>)}</select></label>
+            <label>Days Counted In<Select value={form.timezone} onChange={set('timezone')}>{TIME_ZONES.map((z) => <option key={z} value={z}>{z.replace(/_/g, ' ')}</option>)}</Select></label>
           </div>
         </>
       ) : <p className="p-admin__note">{form.role === 'staff'
