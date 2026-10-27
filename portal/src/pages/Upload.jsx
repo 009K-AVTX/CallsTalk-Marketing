@@ -149,7 +149,7 @@ function UploadForm({ customers, onDone }) {
   const chosen = customers.find((c) => c.id === form.customer);
   const telegramReady = Boolean(chosen?.telegram);
 
-  // The days in the chosen files (Excel template format): they set the report's period, and admins can enter them
+  // The days in the chosen files (Excel template or Financial Overview format): they set the report's period, and admins can enter them
   // in the buyer's billing with the upload. Only admins change billing; staff upload as before.
   const canEnterCalls = canNotify && isAdmin();
   const [read, setRead] = useState(null); // { days, skipped } or null

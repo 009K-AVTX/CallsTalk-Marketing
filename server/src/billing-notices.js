@@ -176,8 +176,8 @@ function table(header, rows) {
 }
 
 // `customers`: rows from financeReport (finance.js). Pure, so it can be checked without a database.
-// `title`: "Daily Billing Summary" for the scheduled post; /buyers in the team's chat asks for one now.
-export function summaryText(customers, now = new Date(), { title = 'Daily Billing Summary' } = {}) {
+// The scheduled post and /buyers in the team's chat look the same.
+export function summaryText(customers, now = new Date()) {
   const rows = customers.map((c) => ({
     name: c.customer, price: cents(c.price_per_call), confirming: cents(c.pending), ...standing(cents(c.balance_now), cents(c.price_per_call)),
   }));
@@ -186,14 +186,15 @@ export function summaryText(customers, now = new Date(), { title = 'Daily Billin
   const paid = rows.filter((r) => r.paid).sort((a, b) => (a.calls ?? Infinity) - (b.calls ?? Infinity) || a.name.localeCompare(b.name));
   const sum = (list, k) => list.reduce((t, r) => t + (r[k] || 0), 0);
   const day = new Intl.DateTimeFormat('en-US', { timeZone: TZ, weekday: 'short', month: 'short', day: 'numeric' }).format(now);
-  const when = title === 'Daily Billing Summary' ? day : `${day}, ${formatClock(now)}`;
 
   const head = [
-    `<b>${title}</b> · ${when}`,
+    '<b>Daily Billing Summary</b>',
     '',
-    `<b>Owed:</b> ${usd(sum(pending, 'owed'))}`,
-    `<b>Credit:</b> ${usd(sum(paid, 'credit'))}`,
-    ...(sum(rows, 'confirming') ? [`<b>Confirming:</b> ${usd(sum(rows, 'confirming'))}`] : []),
+    day,
+    '',
+    `• <b>Owed:</b> ${usd(sum(pending, 'owed'))}`,
+    `• <b>Credit:</b> ${usd(sum(paid, 'credit'))}`,
+    ...(sum(rows, 'confirming') ? [`• <b>Confirming:</b> ${usd(sum(rows, 'confirming'))}`] : []),
   ];
   if (!rows.length) return [...head, '', 'No buyers yet.'].join('\n');
 
@@ -218,22 +219,22 @@ export function summaryText(customers, now = new Date(), { title = 'Daily Billin
   const pendingBlocks = blocks.slice(0, pending.length);
   const paidBlocks = blocks.slice(pending.length);
 
-  // Pending comes first and gets the room it needs, leaving at least a few buyers' worth for Paid.
+  // Paid is shown first, but Pending gets the room it needs, leaving at least a few buyers' worth for Paid.
   const top = head.join('\n').length + 60; // the head and both group titles
   const keepForPaid = Math.min(paidBlocks.join(between).length + MORE, 800);
-  const section = (name, list, text) => (list.length ? ['', `<b>${name} (${list.length})</b>`, '', text] : ['', `<b>${name}:</b> none`]);
+  const section = (name, list, text) => ['', `<b>${name}</b>`, list.length ? text : 'None'];
   const pendingText = pending.length ? group(pendingBlocks, TELEGRAM_BUDGET - top - keepForPaid) : '';
   const paidText = paid.length ? group(paidBlocks, TELEGRAM_BUDGET - top - pendingText.length) : '';
-  return [...head, ...section('Pending', pending, pendingText), ...section('Paid', paid, paidText)].join('\n');
+  return [...head, ...section('Paid', paid, paidText), ...section('Pending', pending, pendingText)].join('\n');
 }
 
 // The summary as of `now`, with every buyer who is billed and can still log in.
-export async function billingSummary(now = new Date(), options = {}) {
+export async function billingSummary(now = new Date()) {
   const today = localDate(now, 'UTC');
   // Payments still confirming are counted over the last 60 days; balances always run from each buyer's start.
   const report = await financeReport({ from: addDays(today, -60), to: addDays(today, 1), now });
   const live = report.customers.filter((c) => c.status !== 'disabled' && c.billing_since <= today);
-  return summaryText(live, now, options);
+  return summaryText(live, now);
 }
 
 export async function sendSummary(now = new Date()) {
@@ -242,7 +243,7 @@ export async function sendSummary(now = new Date()) {
 
 // /buyers in the support chat or the billing chat: the same summary, as of now, as a reply.
 export async function buyersReply() {
-  const text = await billingSummary(new Date(), { title: 'Billing Summary' });
+  const text = await billingSummary(new Date());
   return live ? text : `<b>Local test</b>\n\n${text}`;
 }
 
