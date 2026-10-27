@@ -222,29 +222,23 @@ function UploadForm({ customers, onDone }) {
       const single = files.length === 1 && (form.title.trim() || counted);
       for (const file of files) uploaded.push(await uploadReport({ ...form, kind, title: single || '', file }));
       const who = customers.find((c) => c.id === form.customer)?.login || form.customer.trim().toLowerCase();
+      // Only what went wrong is added to the message.
       let notes = '';
       if (kind === 'billing' && enterCalls && plan && toEnter(plan).length) {
-        const { saved, failed } = await enterBillingDays(form.customer, plan, dayLabel);
-        notes += saved ? ` Calls for ${saved} day${saved === 1 ? '' : 's'} entered in their billing.` : '';
-        if (failed.length) notes += ` Not entered: ${failed.join('; ')}.`;
+        const { failed } = await enterBillingDays(form.customer, plan, dayLabel);
+        if (failed.length) notes += ` Not entered in billing: ${failed.join('; ')}.`;
       }
       const telegram = byTelegram && telegramReady;
       if (kind === 'calls' && (notify || telegram) && canNotify) {
         // One notice per channel for the whole upload. A failed notice never undoes the upload.
         const sent = await notifyReports(form.customer, uploaded.map((r) => r.id), { email: notify, telegram })
           .catch((err) => ({ emailed: false, reason: err.message, telegram: { sent: false, reason: err.message } }));
-        if (notify) notes += sent.emailed ? ` An email has been sent to ${sent.email}.` : ` The customer was not emailed: ${sent.reason}.`;
-        if (telegram) {
-          notes += sent.telegram?.sent
-            ? ` A Telegram message has been sent${sent.telegram.username ? ` to @${sent.telegram.username}` : ''}.`
-            : ` No Telegram message was sent: ${sent.telegram?.reason || 'unknown error'}.`;
-        }
+        if (notify && !sent.emailed) notes += ` Email not sent: ${sent.reason}.`;
+        if (telegram && !sent.telegram?.sent) notes += ` Telegram not sent: ${sent.telegram?.reason || 'unknown error'}.`;
       }
       setStatus('done');
-      const n = files.length;
-      setMessage(kind === 'calls'
-        ? `${n} Call Summar${n === 1 ? 'y' : 'ies'} uploaded for ${who}. They can view ${n === 1 ? 'it' : 'them'} in their portal now.${notes}`
-        : `${n} billing report${n === 1 ? '' : 's'} uploaded for ${who}, for our team only.${notes}`);
+      const many = files.length > 1;
+      setMessage(`${kind === 'calls' ? `Call ${many ? 'summaries' : 'summary'}` : `Billing report${many ? 's' : ''}`} successfully uploaded for ${who}.${notes}`);
       setFiles([]);
       setForm({ ...form, title: '', note: '' });
       if (input.current) input.current.value = '';
