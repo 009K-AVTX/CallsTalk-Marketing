@@ -2,9 +2,10 @@
 
 Backend for the website's "Talk to Our Team" chat.
 
-- Each new chat is posted to your team's Telegram with the visitor's name, email, time (for example 3:20 PM EST)
-  and their message. Name and email appear only if the visitor filled in the "Talk to Our Team" form;
-  a question typed straight into the chat shows up as **Visitor**.
+- Each new chat is posted to your team's Telegram with the visitor's name, time (for example 3:20 PM EST)
+  and their message. The name appears only if the visitor filled in the "Talk to Our Team" form;
+  a question typed straight into the chat shows up as **Visitor**. Chats from customers signed in to the
+  portal also show their company and login email.
 - Each later visitor message is forwarded to the same Telegram chat.
 - When someone on the team replies in Telegram, the reply appears in the visitor's chat window
   within a few seconds.
@@ -46,8 +47,9 @@ Set `EMAIL_TO`, the `SMTP_*` settings, `EMAIL_FROM` and `PUBLIC_URL` in `.env` (
 - **Reply in the chat** opens `https://<PUBLIC_URL>/reply/<link>`. On that page you can send
   an answer or end the chat (anything typed is sent as the goodbye). Telegram is told about anything sent from the page, so the team
   stays in sync.
-- Pressing **Reply** in your mail app emails the visitor directly, because Reply-To is their
-  address. That reply does not appear in the website chat.
+- For a portal customer's chat, pressing **Reply** in your mail app emails the customer directly, because
+  Reply-To is their login email. That reply does not appear in the chat. Website visitors give no email
+  address, so answer them with **Reply in the chat**.
 - Links are signed with a secret that the server creates and stores in its database. They expire after
   `REPLY_LINK_DAYS` (30 by default). Anyone who has a link can reply as the team, so don't forward
   the emails outside the team.

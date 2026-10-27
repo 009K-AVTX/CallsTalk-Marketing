@@ -1,8 +1,6 @@
-# CallsTalk Portal: what Avortyx must provide
+# CallsTalk Portal: report endpoints
 
-> **Now served by our own server** (`server/src/accounts.js`, `server/src/portal.js`, data in PostgreSQL, entered by admins in the portal). Every login also has a 6-digit authenticator code, so `/accounts/login` always answers `mfa_required`. See [maintenance.md, section 16](maintenance.md#16-customer-portal-portalcallstalkcom).
-
-**From:** CallsTalk Portal (frontend, done, in `portal/`) · **For:** Avortyx backend developer · **Switch-over:** next week
+Served by our own server (`server/src/accounts.js`, `server/src/portal.js`, data in PostgreSQL, entered by admins in the portal). Every login also has a 6-digit authenticator code, so `/accounts/login` always answers `mfa_required`. Running it: [maintenance.md, section 16](maintenance.md#16-customer-portal-portalcallstalkcom).
 
 The portal is a **billing portal**. Customers see their balance and daily bills, pay online, and open the **billing reports** our team uploads as Excel files. They never see caller numbers or call lists.
 
@@ -51,22 +49,13 @@ For `POST`:
 - `title` may be empty; default it to the file name without its extension.
 - Reject `period_from > period_to`.
 
-## This week: the demo deployment
+## The shareable demo (Vercel)
 
-Until Avortyx has these endpoints, the demo at **callstalk-portal.vercel.app** keeps reports in its own Vercel Blob store through `portal/api/reports.mjs`.
+A production build with `VITE_PORTAL_DEMO=true` (or with no API URL) keeps reports in a Vercel Blob store through `portal/api/reports.mjs`.
 - **Customers** are matched by their login email.
 - **The upload page** uses a shared upload key (Vercel env `UPLOAD_KEY`) instead of a staff login.
-- **Not secure enough for real customers:** anyone who knows a customer's email can list that customer's reports.
-
-## Switching to Avortyx
-
-In the `callstalk-portal` Vercel project:
-1. Set `VITE_PORTAL_API_URL` to the Avortyx API base, e.g. `https://api.avortyx.io/api`.
-2. Remove `VITE_PORTAL_DEMO`.
-3. Redeploy.
-
-The same screens then call the endpoints above, and the upload page asks for a staff email and password instead of the key. Reports uploaded to the demo store don't move over by themselves: re-upload any you need to keep, or ask for a one-off copy.
+- **Not secure enough for real customers:** anyone who knows a customer's email can list that customer's reports. Real customers use portal.callstalk.com.
 
 ## Running locally
 
-`npm run portal` opens http://localhost:5180. With no API URL set, any customer login works. The upload key is `local-upload-key`, and uploads are kept in that browser only.
+`npm run portal` opens http://localhost:5180 with sample data: any customer login works, the upload key is `local-upload-key`, and uploads are kept in that browser only. `npm run portal:live` uses the server in `server/` through `/api`, with real logins.

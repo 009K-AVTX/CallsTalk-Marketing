@@ -60,7 +60,7 @@ h3 { font-size: 1.5rem; }
 .lead { font-size: 1.2rem; line-height: 1.55; color: var(--slate); max-width: 34em; margin: 0; }
 .fine { font-size: .9rem; color: var(--slate); margin-top: 28px; }
 .section--dark .fine { color: var(--on-dark-soft); }
-.link { font-weight: 500; text-decoration: underline; text-decoration-color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 6px; transition: text-decoration-color .2s; }
+.link { padding-block: 10px; margin-block: -10px; font-weight: 500; text-decoration: underline; text-decoration-color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 6px; transition: text-decoration-color .2s; }
 .link:hover { text-decoration-color: currentColor; }
 
 /* Buttons */
@@ -110,6 +110,7 @@ h3 { font-size: 1.5rem; }
 .hero__copy .lead { font-size: 1.18rem; max-width: 26em; }
 .hero .lead { color: var(--on-dark-soft); }
 .hero__film { position: relative; z-index: 1; margin: 0 -5% 0 -2%; }
+@media (max-width: 1300px) { .hero__film { margin-right: -16px; } } /* bleed only into the gutter, never off-screen */
 .hero__film::before { content: ""; position: absolute; inset: 8% 6%; z-index: -1; border-radius: 50%; background: radial-gradient(closest-side, rgba(150, 90, 220, .32), transparent); filter: blur(30px); }
 
 /* Frameless: the scene floats on the page, its edges fading into the background. */
@@ -516,7 +517,7 @@ h3 { font-size: 1.5rem; }
 .footer a:hover { color: var(--white); }
 .footer__legal { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; border-top: 1px solid var(--rule-dark); margin-top: 56px; padding-top: 28px; font-size: .9rem; }
 .footer__links { display: flex; flex-wrap: wrap; gap: 24px; }
-.footer__links a { text-decoration: none; }
+.footer__links a { padding: 10px 0; margin: -10px 0; text-decoration: none; } /* a finger-sized tap area, same layout */
 
 /* Legal Center and 404 */
 .legal { padding: 88px 0 120px; min-height: 70vh; background: radial-gradient(50% 40% at 80% 0%, rgba(126, 72, 190, .16), transparent 70%); }
