@@ -759,7 +759,10 @@ Customers log in at **https://portal.callstalk.com** (the website's Log In goes 
 - **Billing:** open a customer → enter each day's **billable calls** and **payments** received. Customers see
   their balance and the last five days; older days go to them as Excel reports (Reports → upload).
 - **Calls from a report:** a report itself never changes the balance. When an admin uploads one in the **Excel
-  Template** format (a **Daily Bills** sheet, or any sheet with **Date** and **Total Calls** columns), the upload
+  Template** format (a **Daily Bills** sheet, or any sheet with **Date** and **Total Calls** columns) or the team's
+  **Financial Overview** format (a box per day titled "Oct 22, 2026 · Financial Overview", on one sheet or several,
+  whose **Total No.** is read as the calls: "125 - 2" is 125 calls, 2 replaced; it has no price, so each day keeps
+  the one billing has; its balances and payments are not read), the upload
   form lists its days (calls, replacements, price) beside what the customer's billing has now: **New**,
   **Changes**, **Same**, or **Skipped** with the reason (before billing started, a future day, a row that is not a
   date). Tick **Enter these calls in the customer's billing** to save the new and changed days once the report has
@@ -846,8 +849,9 @@ disconnecting are in the Audit Log.
 - Every payment notice, the team's and the buyer's, shows a USDT deposit's **From Wallet** (the sender's address)
   and **Transaction Hash**, or the **Reference** an admin entered for a payment they record. In Telegram they are
   monospace, so a tap copies them.
-- **Daily Billing Summary**: every buyer, Pending first (largest debt first), then Paid (closest to running out
-  first), under the totals owed, held in credit and still confirming. Each group is one monospace box; in it each
+- **Daily Billing Summary** (also what /buyers posts): the title, the day ("Tue, Oct 27"), then the totals owed,
+  held in credit and still confirming as bullets, then every buyer, Paid first (closest to running out first),
+  then Pending (largest debt first). Each group is one monospace box; in it each
   buyer is a small table of Buyer, Price and Balance (negative when they owe) and the calls that balance stands
   for: **Remaining Calls** for a buyer in credit, **Unpaid Calls** for one who owes. A dotted line, with a blank line
   either side, separates one buyer from the next. Amounts are US dollars, shown without cents when every amount is
