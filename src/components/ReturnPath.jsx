@@ -286,10 +286,10 @@ async function mount(el, onStep, reducedMotion) {
   const { RoundedBoxGeometry } = THREE;
   await webFontsReady();
 
-  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
   // Phones get a lighter render: their screens are dense and their GPUs are slower.
   const small = window.innerWidth < 700;
-  renderer.setPixelRatio(small ? Math.min(window.devicePixelRatio, 1.5) : Math.min(Math.max(window.devicePixelRatio, 1.5), 2));
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, small ? 1.5 : 2));
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   el.prepend(renderer.domElement);
 
@@ -602,14 +602,21 @@ async function mount(el, onStep, reducedMotion) {
   let frame = 0;
   let visible = false;
   const clock = new THREE.Clock(false);
+  // The loop runs only while the scene is on screen.
   const loopFrame = () => {
     frame = requestAnimationFrame(loopFrame);
-    if (visible) draw(clock.getElapsedTime());
+    draw(clock.getElapsedTime());
   };
   const io = new IntersectionObserver(([entry]) => {
     visible = entry.isIntersecting;
-    if (visible) clock.start();
-    else clock.stop();
+    if (visible && !frame) {
+      clock.start();
+      loopFrame();
+    } else if (!visible && frame) {
+      cancelAnimationFrame(frame);
+      frame = 0;
+      clock.stop();
+    }
   });
 
   if (reducedMotion) {
@@ -617,7 +624,6 @@ async function mount(el, onStep, reducedMotion) {
   } else {
     io.observe(el);
     window.addEventListener('pointermove', onPointer);
-    loopFrame();
   }
 
   return () => {

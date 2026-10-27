@@ -95,10 +95,10 @@ async function mount(el, onStep, reducedMotion) {
   const { RoundedBoxGeometry } = THREE;
   await webFontsReady();
 
-  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
   // Phones get a lighter render: their screens are dense and their GPUs are slower.
   const small = window.innerWidth < 700;
-  renderer.setPixelRatio(small ? Math.min(window.devicePixelRatio, 1.5) : Math.min(Math.max(window.devicePixelRatio, 1.5), 2));
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, small ? 1.5 : 2));
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   el.prepend(renderer.domElement);
   requestAnimationFrame(() => el.classList.add('is-live'));
@@ -732,14 +732,23 @@ async function mount(el, onStep, reducedMotion) {
   let visible = false;
   let paused = false;
   const clock = new THREE.Clock(false);
+  // The loop runs only while the scene is on screen and playing, so it costs nothing while the visitor scrolls on.
   const loop = () => {
     frame = requestAnimationFrame(loop);
-    if (visible && !paused) draw(clock.getElapsedTime());
+    draw(clock.getElapsedTime());
+  };
+  const sync = () => {
+    if (visible && !paused) {
+      if (!frame) { clock.start(); loop(); }
+    } else if (frame) {
+      cancelAnimationFrame(frame);
+      frame = 0;
+      clock.stop();
+    }
   };
   const io = new IntersectionObserver(([entry]) => {
     visible = entry.isIntersecting;
-    if (visible && !paused) clock.start();
-    else clock.stop();
+    sync();
   });
 
   if (reducedMotion) {
@@ -747,14 +756,12 @@ async function mount(el, onStep, reducedMotion) {
   } else {
     io.observe(el);
     window.addEventListener('pointermove', onPointer);
-    loop();
   }
 
   return {
     setPaused(p) {
       paused = p;
-      if (p) clock.stop();
-      else if (visible) clock.start();
+      sync();
     },
     dispose() {
       cancelAnimationFrame(frame);
