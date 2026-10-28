@@ -6,6 +6,7 @@ import { ErrorNote, PageHead } from '../components/Shell.jsx';
 import { money, today } from '../format.js';
 import { navigate } from '../router.jsx';
 import useLoad from '../useLoad.js';
+import Select from '../../../src/components/Select.jsx';
 
 export const ROLE_LABEL = { customer: 'Customer', staff: 'Staff', admin: 'Admin' };
 
@@ -43,7 +44,8 @@ export function LinkResult({ result, email }) {
 
 const BLANK = { role: 'customer', name: '', email: '', company: '', price_per_call: '', opening_balance: '0', start_date: '', timezone: TIME_ZONES[0] };
 
-function NewLogin({ onCreated }) {
+// `roles`: the kinds of login this person may add (staff: customers only).
+export function NewLogin({ onCreated, roles = ['customer', 'staff', 'admin'] }) {
   const [form, setForm] = useState({ ...BLANK, start_date: today() });
   const [status, setStatus] = useState('idle'); // idle | sending | error
   const [error, setError] = useState('');
@@ -71,13 +73,15 @@ function NewLogin({ onCreated }) {
     <form className="p-card p-form p-admin__new" onSubmit={submit}>
       <header className="p-card__head">
         <div><h2>New Login</h2><p>We will email them a single-use link to choose a password and add their authenticator app.</p></div>
-        <div className="p-ranges" role="radiogroup" aria-label="Role">
-          {['customer', 'staff', 'admin'].map((r) => (
-            <button key={r} type="button" role="radio" aria-checked={form.role === r} className={form.role === r ? 'is-on' : ''} onClick={() => setForm({ ...form, role: r })}>
-              {ROLE_LABEL[r]}
-            </button>
-          ))}
-        </div>
+        {roles.length > 1 && (
+          <div className="p-ranges" role="radiogroup" aria-label="Role">
+            {roles.map((r) => (
+              <button key={r} type="button" role="radio" aria-checked={form.role === r} className={form.role === r ? 'is-on' : ''} onClick={() => setForm({ ...form, role: r })}>
+                {ROLE_LABEL[r]}
+              </button>
+            ))}
+          </div>
+        )}
       </header>
       <div className="p-form__row">
         <label>Full Name<input required value={form.name} onChange={set('name')} maxLength={100} autoComplete="off" /></label>
@@ -92,11 +96,11 @@ function NewLogin({ onCreated }) {
           </div>
           <div className="p-form__row">
             <label>Billing Starts<input required type="date" value={form.start_date} max={today()} onChange={set('start_date')} /></label>
-            <label>Days Counted In<select value={form.timezone} onChange={set('timezone')}>{TIME_ZONES.map((z) => <option key={z} value={z}>{z.replace(/_/g, ' ')}</option>)}</select></label>
+            <label>Days Counted In<Select value={form.timezone} onChange={set('timezone')}>{TIME_ZONES.map((z) => <option key={z} value={z}>{z.replace(/_/g, ' ')}</option>)}</Select></label>
           </div>
         </>
       ) : <p className="p-admin__note">{form.role === 'staff'
-        ? 'Staff can only upload and remove customer reports; they cannot see billing, payments or logins.'
+        ? 'Staff can upload and remove customer reports and add customers; they cannot see billing, payments or logins.'
         : 'Admins can add and turn off logins, enter calls and payments, and upload reports for every customer.'}</p>}
       {status === 'error' && <p className="access-card__error" role="alert">{error}</p>}
       <button type="submit" className="btn btn--light" disabled={status === 'sending'}>{status === 'sending' ? 'Creating…' : 'Create Login and Send Link'}</button>

@@ -1,4 +1,4 @@
-// Page content. Placeholder values (prices, testimonials, phone) must be replaced before launch.
+// Page content. Placeholder values (prices, phone) must be replaced before launch.
 
 export const navLinks = [
   { href: '/#features', label: 'Platform' },
@@ -82,13 +82,6 @@ export const steps = [
   { title: 'Connect Your Platforms', text: 'Link your ad accounts, CRM and messaging tools.', link: 'See Connections', href: '/#integrations' },
   { title: 'Get a Setup Review', text: 'A specialist confirms that everything is configured correctly.', link: 'Speak With Us', href: '/request-access' },
 ];
-
-export const reviews = ['A', 'B', 'C', 'D', 'E', 'F'].map((initial) => ({
-  initial,
-  quote: 'Placeholder: insert a genuine customer testimonial here.',
-  name: 'Full Name',
-  role: 'Job Title, Organization',
-}));
 
 export const footerColumns = [
   { title: 'Platform', links: [['Call Attribution', '/#features'], ['Lead Scoring', '/#features'], ['Reporting', '/#features'], ['Pricing', '/#pricing']] },

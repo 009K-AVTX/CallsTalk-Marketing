@@ -14,6 +14,7 @@ import { Link, navigate } from '../router.jsx';
 import useLoad from '../useLoad.js';
 import { LinkResult, ROLE_LABEL, StatePill, when } from './AdminUsers.jsx';
 import { Avatar } from '../avatar.jsx';
+import Select from '../../../src/components/Select.jsx';
 
 // A form's own state: what was typed, sending, and the last error or confirmation.
 // `onConflict`: someone else saved this first (409); the page then loads the latest, and what was typed stays.
@@ -52,11 +53,11 @@ function Profile({ user, onSaved, onConflict }) {
       <label>Full Name<input required value={f.form.name} onChange={f.set('name')} maxLength={100} /></label>
       <label>Company<input value={f.form.company} onChange={f.set('company')} maxLength={120} /></label>
       <label>Role
-        <select value={f.form.role} onChange={f.set('role')} disabled={self}>
+        <Select value={f.form.role} onChange={f.set('role')} disabled={self}>
           <option value="customer">Customer</option>
-          <option value="staff">Staff (report uploads only)</option>
+          <option value="staff">Staff (report uploads and new customers)</option>
           <option value="admin">Admin</option>
-        </select>
+        </Select>
       </label>
       <Note f={f} />
       <button type="submit" className="btn btn--light btn--sm" disabled={f.status === 'sending'}>{f.status === 'sending' ? 'Saving…' : 'Save Details'}</button>
@@ -166,7 +167,7 @@ function Terms({ id, account, onSaved, onConflict }) {
       </div>
       <div className="p-form__row">
         <label>Billing Starts<input required type="date" value={f.form.start_date} max={today()} onChange={f.set('start_date')} /></label>
-        <label>Days Counted In<select value={f.form.timezone} onChange={f.set('timezone')}>{[...new Set([f.form.timezone, ...TIME_ZONES])].map((z) => <option key={z} value={z}>{z.replace(/_/g, ' ')}</option>)}</select></label>
+        <label>Days Counted In<Select value={f.form.timezone} onChange={f.set('timezone')}>{[...new Set([f.form.timezone, ...TIME_ZONES])].map((z) => <option key={z} value={z}>{z.replace(/_/g, ' ')}</option>)}</Select></label>
       </div>
       <Note f={f} />
       <button type="submit" className="btn btn--light btn--sm" disabled={f.status === 'sending'}>{f.status === 'sending' ? 'Saving…' : account ? 'Save Terms' : 'Set Up Billing'}</button>
@@ -230,7 +231,7 @@ function Payment({ id, account, onSaved }) {
         <label><span>Shown to Customer <i className="p-optional">optional</i></span><input value={f.form.note} onChange={f.set('note')} maxLength={200} placeholder="Bank transfer" /></label>
         <label><span>Reference <i className="p-optional">optional</i></span><input value={f.form.reference} onChange={f.set('reference')} maxLength={120} /></label>
       </div>
-      <label>Status<select value={f.form.status} onChange={f.set('status')}><option value="completed">Completed</option><option value="pending">Pending</option><option value="failed">Failed</option></select></label>
+      <label>Status<Select value={f.form.status} onChange={f.set('status')}><option value="completed">Completed</option><option value="pending">Pending</option><option value="failed">Failed</option></Select></label>
       <Note f={f} />
       <button type="submit" className="btn btn--light btn--sm" disabled={f.status === 'sending'}>{f.status === 'sending' ? 'Saving…' : 'Record Payment'}</button>
     </form>

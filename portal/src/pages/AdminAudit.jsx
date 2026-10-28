@@ -11,6 +11,7 @@ import { downloadCsv, downloadPdf } from '../exports.js';
 import { addDays, dayLabel } from '../format.js';
 import { Link, navigate } from '../router.jsx';
 import useLoad from '../useLoad.js';
+import Select from '../../../src/components/Select.jsx';
 
 const PAGE = 30;
 const COLORS = ['var(--viz-1)', 'var(--viz-2)', 'var(--viz-3)', 'var(--viz-4)'];
@@ -232,17 +233,17 @@ export default function AdminAudit({ onSignedOut }) {
         <Period value={range} onChange={setRange} presets={['today', '7', '30', '90']} />
         <label className="p-select">
           <span className="sr-only">Kind of activity</span>
-          <select value={group} onChange={(e) => setGroup(e.target.value)}>
+          <Select value={group} onChange={(e) => setGroup(e.target.value)}>
             <option value="">All Activity</option>
             {GROUPS.map((g) => <option key={g.key} value={g.key}>{g.label}</option>)}
-          </select>
+          </Select>
         </label>
         <label className="p-select">
           <span className="sr-only">Done by</span>
-          <select value={person} onChange={(e) => setPerson(e.target.value)}>
+          <Select value={person} onChange={(e) => setPerson(e.target.value)}>
             <option value="">Anyone</option>
             {(people.data || []).map((u) => <option key={u.id} value={u.id}>{u.email}</option>)}
-          </select>
+          </Select>
         </label>
         <label className={`p-toggle${onlyFailed ? ' is-on' : ''}`}>
           <input type="checkbox" checked={onlyFailed} onChange={(e) => setOnlyFailed(e.target.checked)} />

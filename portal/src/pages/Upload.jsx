@@ -12,6 +12,7 @@ import {
   canNotify, deleteReport, KINDS, listAll, listCustomers, localKeyHint, MAX_MB, notifyReports, staffSession, staffSignIn, staffSignOut, staffSignInKind, uploadReport,
 } from '../reports.js';
 import { fileSize, period } from './Reports.jsx';
+import Select from '../../../src/components/Select.jsx';
 
 const ACCEPT = '.xlsx,.xls,.csv';
 
@@ -266,10 +267,10 @@ function UploadForm({ customers, onDone }) {
       </div>
       <label>Customer Login ID
         {customers.some((c) => c.id !== c.login) ? (
-          <select required value={form.customer} onChange={set('customer')}>
+          <Select required value={form.customer} onChange={set('customer')}>
             <option value="">Choose a customer</option>
             {customers.map((c) => <option key={c.id} value={c.id}>{c.name} ({c.login}){c.telegram ? ' · Telegram' : ''}</option>)}
-          </select>
+          </Select>
         ) : (
           <>
             <input required type="email" list="p-customers" value={form.customer} onChange={set('customer')} placeholder="customer@company.com" autoComplete="off" />

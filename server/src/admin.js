@@ -4,7 +4,7 @@
 //   GET    /api/admin/users                      a page of logins (?q, ?role, ?limit, ?offset), with setup-link state and price
 //   GET    /api/admin/users/options              everyone, briefly, for filters
 //   GET    /api/admin/users/:id                  one login
-//   POST   /api/admin/users                      new login (+ billing terms for a customer); emails the setup link
+//   POST   /api/admin/users                      new login (+ billing terms for a customer); emails the setup link (staff: customers only)
 //   PATCH  /api/admin/users/:id                  name, company, role, status (active | disabled)
 //   POST   /api/admin/users/:id/invite           new setup link; for a login in use this resets password and code app
 //   DELETE /api/admin/users/:id                  removes the login and everything stored for it
@@ -38,7 +38,7 @@ import { HttpError } from './routes.js';
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
-// customer: billing and reports · staff: uploads customer reports only · admin: everything
+// customer: billing and reports · staff: uploads customer reports and adds customers · admin: everything
 const ROLES = ['customer', 'staff', 'admin'];
 const CURRENCIES = ['USD'];
 const DEFAULT_TZ = 'America/New_York';
@@ -138,6 +138,8 @@ async function billingView(user) {
 const userView = ({ password_hash: _p, totp_secret: _t, totp_last_step: _s, session_id: _i, ...u }) => u;
 
 export const adminRouter = Router();
+// Staff can add buyers (customer logins) too; everything else here is for admins only.
+adminRouter.post('/users', requireUser('staff', 'admin'), createLogin);
 adminRouter.use(requireUser('admin'));
 adminRouter.use('/audit', auditRouter);
 adminRouter.use('/finance', financeRouter);
@@ -165,12 +167,13 @@ adminRouter.get('/users/:id', async (req, res) => {
   res.json({ user });
 });
 
-adminRouter.post('/users', async (req, res) => {
+async function createLogin(req, res) {
   const body = req.body || {};
   const email = str(body.email, 200).toLowerCase();
   const name = str(body.name, 100);
   const company = str(body.company, 120);
   const role = ROLES.includes(body.role) ? body.role : 'customer';
+  if (req.user.role !== 'admin' && role !== 'customer') throw new HttpError(403, 'Staff can only add customer logins.');
   if (!EMAIL.test(email)) throw new HttpError(400, 'Please enter a valid email address.');
   if (!name) throw new HttpError(400, 'Please enter the person\'s name.');
   if (role === 'customer' && !company) throw new HttpError(400, 'Please enter the customer\'s company.');
@@ -180,7 +183,7 @@ adminRouter.post('/users', async (req, res) => {
   const user = await createUser({ email, name, company, role });
   if (billing) await saveAccount(user.id, billing);
   res.status(201).json({ user, ...await sendInvite(user, { createdBy: req.user.id }) });
-});
+}
 
 adminRouter.patch('/users/:id', async (req, res) => {
   const user = await loadUser(req);

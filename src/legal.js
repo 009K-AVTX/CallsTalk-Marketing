@@ -6,9 +6,11 @@ export const TELEGRAM_HANDLE = 'callstalk';
 export const SIMPLEX_LINK = 'https://smp12.simplex.im/i#OtGudtjVlxXRhn6DtJxDBa3_H4vUy5Jx/WeoJ-ftye1IoSx-v0AdGuZeAzAoduWeuvhBcdbIUfjY';
 export const SIMPLEX_NAME = 'Calls Talk';
 export const ZANGI_ID = '23-6327-9692';
-// The customer portal (billing, reports, payments) on the VPS. The website's Log In links go here.
+// The customer portal (billing, reports, payments) on the VPS, shown in the product mock-up.
 export const PORTAL_URL = (import.meta.env.VITE_PORTAL_APP_URL || 'https://portal.callstalk.com').replace(/\/$/, '');
-export const PORTAL_LOGIN = `${PORTAL_URL}/login`;
+// The website's Log In links go here. While developing (npm run dev), the local portal (npm run portal:live, port
+// 5180), so testing never lands on the live portal.
+export const PORTAL_LOGIN = `${import.meta.env.DEV && !import.meta.env.VITE_PORTAL_APP_URL ? 'http://localhost:5180' : PORTAL_URL}/login`;
 export const LEGAL_EMAIL = 'legal@callstalk.com';
 const EFFECTIVE = 'October 23, 2026';
 
