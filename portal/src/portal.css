@@ -146,7 +146,12 @@
 /* Upload: the report's days, to enter in the buyer's billing (admins) */
 .p-import { display: grid; gap: 10px; }
 .p-import__table { max-height: 260px; border: 1px solid var(--line); border-radius: 12px; }
+/* Among the form's fields, so within the card's padding: not out to its edges, as a card's last table is. */
+.p-card:not(.p-card--flush) .p-tablewrap.p-import__table { margin: 0; }
 .p-import__table td .p-pill { margin-left: 6px; }
+/* Narrow beside the list: tighter cells, and the label may go under the figures. */
+.p-import__table.p-tablewrap th, .p-import__table.p-tablewrap td { padding: 9px 10px; }
+.p-import__table td:last-child { white-space: normal; }
 .p-import tr.is-same td, .p-import tr.is-skip td { color: var(--slate); }
 .p-import__why { display: block; font-size: .76rem; color: var(--slate); white-space: normal; }
 .p-form select, .p-form input:not([type="file"]), .p-search input { width: 100%; font: inherit; font-size: .9rem; padding: 10px 13px; border-radius: 11px; border: 1px solid #2c2632; background: #0a080c; color: var(--white); }

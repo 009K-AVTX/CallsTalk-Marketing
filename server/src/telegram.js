@@ -1,8 +1,10 @@
 // Telegram side of the support chat.
 //
-// Outgoing: every new chat and every visitor message is posted to the team's Telegram chat.
+// Outgoing: every new chat and every visitor message is posted to each of the team's Telegram groups
+// (TELEGRAM_CHAT_ID, comma-separated). Topics are in the first group only; the others get it all in their main chat.
 // Incoming: the bot long-polls Telegram (no webhook or public URL needed) and turns the team's
-// replies into `agent` messages that the website widget picks up on its next poll.
+// replies, from any of the groups, into `agent` messages that the website widget picks up on its next poll.
+// What one group says to a visitor is posted in the others, so nobody answers twice.
 //
 // The team answers a visitor in any of these ways:
 //   1. Tap "Reply >" under a visitor's message: the bot opens a reply box for that chat.
@@ -17,7 +19,9 @@ import {
 } from './db.js';
 import { accessDetails, chatKind, clip, escapeHtml, shortId, TEAM_ENDED_MESSAGE, transcriptLines, visitorDetails } from './format.js';
 
-const { token, chatId, threadId: sharedThreadId, topicPerChat } = config.telegram;
+const { token, chatIds, threadId: sharedThreadId, topicPerChat } = config.telegram;
+const [mainChat] = chatIds; // the group with the topics
+const isTeamChat = (id) => chatIds.includes(String(id));
 const MAX_TEXT = 4096;
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -60,15 +64,31 @@ export function sendTo(chat, text, { threadId, ...extra } = {}) {
   });
 }
 
-function send(text, threadId, extra = {}) {
-  return api('sendMessage', {
-    chat_id: chatId,
-    message_thread_id: threadId ?? sharedThreadId,
-    text: clip(text, MAX_TEXT),
-    parse_mode: 'HTML',
-    link_preview_options: { is_disabled: true },
-    ...extra,
+// Posts in every team group but `except` (the group a reply came from). `threadId` is a topic of the first group.
+// -> [{ chat, message_id }] for the groups it reached. Fails only when it reached none of them.
+async function send(text, threadId, extra = {}, { except } = {}) {
+  const chats = chatIds.filter((c) => c !== String(except));
+  const results = await Promise.allSettled(chats.map((chat) => sendTo(chat, text, { threadId: chat === mainChat ? threadId ?? sharedThreadId : undefined, ...extra })));
+  const sent = [];
+  results.forEach((r, i) => {
+    if (r.status === 'fulfilled') sent.push({ chat: chats[i], message_id: r.value.message_id });
   });
+  if (chats.length && !sent.length) throw results[0].reason;
+  results.forEach((r, i) => r.status === 'rejected' && console.error(`[telegram] could not post in chat ${chats[i]}:`, r.reason.message));
+  return sent;
+}
+
+// Ties the posted messages to a chat, so a reply to any of them reaches the visitor.
+export const linkSent = (sent, sessionId) => Promise.all(sent.map((m) => linkTelegramMessage(m.chat, m.message_id, sessionId)));
+
+// What the team did in one group (`msg`), posted in the others.
+async function tellOtherGroups(msg, session, text) {
+  if (chatIds.length < 2) return;
+  const sent = await send(text, session.thread_id, {}, { except: msg.chat.id }).catch((err) => {
+    console.error('[telegram] could not tell the other groups:', err.message);
+    return [];
+  });
+  await linkSent(sent, session.id);
 }
 
 function replyTo(msg, text) {
@@ -86,12 +106,13 @@ const tag = (session) => `<code>#${shortId(session)}</code>`;
 const ipLine = (ip) => (ip ? `\n<b>IP:</b> <code>${escape(ip)}</code>` : '');
 const replyButton = (sessionId) => ({ inline_keyboard: [[{ text: 'Reply >', callback_data: `reply:${sessionId}` }]] });
 
-// Posts a new chat with the visitor's details. Returns the Telegram ids to store with the session.
+// Posts a new chat with the visitor's details. Returns the Telegram ids to store with the session: its topic, and
+// the messages posted (for linkSent once the session is saved).
 export async function notifyNewChat(chat) {
   const { id, name, message, transcript } = chat;
   let threadId;
   if (topicPerChat) {
-    const topic = await api('createForumTopic', { chat_id: chatId, name: clip(`${name} · #${shortId({ id })}`, 128) });
+    const topic = await api('createForumTopic', { chat_id: mainChat, name: clip(`${name} · #${shortId({ id })}`, 128) });
     threadId = topic.message_thread_id;
   }
 
@@ -108,7 +129,7 @@ export async function notifyNewChat(chat) {
     + history;
 
   const sent = await send(text, threadId, { reply_markup: replyButton(id) });
-  return { threadId, messageId: sent.message_id };
+  return { threadId, sent };
 }
 
 // A request-access form submission. It isn't a chat, so replies to it in Telegram go nowhere.
@@ -125,36 +146,36 @@ export async function notifyVisitorMessage(session, text, ip = '') {
   const moved = ip && session.ip && ip !== session.ip ? ` · new IP <code>${escape(ip)}</code>` : '';
   const head = `<b>${escape(session.name)}</b> ${tag(session)}${moved}`;
   const sent = await send(`${head}\n${escape(text)}`, session.thread_id, { reply_markup: replyButton(session.id) });
-  await linkTelegramMessage(chatId, sent.message_id, session.id);
+  await linkSent(sent, session.id);
 }
 
 export async function notifyVisitorEnded(session) {
   // The widget calls this when a visitor's newer chat pushes out their oldest one.
   const sent = await send(`<b>Chat ended</b> ${tag(session)}`, session.thread_id);
-  await linkTelegramMessage(chatId, sent.message_id, session.id);
+  await linkSent(sent, session.id);
   closeTopic(session);
 }
 
 export async function notifyAutoEnded(session, hours) {
   const sent = await send(`<b>Chat ended automatically</b> ${tag(session)}: no messages for ${hours} hours`, session.thread_id);
-  await linkTelegramMessage(chatId, sent.message_id, session.id);
+  await linkSent(sent, session.id);
   closeTopic(session);
 }
 
 // Keeps Telegram in the loop when someone answers from the email reply page.
 export async function notifyAgentReply(session, agentName, text) {
   const sent = await send(`<b>${escape(agentName)} replied to ${escape(session.name)}</b> ${tag(session)} from email\n${escape(text)}`, session.thread_id);
-  await linkTelegramMessage(chatId, sent.message_id, session.id);
+  await linkSent(sent, session.id);
 }
 
 export async function notifyEndedFromEmail(session, agentName) {
   const sent = await send(`<b>${escape(agentName)} ended the chat</b> ${tag(session)} from email`, session.thread_id);
-  await linkTelegramMessage(chatId, sent.message_id, session.id);
+  await linkSent(sent, session.id);
   closeTopic(session);
 }
 
 function closeTopic(session) {
-  if (session.thread_id) api('closeForumTopic', { chat_id: chatId, message_thread_id: session.thread_id }).catch(() => {});
+  if (session.thread_id) api('closeForumTopic', { chat_id: mainChat, message_thread_id: session.thread_id }).catch(() => {});
 }
 
 const HELP = `<b>Answering website chats</b>
@@ -180,14 +201,14 @@ async function handleMessage(msg) {
   }
   // A customer's own chat with the bot (Connect Telegram in the portal), never part of the support chat.
   // Loaded when needed: telegram-link.js uses this file to send, so a static import would be circular.
-  if (msg.chat.type === 'private' && String(msg.chat.id) !== chatId) {
+  if (msg.chat.type === 'private' && !isTeamChat(msg.chat.id)) {
     if (!await claimTelegramUpdate(`${msg.chat.id}:${msg.message_id}`)) return;
     const { handlePrivateMessage } = await import('./telegram-link.js');
     return handlePrivateMessage(msg, command);
   }
-  // Every buyer as paid or pending, as of now: in the support chat or the team's billing chat (billing-notices.js,
+  // Every buyer as paid or pending, as of now: in a support group or a billing group (billing-notices.js,
   // loaded when needed for the same reason as above).
-  if (command?.[1] === 'buyers' && [chatId, config.telegram.billingChatId].includes(String(msg.chat.id))) {
+  if (command?.[1] === 'buyers' && (isTeamChat(msg.chat.id) || config.telegram.billingChatIds.includes(String(msg.chat.id)))) {
     if (!await claimTelegramUpdate(`${msg.chat.id}:${msg.message_id}`)) return;
     const { buyersReply } = await import('./billing-notices.js');
     return replyTo(msg, await buyersReply().catch((err) => {
@@ -195,8 +216,8 @@ async function handleMessage(msg) {
       return '<b>Could not read the buyers just now.</b> Please try again, or open Finance in the portal.';
     }));
   }
-  if (String(msg.chat.id) !== chatId) {
-    console.warn(`[telegram] ignored a message from chat ${msg.chat.id}; only TELEGRAM_CHAT_ID=${chatId} is accepted`);
+  if (!isTeamChat(msg.chat.id)) {
+    console.warn(`[telegram] ignored a message from chat ${msg.chat.id}; only TELEGRAM_CHAT_ID=${chatIds.join(',')} is accepted`);
     return;
   }
   // Answered once, even if Telegram delivers it twice (two copies of the server, or a restart before it was confirmed).
@@ -212,7 +233,9 @@ async function handleMessage(msg) {
     const tagged = !session && /#([0-9a-f]{8})\b/i.exec(target.text || target.caption || '');
     if (tagged) session = await findSessionByShortId(tagged[1]);
   }
-  if (!session && msg.is_topic_message && msg.message_thread_id !== sharedThreadId) session = await findSessionByThread(msg.message_thread_id);
+  if (!session && String(msg.chat.id) === mainChat && msg.is_topic_message && msg.message_thread_id !== sharedThreadId) {
+    session = await findSessionByThread(msg.message_thread_id);
+  }
   if (!session) {
     const prefixed = body.match(/^#?([0-9a-f]{8})\b\s*([\s\S]*)$/i);
     if (prefixed) {
@@ -236,6 +259,7 @@ async function handleMessage(msg) {
     await addMessage(session.id, 'agent', agentName, body || TEAM_ENDED_MESSAGE);
     await setStatus(session.id, 'ended');
     await replyTo(msg, `<b>Chat ended</b> ${tag(session)}`);
+    await tellOtherGroups(msg, session, `<b>${escape(agentName || 'The team')} ended the chat</b> ${tag(session)}`);
     closeTopic(session);
     return;
   }
@@ -249,6 +273,7 @@ async function handleMessage(msg) {
   }
 
   await addMessage(session.id, 'agent', agentName, body);
+  await tellOtherGroups(msg, session, `<b>${escape(agentName || 'The team')} replied to ${escape(session.name)}</b> ${tag(session)}\n${escape(body)}`);
 
   // Answered through "Reply >": turn the "replying to" prompt into the delivery confirmation.
   const prompt = msg.reply_to_message;
@@ -268,7 +293,7 @@ async function handleReplyButton(query) {
   if (!await claimTelegramUpdate(`button:${query.id}`)) return undefined; // one reply box per tap
   const sessionId = /^reply:([0-9a-f-]{36})$/.exec(query.data || '')?.[1];
   const msg = query.message;
-  if (!sessionId || !msg || String(msg.chat.id) !== chatId) return answer();
+  if (!sessionId || !msg || !isTeamChat(msg.chat.id)) return answer();
   const session = await getSession(sessionId);
   if (!session) return answer('This chat no longer exists.');
 
@@ -276,11 +301,12 @@ async function handleReplyButton(query) {
   const mention = agent.username
     ? `@${agent.username}`
     : `<a href="tg://user?id=${agent.id}">${escape(agent.first_name || 'You')}</a>`;
-  const prompt = await send(`${mention} <b>replying to ${escape(session.name)}</b> ${tag(session)}`,
-    msg.is_topic_message ? msg.message_thread_id : undefined, {
-      reply_markup: { force_reply: true, selective: true, input_field_placeholder: clip(`Reply to ${session.name}`, 64) },
-    });
-  await linkTelegramMessage(chatId, prompt.message_id, session.id);
+  // Only in the group where it was tapped.
+  const prompt = await sendTo(msg.chat.id, `${mention} <b>replying to ${escape(session.name)}</b> ${tag(session)}`, {
+    threadId: msg.is_topic_message ? msg.message_thread_id : undefined,
+    reply_markup: { force_reply: true, selective: true, input_field_placeholder: clip(`Reply to ${session.name}`, 64) },
+  });
+  await linkTelegramMessage(msg.chat.id, prompt.message_id, session.id);
   return answer();
 }
 

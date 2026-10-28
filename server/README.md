@@ -128,6 +128,9 @@ To find `TELEGRAM_CHAT_ID`:
 2. In the Telegram group, send `/chatid`. The bot replies with an id such as `-1001234567890`.
 3. Stop the server (Ctrl+C), put that id in `.env`, and continue.
 
+For more than one group, list their ids separated by commas: `TELEGRAM_CHAT_ID=-1001111111111,-1002222222222`.
+The bot posts in each and takes replies from any.
+
 ### 6. Run it permanently with PM2
 
 ```bash
@@ -215,7 +218,7 @@ database is lost, links in emails already sent stop working (a new signing secre
 | `[db] cannot use PostgreSQL database …` | Check `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD` and that step 4 was run. `password authentication failed` means the password doesn't match the one in `CREATE ROLE`. |
 | `TELEGRAM_BOT_TOKEN was rejected` | Copy the token from @BotFather again. |
 | `Another copy of this server is already polling` | Only one process may use the bot token. Stop the other one (a second PM2 app, or `npm start` left running on another machine). |
-| `ignored a message from chat -100…` | `TELEGRAM_CHAT_ID` doesn't match the group. Use the id from `/chatid`. |
+| `ignored a message from chat -100…` | That group isn't in `TELEGRAM_CHAT_ID`. Add the id from `/chatid`. |
 | Visitor sees "We could not reach our team" | The bot can't post to the group. Check that it's still a member and an admin. With topics, it also needs **Manage topics**. |
 | Team replies don't arrive | Make sure people use **Reply** (or type in the visitor's topic), and that the bot is an admin. |
 | `[email] cannot log in to …` | Check `SMTP_USER` / `SMTP_PASS`. For Gmail use an App Password; for port 587 set `SMTP_PORT=587`. |

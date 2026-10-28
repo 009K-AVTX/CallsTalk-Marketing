@@ -5,6 +5,8 @@ import path from 'node:path';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const env = (key, fallback = '') => (process.env[key] ?? fallback).trim();
+// "a, b,c" -> ['a', 'b', 'c']
+const list = (value) => value.split(',').map((v) => v.trim()).filter(Boolean);
 
 const isDev = env('NODE_ENV', 'production') === 'development';
 
@@ -25,20 +27,23 @@ export const config = {
   timezone: 'EST',
   // Open chats end by themselves after this many hours without a new message.
   chatTimeoutHours: Number(env('CHAT_TIMEOUT_HOURS', '24')),
-  corsOrigins: env('CORS_ALLOWED_ORIGINS').split(',').map((o) => o.trim().replace(/\/$/, '')).filter(Boolean),
+  corsOrigins: list(env('CORS_ALLOWED_ORIGINS')).map((o) => o.replace(/\/$/, '')),
 
   telegram: {
     token: env('TELEGRAM_BOT_TOKEN'),
-    chatId: env('TELEGRAM_CHAT_ID'),
-    // Optional: post everything into one topic of a forum group.
+    // The team's support groups, comma-separated: everything is posted in each, and the team can answer from any.
+    chatIds: list(env('TELEGRAM_CHAT_ID')),
+    // Optional: post everything into one topic of a forum group (the first group's).
     threadId: env('TELEGRAM_THREAD_ID') ? Number(env('TELEGRAM_THREAD_ID')) : undefined,
-    // Optional: open a separate forum topic for every visitor.
+    // Optional: open a separate forum topic for every visitor (in the first group; the others get the messages in
+    // their main chat).
     topicPerChat: env('TELEGRAM_TOPIC_PER_CHAT') === 'true',
     // false on a local copy, so it does not take the live server's updates from the same bot.
     polling: env('TELEGRAM_POLLING', 'true') !== 'false',
     // Billing notices for the team (each payment, the daily paid/pending summary): their own chat or topic, so
-    // they stay apart from website chats. Empty: the support chat (and TELEGRAM_THREAD_ID).
-    billingChatId: env('TELEGRAM_BILLING_CHAT_ID'),
+    // they stay apart from website chats. Comma-separated for several groups; the topic is in the first.
+    // Empty: the support groups (and TELEGRAM_THREAD_ID).
+    billingChatIds: list(env('TELEGRAM_BILLING_CHAT_ID')),
     billingThreadId: env('TELEGRAM_BILLING_THREAD_ID') ? Number(env('TELEGRAM_BILLING_THREAD_ID')) : undefined,
     // How long the Connect Telegram link in a customer's Settings works.
     linkMinutes: Number(env('TELEGRAM_LINK_MINUTES', '15')),
@@ -46,7 +51,7 @@ export const config = {
 
   // Optional: email every visitor message, with a link to answer it from the browser.
   email: {
-    to: env('EMAIL_TO').split(',').map((a) => a.trim()).filter(Boolean),
+    to: list(env('EMAIL_TO')),
     from: env('EMAIL_FROM') || env('SMTP_USER'),
     smtp: {
       host: env('SMTP_HOST'),

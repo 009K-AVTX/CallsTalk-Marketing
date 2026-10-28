@@ -9,12 +9,11 @@
 
 import { randomUUID } from 'node:crypto';
 import { Router } from 'express';
-import { addMessage, createSession, getSession, linkTelegramMessage, listMessages, setStatus } from './db.js';
-import { notifyNewChat, notifyVisitorEnded, notifyVisitorMessage } from './telegram.js';
+import { addMessage, createSession, getSession, listMessages, setStatus } from './db.js';
+import { linkSent, notifyNewChat, notifyVisitorEnded, notifyVisitorMessage } from './telegram.js';
 import { emailNewChat, emailVisitorMessage } from './email.js';
 import { rateLimit } from './rate-limit.js';
 import { ANONYMOUS_NAME, clientIp } from './format.js';
-import { config } from './config.js';
 import { findSessionUser } from './portal-db.js';
 import { hashToken } from './auth-crypto.js';
 import { CSRF_HEADER, sessionToken } from './security.js';
@@ -90,7 +89,7 @@ router.post('/chat', rateLimit({ windowMs: 10 * 60_000, max: 5 }), async (req, r
   const messageId = await createSession({
     id, name, email, threadId: posted.threadId, message, portalUserId: customer?.id ?? null, company: customer?.company ?? '', ip: chat.ip,
   });
-  await linkTelegramMessage(config.telegram.chatId, posted.messageId, id);
+  await linkSent(posted.sent, id);
   emailNewChat(chat, messageId).catch(emailFailed);
   res.status(201).json({ session_id: id, message: 'Thank you. Our team has received your message and will respond here shortly.' });
 });

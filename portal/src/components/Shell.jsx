@@ -23,9 +23,10 @@ export const ADMIN_NAV = [
   { to: '/settings', label: 'Settings', icon: 'settings' },
 ];
 
-// Staff: customer reports only.
+// Staff: customer reports, and adding customers.
 export const STAFF_NAV = [
   { to: '/upload', label: 'Reports', icon: 'reports' },
+  { to: '/customers/new', label: 'New Customer', icon: 'users' },
   { to: '/settings', label: 'Settings', icon: 'settings' },
 ];
 

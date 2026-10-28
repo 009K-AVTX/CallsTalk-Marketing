@@ -14,6 +14,7 @@ export function usePath() {
     const sync = () => setPath(window.location.pathname);
     window.addEventListener('popstate', sync);
     window.addEventListener('portal:navigate', sync);
+    sync(); // a page may have navigated already: its effects run before this one (staff opening / go to /upload)
     return () => {
       window.removeEventListener('popstate', sync);
       window.removeEventListener('portal:navigate', sync);

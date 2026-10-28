@@ -540,9 +540,9 @@ All of these are edits to `/var/www/Callstalk/server/.env`, followed by `pm2 res
 | Setting | What it does | Notes |
 |---|---|---|
 | `TELEGRAM_BOT_TOKEN` | The bot that posts chats | See 11.1 |
-| `TELEGRAM_CHAT_ID` | The support group | Send `/chatid` in a group to get its id |
-| `TELEGRAM_THREAD_ID` | Post into one topic of a forum group | Optional |
-| `TELEGRAM_TOPIC_PER_CHAT` | One forum topic per visitor | Needs Topics on and the bot's "Manage topics" right |
+| `TELEGRAM_CHAT_ID` | The support group, or several separated by commas | Send `/chatid` in a group to get its id. Everything is posted in each group, the team can answer from any, and an answer given in one is shown in the others. The bot must be an admin in all of them |
+| `TELEGRAM_THREAD_ID` | Post into one topic of a forum group | Optional. With several groups, the topic is in the first |
+| `TELEGRAM_TOPIC_PER_CHAT` | One forum topic per visitor | Needs Topics on and the bot's "Manage topics" right. With several groups, the topics are in the first; the others get the messages in their main chat |
 | `EMAIL_TO` | Who gets notification emails | Comma-separated; empty turns emails off |
 | `EMAIL_FROM`, `SMTP_*` | Mailbox that sends them | See 11.2 |
 | `PUBLIC_URL` | Base of the links in emails | Must stay `https://callstalk.com` |
@@ -889,7 +889,8 @@ Admins switch each on or off and set the summary's time (EST) under **Settings â
 Keep them out of the website-chat thread: either make a topic for billing in the support group and set
 `TELEGRAM_BILLING_THREAD_ID` (send `/chatid` inside that topic to get its id), or put the bot in a separate group
 and set `TELEGRAM_BILLING_CHAT_ID`. Then `pm2 restart callstalk-chat`. With neither set, they post in the support
-chat itself, and the Settings card says so.
+chat itself, and the Settings card says so. For several billing groups, list them in `TELEGRAM_BILLING_CHAT_ID`
+separated by commas; `TELEGRAM_BILLING_THREAD_ID` is then a topic of the first.
 
 Only the live server posts or emails these by itself. A copy started with `TELEGRAM_POLLING=false` or
 `NODE_ENV=development` (a local copy borrowing the live bot) sends nothing on its own, so buyers in a local database

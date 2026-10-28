@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useStatement } from '../../src/components/BillingPage.jsx';
 import { loadSession } from '../../src/lib/portal.js';
-import Shell, { ADMIN_NAV, NAV, STAFF_NAV } from './components/Shell.jsx';
+import Shell, { ADMIN_NAV, NAV, PageHead, STAFF_NAV } from './components/Shell.jsx';
 import { navigate, usePath } from './router.jsx';
 import Login from './pages/Login.jsx';
 import Setup from './pages/Setup.jsx';
@@ -12,7 +12,7 @@ import Settings from './pages/Settings.jsx';
 import Upload, { ReportManager } from './pages/Upload.jsx';
 import { listMine, markReportsSeen, reportsSeenAt, staffSignInKind, unseenReports } from './reports.js';
 import useLoad from './useLoad.js';
-import AdminUsers from './pages/AdminUsers.jsx';
+import AdminUsers, { NewLogin } from './pages/AdminUsers.jsx';
 import AdminUser from './pages/AdminUser.jsx';
 import AdminFinance from './pages/AdminFinance.jsx';
 import AdminAudit from './pages/AdminAudit.jsx';
@@ -83,18 +83,23 @@ function Admin({ path }) {
   );
 }
 
-// Signed in as staff: customer reports (/upload) and their own settings, in the same frame as admins. Nothing else.
+// Signed in as staff: customer reports (/upload), adding customers (/customers/new) and their own settings, in the
+// same frame as admins. Nothing else.
+const STAFF_TITLES = { '/upload': 'Reports', '/customers/new': 'New Customer', '/settings': 'Settings' };
+
 function Staff({ path }) {
-  const known = path === '/upload' || path === '/settings';
+  const known = Boolean(STAFF_TITLES[path]);
   useEffect(() => {
-    if (known) document.title = `${path === '/settings' ? 'Settings' : 'Reports'} | CallsTalk Staff`;
+    if (known) document.title = `${STAFF_TITLES[path]} | CallsTalk Staff`;
     else navigate('/upload', { replace: true });
   }, [path, known]);
 
   if (!known) return null;
   return (
     <Shell path={path} nav={STAFF_NAV} team="staff">
-      {path === '/settings' ? <Settings team="staff" /> : <ReportManager onSignedOut={toLogin} />}
+      {path === '/settings' ? <Settings team="staff" />
+        : path === '/customers/new' ? <><PageHead title="New Customer" /><NewLogin roles={['customer']} onCreated={() => {}} /></>
+        : <ReportManager onSignedOut={toLogin} />}
     </Shell>
   );
 }
