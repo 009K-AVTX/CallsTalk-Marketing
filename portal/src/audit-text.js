@@ -70,7 +70,7 @@ const FIELD = {
   name: 'Name', company: 'Company', role: 'Role', status: 'Status', calls: 'Calls', replacements: 'Replaced',
   price_per_call: 'Price per Call', opening_balance: 'Opening Balance', start_date: 'Billing Starts', timezone: 'Time Zone',
   currency: 'Currency', amount: 'Amount', reference: 'Reference', note: 'Note', date: 'Day', telegram: 'Telegram',
-  element: 'Element X', zangi: 'Zangi', signal: 'Signal', email: 'Email', title: 'Title', filename: 'File',
+  whatsapp: 'WhatsApp', element: 'Element X', zangi: 'Zangi', signal: 'Signal', email: 'Email', title: 'Title', filename: 'File',
   period_from: 'Period From', period_to: 'Period To', format: 'Format', rows: 'Rows', from: 'From', to: 'To',
   file_bytes: 'File Size', emailed: 'Emailed', telegram_sent: 'Sent on Telegram', reports: 'Reports', payments: 'Each Payment',
   summary: 'Daily Summary', summary_time: 'Summary Time', username: 'Telegram User', via: 'Via', reason: 'Reason', customer: 'Customer', kind: 'Groups', q: 'Search',

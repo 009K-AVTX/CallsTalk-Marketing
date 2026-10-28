@@ -192,7 +192,7 @@ export const fetchProfile = () => (PREVIEW
   ? previewGuard(() => ({ ...previewProfile(loadSession()?.email), id: 'preview', avatar_version: previewAvatar() ? 1 : null }))
   : authed('/accounts/me'));
 
-// ── contact methods (Telegram, Element X, Zangi, Signal, another email) ──────
+// ── contact methods (Telegram, WhatsApp, Element X, Zangi, Signal, another email) ──
 
 const PREVIEW_CONTACTS = 'callstalk.previewContacts';
 
