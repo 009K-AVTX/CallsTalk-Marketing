@@ -47,18 +47,23 @@ export async function noticeSettings() {
   }
 }
 
-// The team's billing chat: its own, or the support chat (in TELEGRAM_BILLING_THREAD_ID, else the chat's usual topic).
-function target() {
+// The team's billing groups: their own, or the support groups. The topic (TELEGRAM_BILLING_THREAD_ID, else the
+// support chat's usual topic) is in the first group only.
+function targets() {
   const t = config.telegram;
-  return t.billingChatId ? { chat: t.billingChatId, threadId: t.billingThreadId } : { chat: t.chatId, threadId: t.billingThreadId ?? t.threadId };
+  const [chats, threadId] = t.billingChatIds.length ? [t.billingChatIds, t.billingThreadId] : [t.chatIds, t.billingThreadId ?? t.threadId];
+  return chats.map((chat, i) => ({ chat, threadId: i ? undefined : threadId }));
 }
 // Only the live server tells the team on its own. A local copy that borrows the live bot token
 // (TELEGRAM_POLLING=false, or NODE_ENV=development) would otherwise post figures from its own test database into the
 // team's chat; there, only "Post Summary Now" posts, labelled as a test.
 const live = config.telegram.polling && !config.isDev;
-const post = (text) => {
-  const { chat, threadId } = target();
-  return sendTo(chat, live ? text : `<b>Local test</b>\n\n${text}`, { threadId });
+// Posted in every billing group; fails, naming them, when any group did not take it.
+const post = async (text) => {
+  const all = targets();
+  const results = await Promise.allSettled(all.map(({ chat, threadId }) => sendTo(chat, live ? text : `<b>Local test</b>\n\n${text}`, { threadId })));
+  const failed = results.flatMap((r, i) => (r.status === 'rejected' ? [`chat ${all[i].chat}: ${r.reason.message}`] : []));
+  if (failed.length) throw new Error(failed.join('; '));
 };
 
 // Where a buyer stands, as on the Finance page: Paid (nothing owed; the calls their credit covers) or Pending
@@ -275,7 +280,7 @@ export function startBillingNotices() {
 const settingsView = async () => ({
   settings: await noticeSettings(),
   time_zone: TZ,
-  separate_chat: Boolean(config.telegram.billingChatId || config.telegram.billingThreadId),
+  separate_chat: Boolean(config.telegram.billingChatIds.length || config.telegram.billingThreadId),
   available: Boolean(config.telegram.token),
   team_email: emailEnabled ? config.email.to.join(', ') : '', // where payment emails go; empty when EMAIL_TO is not set
 });
@@ -301,7 +306,7 @@ billingNoticesRouter.post('/test', rateLimit({ windowMs: 10 * 60_000, max: 5, de
     await sendSummary();
   } catch (err) {
     console.error('[billing] could not post the summary on request:', err.message);
-    throw new HttpError(502, 'Telegram did not accept the summary. Check that the bot is still in the billing chat.');
+    throw new HttpError(502, 'Telegram did not accept the summary in one or more billing chats. Check that the bot is still in each of them.');
   }
   res.json({ sent: true });
 });

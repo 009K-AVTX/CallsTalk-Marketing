@@ -56,8 +56,9 @@ export default async function handler(req, res) {
 // Returns 'sent', 'failed' or 'off' (not configured).
 async function sendTelegram(data) {
   const token = process.env.TELEGRAM_BOT_TOKEN?.trim();
-  const chatId = process.env.TELEGRAM_CHAT_ID?.trim();
-  if (!token || !chatId) return 'off';
+  // One or more groups, comma-separated; the topic is in the first.
+  const chatIds = (process.env.TELEGRAM_CHAT_ID || '').split(',').map((c) => c.trim()).filter(Boolean);
+  if (!token || !chatIds.length) return 'off';
   const lines = [
     '<b>New access request</b>\n',
     `<b>Name:</b> ${escape(data.name)}`,
@@ -68,18 +69,21 @@ async function sendTelegram(data) {
     data.message && `\n<b>Message</b>\n<blockquote>${escape(data.message)}</blockquote>`,
   ].filter(Boolean);
   const thread = process.env.TELEGRAM_THREAD_ID?.trim();
-  try {
-    const r = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ chat_id: chatId, text: lines.join('\n'), parse_mode: 'HTML', disable_web_page_preview: true, ...(thread ? { message_thread_id: Number(thread) } : {}) }),
-    });
-    if (r.ok) return 'sent';
-    console.error('[api/request-access] Telegram', r.status, (await r.text()).slice(0, 300));
-  } catch (err) {
-    console.error('[api/request-access] Telegram network error', err);
-  }
-  return 'failed';
+  const sent = await Promise.all(chatIds.map(async (chatId, i) => {
+    try {
+      const r = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ chat_id: chatId, text: lines.join('\n'), parse_mode: 'HTML', disable_web_page_preview: true, ...(thread && !i ? { message_thread_id: Number(thread) } : {}) }),
+      });
+      if (r.ok) return true;
+      console.error('[api/request-access] Telegram', chatId, r.status, (await r.text()).slice(0, 300));
+    } catch (err) {
+      console.error('[api/request-access] Telegram network error', chatId, err);
+    }
+    return false;
+  }));
+  return sent.includes(true) ? 'sent' : 'failed';
 }
 
 async function sendEmail(data) {
