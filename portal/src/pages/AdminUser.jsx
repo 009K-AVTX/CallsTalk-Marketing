@@ -55,7 +55,7 @@ function Profile({ user, onSaved, onConflict }) {
       <label>Role
         <Select value={f.form.role} onChange={f.set('role')} disabled={self}>
           <option value="customer">Customer</option>
-          <option value="staff">Staff (report uploads only)</option>
+          <option value="staff">Staff (report uploads and new customers)</option>
           <option value="admin">Admin</option>
         </Select>
       </label>
