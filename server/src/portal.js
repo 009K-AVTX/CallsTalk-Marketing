@@ -94,7 +94,8 @@ portalRouter.post('/billing/statement/pay', requireUser('customer'), async (req,
 });
 
 portalRouter.get('/portal/reports', requireUser('customer'), async (req, res) => {
-  res.json({ results: await listReports(req.user.id, 'calls') });
+  // Without their nickname: that is the team's name for them.
+  res.json({ results: (await listReports(req.user.id, 'calls')).map(({ customer_name, ...r }) => r) });
 });
 
 portalRouter.get('/portal/reports/:id/file', requireUser('customer', 'staff', 'admin'), async (req, res) => {
@@ -116,7 +117,7 @@ staff.get('/customers', async (req, res) => {
   // `telegram`: they connected Telegram in their Settings, so a new report can be announced there too.
   const linked = await telegramLinked(customers.map((u) => u.id));
   res.json({ results: customers.map((u) => ({
-    id: u.id, name: u.company || u.name || u.email, login: u.email, nickname: u.nickname, version: u.version,
+    id: u.id, name: u.name || u.email, company: u.company, login: u.email, nickname: u.nickname, version: u.version,
     avatar_version: u.avatar_version, telegram: linked.has(u.id),
   })) });
 });

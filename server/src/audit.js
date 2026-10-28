@@ -19,6 +19,7 @@
 import { Router } from 'express';
 import { validTimeZone } from './billing.js';
 import { UUID } from './db.js';
+import { buyerName } from './format.js';
 import {
   addAuditEntry, auditActions, auditSummary, getAccount, getDay, getPayment, getReplacedCall, getReportInfo, getUser, listAudit, paymentStatuses,
 } from './portal-db.js';
@@ -40,7 +41,7 @@ function clean(body) {
   return out;
 }
 
-const label = (u) => u?.company || u?.name || u?.email || '';
+const label = buyerName;
 const dayChange = ({ date, before, after }) => `${date}: ${before ?? 'none'} to ${after ?? 'none'} call${after === 1 ? '' : 's'}`;
 const pick = (o, keys) => o && Object.fromEntries(keys.filter((k) => o[k] !== undefined).map((k) => [k, o[k]]));
 

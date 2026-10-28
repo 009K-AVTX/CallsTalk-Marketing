@@ -13,6 +13,7 @@ import { Router } from 'express';
 import { recordAudit } from './audit.js';
 import { addDays, localDate, statement } from './billing.js';
 import { UUID } from './db.js';
+import { buyerName } from './format.js';
 import { listBillingCustomers, listDaysOf, listPaymentsOf } from './portal-db.js';
 import { reportLimits } from './rate-limit.js';
 import { HttpError } from './routes.js';
@@ -71,7 +72,7 @@ export async function financeReport({ from, to, customer = null, now = new Date(
       if (p.status === 'pending') row.pending += cents(p.amount);
       if (p.status === 'failed') row.failed += cents(p.amount);
       payments.push({
-        id: p.id, date, customer_id: user.id, customer: user.company || user.name || user.email, amount: money(cents(p.amount)),
+        id: p.id, date, customer_id: user.id, customer: buyerName(user), amount: money(cents(p.amount)),
         currency: p.currency, status: p.status, method: METHOD[p.provider] || p.provider, reference: p.reference, note: p.note,
       });
     }
@@ -83,7 +84,7 @@ export async function financeReport({ from, to, customer = null, now = new Date(
     const started = account.start_date <= to;
 
     customers.push({
-      id: user.id, customer: user.company || user.name || user.email, email: user.email, status: user.status,
+      id: user.id, customer: buyerName(user), email: user.email, status: user.status,
       currency: account.currency, price_per_call: account.price_per_call, billing_since: account.start_date,
       calls: row.calls, replacements: row.replacements, billable_calls: row.billable_calls,
       opening_balance: money(started ? opening : 0), charges: money(row.charges), received: money(row.received),

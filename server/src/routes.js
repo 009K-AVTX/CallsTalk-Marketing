@@ -13,7 +13,7 @@ import { addMessage, createSession, getSession, listMessages, setStatus } from '
 import { linkSent, notifyNewChat, notifyVisitorEnded, notifyVisitorMessage } from './telegram.js';
 import { emailNewChat, emailVisitorMessage } from './email.js';
 import { rateLimit } from './rate-limit.js';
-import { ANONYMOUS_NAME, clientIp } from './format.js';
+import { ANONYMOUS_NAME, buyerName, clientIp } from './format.js';
 import { findSessionUser } from './portal-db.js';
 import { hashToken } from './auth-crypto.js';
 import { CSRF_HEADER, sessionToken } from './security.js';
@@ -64,7 +64,7 @@ router.post('/chat', rateLimit({ windowMs: 10 * 60_000, max: 5 }), async (req, r
   // Signed-in portal customers are known: their login's details are used, not what the page sends.
   const customer = await portalCustomer(req);
   // Name and email are optional: a visitor can just type a question into the chat.
-  const givenName = customer ? customer.name || customer.company : text(body.name, 'name', { max: 100, required: false });
+  const givenName = customer ? buyerName(customer) : text(body.name, 'name', { max: 100, required: false });
   const email = customer ? customer.email : text(body.email, 'email', { max: 200, required: false });
   if (email && !EMAIL.test(email)) throw new HttpError(400, 'Please enter a valid email address.');
   const name = givenName || ANONYMOUS_NAME;
@@ -77,7 +77,7 @@ router.post('/chat', rateLimit({ windowMs: 10 * 60_000, max: 5 }), async (req, r
   const id = randomUUID();
   const chat = {
     id, name, email, message, transcript, anonymous: !givenName, ip: clientIp(req),
-    ...(customer && { portal: true, portalUserId: customer.id, company: customer.company }),
+    ...(customer && { portal: true, portalUserId: customer.id, company: customer.company, nickname: customer.nickname, fullName: customer.name }),
   };
   let posted;
   try {

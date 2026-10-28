@@ -17,6 +17,7 @@
 //   DELETE /api/admin/users/:id/days/:date
 //   POST   /api/admin/users/:id/replaced-calls   { report, calls: [{ date, called_at, caller, duration }], reason }: calls
 //                                                from a Call Summary taken off their days' bills, one replacement each
+//   GET    /api/admin/users/:id/replaced-calls?from=&to=  calls replaced on those days (default the last 7), latest first
 //   DELETE /api/admin/users/:id/replaced-calls/:callId   puts a replaced call back on its day's bill
 //   POST   /api/admin/users/:id/payments         a payment received (bank transfer, USDT...)
 //   DELETE /api/admin/users/:id/payments/:paymentId
@@ -65,7 +66,7 @@ const outOfDate = () => new HttpError(409, 'Someone else saved a change here a m
 async function nickname(v, exceptId = null) {
   const nick = str(v, 40);
   const taken = nick && await findUserByNickname(nick, exceptId);
-  if (taken) throw new HttpError(400, `${taken.company || taken.name || taken.email} already has the nickname ${nick}.`);
+  if (taken) throw new HttpError(400, `${taken.name || taken.email} already has the nickname ${nick}.`);
   return nick;
 }
 // The database's own check, for two saves of the same nickname at once.
@@ -170,7 +171,7 @@ const STAFF_ROUTES = [
   ['GET', `/users/${ID}/billing`], ['PUT', `/users/${ID}/billing`], ['GET', `/users/${ID}/activity`],
   ['PUT', `/users/${ID}/days/[^/]+`], ['DELETE', `/users/${ID}/days/[^/]+`],
   ['POST', `/users/${ID}/payments`], ['DELETE', `/users/${ID}/payments/[^/]+`],
-  ['POST', `/users/${ID}/replaced-calls`], ['DELETE', `/users/${ID}/replaced-calls/[^/]+`],
+  ['GET', `/users/${ID}/replaced-calls`], ['POST', `/users/${ID}/replaced-calls`], ['DELETE', `/users/${ID}/replaced-calls/[^/]+`],
 ].map(([method, path]) => [method, new RegExp(`^${path}$`)]);
 
 async function staffOnCustomers(req, res, next) {
@@ -344,6 +345,18 @@ adminRouter.delete('/users/:id/days/:date', async (req, res) => {
   if (existing?.from_calls) throw fromCallLog(date, existing.calls);
   if (!await deleteDay(user.id, date, expected)) throw outOfDate();
   res.json({ user: userView(user), ...await billingView(user) });
+});
+
+// The calls replaced on a period's days (?from=, ?to=; the last 7 days by default), latest day first. Replacements
+// are asked for a day or two after the calls, so the team looks them up by the day of the call.
+adminRouter.get('/users/:id/replaced-calls', async (req, res) => {
+  const user = await loadCustomer(req);
+  const account = await getAccount(user.id);
+  if (!account) return res.json({ results: [] });
+  const to = DAY.test(req.query.to || '') ? req.query.to : localDate(new Date(), account.timezone);
+  const from = DAY.test(req.query.from || '') ? req.query.from : addDays(to, -6);
+  if (from > to) throw new HttpError(400, 'The start date is after the end date.');
+  res.json({ results: await listReplacedCalls(user.id, from, to) });
 });
 
 // Calls the buyer asked to have replaced, picked in one of their Call Summaries. Each call's day must have its calls

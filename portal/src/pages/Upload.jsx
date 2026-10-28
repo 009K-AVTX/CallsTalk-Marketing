@@ -7,7 +7,7 @@ import { enterBillingDays, planBillingDays, readBillingDays, toEnter } from '../
 import { callsIn, readCallSummary } from '../call-summary.js';
 import Icon from '../components/Icons.jsx';
 import { ErrorNote } from '../components/Shell.jsx';
-import { addDays, dayLabel, money, today } from '../format.js';
+import { addDays, buyerName, dayLabel, money, today } from '../format.js';
 import {
   canNotify, deleteReport, KINDS, listAll, listCustomers, localKeyHint, MAX_MB, notifyReports, staffSession, staffSignIn, staffSignOut, staffSignInKind, uploadReport,
 } from '../reports.js';
@@ -231,7 +231,7 @@ function UploadForm({ customers, onDone }) {
         const calls = kind === 'calls' ? await callsIn(await file.arrayBuffer()) : null;
         uploaded.push(await uploadReport({ ...form, kind, title: single || '', file, calls }));
       }
-      const who = chosen?.nickname || chosen?.login || form.customer.trim().toLowerCase();
+      const who = chosen ? buyerName(chosen) : form.customer.trim().toLowerCase();
       // Only what went wrong is added to the message.
       let notes = '';
       if (kind === 'billing' && enterCalls && plan && toEnter(plan).length) {
@@ -362,7 +362,7 @@ export function ReportManager({ onSignedOut }) {
 
   const remove = async (r) => {
     const seen = r.kind === 'calls' ? ' The customer will no longer be able to see it, and its calls come off their billing.' : '';
-    if (!window.confirm(`Delete "${r.title}" for ${r.customer}?${seen}`)) return;
+    if (!window.confirm(`Delete "${r.title}" for ${r.customer_name || r.customer}?${seen}`)) return;
     try {
       await deleteReport(r.id);
       load();
@@ -371,7 +371,8 @@ export function ReportManager({ onSignedOut }) {
     }
   };
 
-  const shown = (reports || []).filter((r) => !filter || r.customer.includes(filter.trim().toLowerCase()) || r.title.toLowerCase().includes(filter.trim().toLowerCase()));
+  const q = filter.trim().toLowerCase();
+  const shown = (reports || []).filter((r) => !q || [r.customer, r.customer_name, r.title].some((v) => (v || '').toLowerCase().includes(q)));
 
   return (
     <>
@@ -393,7 +394,7 @@ export function ReportManager({ onSignedOut }) {
                     <th scope="row">
                       <span className="p-person">
                         <Avatar userId={r.user_id} version={customers.find((c) => c.id === r.user_id)?.avatar_version} name={r.customer} size="sm" />
-                        {r.customer}
+                        {r.customer_name || r.customer}
                       </span>
                     </th>
                     <td>{r.title}<small className="p-up__file">{KINDS[r.kind] || KINDS.billing} · {r.filename} · {fileSize(r.size)}</small></td>

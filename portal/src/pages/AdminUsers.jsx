@@ -3,7 +3,7 @@ import { Avatar } from '../avatar.jsx';
 import { createUser, listUsers, loginState, signedIn, TIME_ZONES } from '../admin.js';
 import Icon from '../components/Icons.jsx';
 import { ErrorNote, PageHead } from '../components/Shell.jsx';
-import { money, today } from '../format.js';
+import { buyerName, money, today } from '../format.js';
 import { navigate } from '../router.jsx';
 import useLoad from '../useLoad.js';
 import Select from '../../../src/components/Select.jsx';
@@ -177,7 +177,7 @@ export default function AdminUsers({ onSignedOut }) {
                     <th scope="row">
                       <span className="p-person">
                         <Avatar userId={u.id} version={u.avatar_version} name={u.name || u.email} size="sm" />
-                        <span>{u.name || '—'}{(u.company || u.nickname) && <small className="p-up__file">{[u.company, u.nickname].filter(Boolean).join(' · ')}</small>}</span>
+                        <span>{buyerName(u) || '—'}{(u.nickname || u.company) && <small className="p-up__file">{[u.nickname && u.name, u.company].filter(Boolean).join(' · ')}</small>}</span>
                       </span>
                     </th>
                     <td>{u.email}</td>

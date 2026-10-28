@@ -1,0 +1,837 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>CallsTalk Portal Team Guide</title>
+<style>
+  @page {
+    size: A4; margin: 16mm 16mm 18mm;
+    @bottom-left { content: "CallsTalk Portal \00B7  Team Guide"; font: 7.5pt "Segoe UI", sans-serif; color: #8a8594; }
+    @bottom-right { content: "Page " counter(page) " of " counter(pages); font: 7.5pt "Segoe UI", sans-serif; color: #8a8594; }
+  }
+  @page :first { @bottom-left { content: none; } @bottom-right { content: none; } }
+  :root { --ink: #1d1a22; --soft: #5c5866; --line: #e3dfe9; --accent: #7b3fb8; --tint: #f6f1fb; --warn: #9a5b00; --warn-tint: #fff6e6; }
+  * { box-sizing: border-box; }
+  html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body { margin: 0; font: 10.2pt/1.5 "Segoe UI", system-ui, sans-serif; color: var(--ink); background: #fff; }
+  h1, h2, h3 { font-weight: 600; line-height: 1.25; }
+  h1 { font-size: 20pt; margin: 0 0 4mm; }
+  h1 .n { color: var(--accent); margin-right: 3mm; }
+  h2 { font-size: 13pt; margin: 7mm 0 2.5mm; break-after: avoid; }
+  h3 { font-size: 10.5pt; margin: 5mm 0 1.5mm; break-after: avoid; }
+  p { margin: 0 0 2.5mm; }
+  .lead { font-size: 11pt; color: var(--soft); margin-bottom: 5mm; }
+  .chapter { break-before: page; }
+  b, strong { font-weight: 600; }
+  .ui { font-weight: 600; }
+  code { font-family: Consolas, monospace; font-size: 9.2pt; background: var(--tint); padding: 0 1mm; border-radius: 1mm; }
+  ul, ol { margin: 0 0 3mm; padding-left: 6mm; }
+  li { margin-bottom: 1.2mm; }
+  ol.steps { list-style: none; padding: 0; counter-reset: s; }
+  ol.steps > li { counter-increment: s; position: relative; padding-left: 8mm; margin-bottom: 2mm; }
+  ol.steps > li::before { content: counter(s); position: absolute; left: 0; top: .2mm; width: 5.2mm; height: 5.2mm; border-radius: 50%; background: var(--accent); color: #fff; font-size: 8.5pt; font-weight: 600; text-align: center; line-height: 5.2mm; }
+
+  figure { margin: 3mm 0 5mm; break-inside: avoid; }
+  figure img { display: block; width: 100%; border-radius: 2mm; border: 1px solid #2a2530; }
+  figcaption { font-size: 8.8pt; color: var(--soft); margin-top: 1.5mm; }
+  .side { display: flex; gap: 6mm; align-items: flex-start; break-inside: avoid; }
+  .side > div { flex: 1; }
+  .side > figure { flex: 0 0 auto; margin-top: 0; }
+  /* A whole-page screenshot: on a page of its own, as tall as fits. */
+  figure.tall { break-before: page; width: 112mm; margin: 0 auto; }
+  .w55 { width: 55mm; } .w62 { width: 62mm; } .w70 { width: 70mm; } .w80 { width: 80mm; } .w95 { width: 95mm; }
+
+  table { width: 100%; border-collapse: collapse; margin: 2mm 0 4mm; font-size: 9.4pt; break-inside: avoid; }
+  th, td { text-align: left; vertical-align: top; padding: 1.8mm 2.4mm; border-bottom: 1px solid var(--line); }
+  thead th { font-size: 8pt; letter-spacing: .06em; text-transform: uppercase; color: var(--accent); border-bottom: 1.5px solid var(--accent); }
+  td.c, th.c { text-align: center; } td.r, th.r { text-align: right; } td.nw { white-space: nowrap; }
+  .yes { color: #157a4a; font-weight: 600; } .no { color: #a0283f; font-weight: 600; }
+  tr.total td { font-weight: 600; border-top: 1.5px solid var(--ink); }
+  .neg { color: #b4233c; } .pos { color: #157a4a; }
+
+  .box { border: 1px solid var(--line); background: var(--tint); border-radius: 2.5mm; padding: 3mm 4mm; margin: 3mm 0 4mm; break-inside: avoid; }
+  .box > .t { display: block; font-size: 8pt; letter-spacing: .08em; text-transform: uppercase; font-weight: 700; color: var(--accent); margin-bottom: 1mm; }
+  .box p:last-child, .box ul:last-child { margin-bottom: 0; }
+  .box.warn { background: var(--warn-tint); border-color: #f1d9a8; } .box.warn > .t { color: var(--warn); }
+  .new { display: inline-block; font-size: 7pt; font-weight: 700; letter-spacing: .08em; color: #fff; background: var(--accent); border-radius: 1mm; padding: .3mm 1.4mm; vertical-align: 1.2mm; margin-left: 1.5mm; }
+  .sum { font-family: Consolas, monospace; font-size: 9.4pt; background: #faf8fc; border-left: 3px solid var(--accent); padding: 2.5mm 4mm; margin: 2mm 0 4mm; }
+
+  .qa { break-inside: avoid; margin-bottom: 3.5mm; }
+  .qa .q { font-weight: 600; margin-bottom: 1mm; }
+  .qa .q::before { content: "Q"; color: var(--accent); margin-right: 2mm; }
+  .qa-head { font-size: 8.5pt; letter-spacing: .1em; text-transform: uppercase; color: var(--accent); font-weight: 700; margin: 6mm 0 2.5mm; border-bottom: 1px solid var(--line); padding-bottom: 1mm; }
+
+  /* Cover and contents */
+  .cover { height: 255mm; display: flex; flex-direction: column; justify-content: center; }
+  .cover .brand { font-size: 12pt; font-weight: 600; color: var(--accent); letter-spacing: .04em; }
+  .cover h1 { font-size: 32pt; margin: 3mm 0 4mm; }
+  .cover .sub { font-size: 12.5pt; color: var(--soft); max-width: 140mm; }
+  .cover .meta { margin-top: 12mm; color: var(--soft); font-size: 10pt; }
+  .toc { columns: 2; column-gap: 10mm; margin-top: 4mm; }
+  .toc div { break-inside: avoid; margin-bottom: 3.2mm; }
+  .toc b { display: block; }
+  .toc span { color: var(--soft); font-size: 9.2pt; }
+  .toc i { font-style: normal; color: var(--accent); font-weight: 600; margin-right: 2mm; }
+</style>
+</head>
+<body>
+
+<!-- ───────────────────────── cover ───────────────────────── -->
+<section class="cover">
+  <div class="brand">CallsTalk Portal</div>
+  <h1>Team Guide for Staff and Admins</h1>
+  <p class="sub">How to use the portal from the team side: uploading reports, adding buyers, working a buyer's page, calls from the call logs, replaced calls, payments and the Finance figures, with answers to the questions buyers and the team ask most.</p>
+  <p class="meta">Version 2 &middot; October 28, 2026 &middot; portal.callstalk.com<br>Screenshots use sample buyers and figures, not real customers.</p>
+</section>
+
+<!-- ───────────────────────── contents ───────────────────────── -->
+<section class="chapter">
+  <h1>Contents</h1>
+  <div class="toc">
+    <div><b><i>1</i>Getting Started</b><span>Roles, first-time setup, logging in</span></div>
+    <div><b><i>2</i>Customer Reports</b><span>Call Summaries and billing reports</span></div>
+    <div><b><i>3</i>Customers and New Customers</b><span>Nicknames, opening a buyer, adding one</span></div>
+    <div><b><i>4</i>Your Settings</b><span>Photo, password, logging out</span></div>
+    <div><b><i>5</i>A Buyer's Page</b><span>Admins and staff: login, terms, calls, payments</span></div>
+    <div><b><i>6</i>Calls from the Call Logs</b><span>How a Call Summary sets the day's calls</span></div>
+    <div><b><i>7</i>Replaced Calls</b><span>Taking the calls a buyer asks about off their bill</span></div>
+    <div><b><i>8</i>Entering Calls from a Billing Report</b><span>Same, Changes, New and Skipped</span></div>
+    <div><b><i>9</i>The Finance Page</b><span>Admins: every figure explained</span></div>
+    <div><b><i>10</i>Audit Log and Billing Notifications</b><span>Admins</span></div>
+    <div><b><i>11</i>What Buyers See</b><span>So you can answer their questions</span></div>
+    <div><b><i>12</i>How the Money Is Worked Out</b><span>The rules, with a worked example</span></div>
+    <div><b><i>13</i>Questions and Answers</b><span>Billing, call logs, replacements, reports, logins</span></div>
+    <div><b><i>14</i>Quick Reference</b><span>Where to find things, and a glossary</span></div>
+  </div>
+
+  <div class="box">
+    <span class="t">New in Version 2</span>
+    <ul>
+      <li><b>Call Summaries set the calls.</b> Uploading a buyer's call log now sets that day's calls in their billing, and the balance follows at once (chapter 6). Days with no call log are typed in as before.</li>
+      <li><b>Replaced calls, one by one.</b> Buyers ask for replacements in the portal chat. The team ticks those calls in the buyer's Call Summary, and each comes off the day's bill. Both sides keep the record (chapter 7). Replacements are no longer typed in.</li>
+      <li><b>Staff work buyers' pages.</b> Staff open any buyer from <span class="ui">Customers</span> and do what admins do there: billing terms, calls, replaced calls, payments, the buyer's login. Only changing roles, deleting logins, Finance and the Audit Log stay with admins (chapters 1, 3 and 5).</li>
+      <li><b>Nicknames.</b> Each buyer can have a short nickname, such as <code>HHP</code>, which picks them when uploading (chapter 3).</li>
+    </ul>
+  </div>
+
+  <div class="box">
+    <span class="t">About the Screenshots</span>
+    <p>Every screenshot was taken from the real portal, running on a test copy filled with made-up buyers (Northline Media, Bluepeak Insurance Leads, Harbor Health Partners, Summit Auto Leads, Crestline Solar and others). Names, emails, phone numbers and amounts are examples only. All figures were worked out by the portal itself, so the sums in this guide are the ones the portal really gives.</p>
+  </div>
+</section>
+
+<!-- ───────────────────────── 1 ───────────────────────── -->
+<section class="chapter">
+  <h1><span class="n">1</span>Getting Started</h1>
+  <p class="lead">The portal is at portal.callstalk.com. Buyers, staff and admins all log in at the same address. What you see after logging in depends on your role.</p>
+
+  <h2>Who Can Do What</h2>
+  <table>
+    <thead><tr><th>Task</th><th class="c">Staff</th><th class="c">Admin</th></tr></thead>
+    <tbody>
+      <tr><td>Upload, view and delete customer reports (Call Summaries and billing reports)</td><td class="c yes">Yes</td><td class="c yes">Yes</td></tr>
+      <tr><td>Tell a buyer about a new Call Summary (email and Telegram)</td><td class="c yes">Yes</td><td class="c yes">Yes</td></tr>
+      <tr><td>Add a new customer (buyer) login with their price and opening balance, and give buyers nicknames</td><td class="c yes">Yes</td><td class="c yes">Yes</td></tr>
+      <tr><td>Open a buyer's page: their balance, daily bills, payments and recent activity</td><td class="c yes">Yes</td><td class="c yes">Yes</td></tr>
+      <tr><td>Enter calls for days with no call log, change prices and billing terms</td><td class="c yes">Yes</td><td class="c yes">Yes</td></tr>
+      <tr><td>Replace the calls a buyer asks about, and put them back</td><td class="c yes">Yes</td><td class="c yes">Yes</td></tr>
+      <tr><td>Record and delete payments</td><td class="c yes">Yes</td><td class="c yes">Yes</td></tr>
+      <tr><td>Enter a billing report's calls into a buyer's billing</td><td class="c yes">Yes</td><td class="c yes">Yes</td></tr>
+      <tr><td>Change a buyer's details, send them a new link, deactivate their login</td><td class="c yes">Yes</td><td class="c yes">Yes</td></tr>
+      <tr><td>Change anyone's role, delete logins, add staff or admin logins, open staff and admin logins</td><td class="c no">No</td><td class="c yes">Yes</td></tr>
+      <tr><td>Logins list, Finance page, Audit Log, billing notification settings</td><td class="c no">No</td><td class="c yes">Yes</td></tr>
+      <tr><td>Change your own photo and password</td><td class="c yes">Yes</td><td class="c yes">Yes</td></tr>
+    </tbody>
+  </table>
+  <p>The top bar shows your sections. Staff see <span class="ui">Reports</span>, <span class="ui">Customers</span>, <span class="ui">New Customer</span> and <span class="ui">Settings</span>. Admins see <span class="ui">Logins</span>, <span class="ui">Finance</span>, <span class="ui">Audit Log</span>, <span class="ui">Reports</span> and <span class="ui">Settings</span>. On a phone, the sections fold into a menu behind the button at the top right.</p>
+  <p>The limits for staff are kept by the server itself, not just hidden on the screen: a staff login that tries an admin-only action is refused.</p>
+
+  <h2>Setting Up Your Login (First Time)</h2>
+  <div class="side">
+    <div>
+      <p>An admin creates your login. You then get an email with a single-use setup link, which works for 7 days.</p>
+      <ol class="steps">
+        <li>Install an authenticator app on your phone, for example Google Authenticator, Microsoft Authenticator or Authy.</li>
+        <li>Open the setup link. In the app, scan the QR code. If you can't scan it, choose <span class="ui">Enter a setup key</span> in the app and type the key shown beside the code.</li>
+        <li>Choose a password of at least 8 characters and type it twice.</li>
+        <li>Type the 6-digit code the app shows now, then press <span class="ui">Activate Account</span>.</li>
+      </ol>
+      <div class="box"><span class="t">Keep the App</span><p>You need the app's code every time you log in. If you lose your phone or delete the app, ask an admin to reset your login. They will send you a new setup link.</p></div>
+    </div>
+    <figure class="w70"><img src="shots/setup.jpg" alt=""><figcaption>The setup page from the link.</figcaption></figure>
+  </div>
+
+  <h2>Logging In</h2>
+  <div class="side">
+    <div>
+      <ol class="steps">
+        <li>Go to portal.callstalk.com.</li>
+        <li>Enter your email (your Login ID) and password, then press <span class="ui">Log In</span>.</li>
+        <li>Enter the 6-digit code from your authenticator app.</li>
+      </ol>
+      <p>Staff land on Reports. Admins land on Logins.</p>
+      <p>If you forget your password, use <span class="ui">Forgot password?</span> on the login page. A reset link is emailed to you, and you'll need your authenticator code to finish.</p>
+    </div>
+    <figure class="w70"><img src="shots/login.jpg" alt=""><figcaption>The login card.</figcaption></figure>
+  </div>
+</section>
+
+<!-- ───────────────────────── 2 ───────────────────────── -->
+<section class="chapter">
+  <h1><span class="n">2</span>Customer Reports</h1>
+  <p class="lead">Staff and admins use this page the same way. Upload a buyer's reports on the left. The list on the right shows everything already uploaded.</p>
+  <figure><img src="shots/staff-reports.jpg" alt=""><figcaption>Reports, as staff see it. Admins open the same page from Reports in their top bar.</figcaption></figure>
+
+  <h2>The Two Kinds of Report</h2>
+  <table>
+    <thead><tr><th style="width:24%">Report Type</th><th style="width:24%">Who Sees It</th><th>What It's For</th></tr></thead>
+    <tbody>
+      <tr><td><b>Call Summary</b></td><td>The buyer, in their portal under Reports, and the team</td><td>The day's call log as the dialer exports it: one call per row, with date and time, caller, number called, duration, status and who hung up. Its calls set the buyer's calls in billing for those days (chapter 6). The buyer can view and download it, and is told about it by email and Telegram. It is also where the calls a buyer asks to have replaced are chosen (chapter 7).</td></tr>
+      <tr><td><b>Billing Report</b></td><td>The team only. The buyer never sees it.</td><td>Our own record of a buyer's daily bills. Its calls can be entered into the buyer's billing while uploading (chapter 8).</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Uploading a Call Summary</h2>
+  <div class="side">
+    <div>
+      <ol class="steps">
+        <li>Under <span class="ui">Report Type</span>, keep <span class="ui">Call Summary</span> selected.</li>
+        <li>Choose the buyer under <span class="ui">Customer</span>. Buyers are listed by nickname, for example <span class="ui">HHP &middot; Harbor Health Partners</span>, in order, with those without a nickname last. A buyer marked <span class="ui">&middot; Telegram</span> has connected Telegram and can get the notice there too.</li>
+        <li>Drop the Excel or CSV file on the box, or click it to choose. You can pick several files at once. Each must be 3 MB or smaller.</li>
+        <li>The portal reads the file and shows how many calls it lists and their days, for example <span class="ui">9 calls, Oct 28, 2026</span>. It also fills in <span class="ui">From</span> and <span class="ui">To</span> from those days. Check these match what you expect.</li>
+        <li>Optional: a <span class="ui">Title</span> (left empty, it becomes <span class="ui">Call Summary, 9 calls</span>) and a <span class="ui">Note for the Customer</span>.</li>
+        <li>Choose how the buyer is told (below), then press <span class="ui">Upload Call Summary</span>.</li>
+      </ol>
+      <p>Once it's uploaded, the buyer's calls for those days are counted from it and their balance changes straight away (chapter 6).</p>
+      <p><b>Notifications.</b> <span class="ui">Email the customer</span> sends one email to their Login ID: "Your report has been updated for (dates). You can view your Call Summary report from your portal", with a button that opens it. The file isn't attached. <span class="ui">Send on Telegram</span> sends the same message to their Telegram, but only if they connected it in their portal Settings. Otherwise the option is greyed out.</p>
+    </div>
+    <figure class="w70"><img src="shots/upload-calls.jpg" alt=""><figcaption>A Call Summary ready to upload: Harbor's afternoon calls, 9 on Oct 28.</figcaption></figure>
+  </div>
+
+  <figure class="w95"><img src="shots/upload-done.jpg" alt=""><figcaption>The upload message.</figcaption></figure>
+  <p>When it's done, a green message confirms the upload. If a notice could not be sent, the message adds what went wrong, for example <span class="ui">Telegram not sent: ...</span> The report is still uploaded either way.</p>
+
+  <div class="box warn">
+    <span class="t">Re-uploading a Corrected File</span>
+    <p>A day's calls are every call in all of the buyer's Call Summaries for that day, so a corrected file uploaded next to the wrong one still counts the wrong one's calls. <b>Delete the wrong report first</b>, then upload the right one. Untick <span class="ui">Email the customer</span> if you don't want them told twice. A later export of the same day (an afternoon file after a morning one) is fine to upload as it is: only its new calls are added.</p>
+  </div>
+
+  <div class="box">
+    <span class="t">If the Call Count Doesn't Appear</span>
+    <p>The count only shows when the file is laid out as the dialer exports it, with a date and time at the start of each call row (a header row above them is fine). Any other layout still uploads exactly as it is, but its calls are not counted and the buyer's billing doesn't change. Set From and To yourself.</p>
+  </div>
+
+  <h2>Uploading a Billing Report</h2>
+  <div class="side">
+    <div>
+      <p>Choose <span class="ui">Billing Report</span> under Report Type. Everything else works the same. The <span class="ui">Excel Template</span> button downloads a blank sheet in the layout buyers know from the old Telegram bill. It already has the formulas:</p>
+      <div class="sum">Call Charges = (Total Calls - Replacements) &times; Price per Call<br>Balance = Opening Balance - Call Charges + Payment Received<br>Each day's Opening Balance is the day before's Balance.</div>
+      <p>A billing report is filed for the team only. Nothing in the buyer's billing changes unless you tick <span class="ui">Enter these calls in the customer's billing</span> (chapter 8). Staff and admins can both do this.</p>
+      <p>The portal also recognises our own "Financial Overview" report layout, with one box per day titled like <span class="ui">Oct 22, 2026 &middot; Financial Overview</span>.</p>
+    </div>
+    <figure class="w70"><img src="shots/upload-billing.jpg" alt=""><figcaption>Billing Report selected, with the Excel Template button and the days read from the file.</figcaption></figure>
+  </div>
+
+  <h2>The Uploaded List</h2>
+  <figure><img src="shots/uploaded.jpg" alt=""><figcaption>Every report, newest first.</figcaption></figure>
+  <p>Every report, newest first, with the buyer, title, type, file name and size, period and when it was added. Type in <span class="ui">Filter by customer or title</span> to narrow it. To remove a report, press the &times; at the end of its row and confirm. A deleted Call Summary disappears from the buyer's portal straight away, and its calls come off their billing: those days are counted again from the buyer's other Call Summaries.</p>
+</section>
+
+<!-- ───────────────────────── 3 ───────────────────────── -->
+<section class="chapter">
+  <h1><span class="n">3</span>Customers and New Customers</h1>
+  <p class="lead">Staff have their own list of buyers under Customers. Admins find buyers in Logins (chapter 5).</p>
+
+  <h2>Customers (Staff)</h2>
+  <figure><img src="shots/customers.jpg" alt=""><figcaption>Customers, as staff see it.</figcaption></figure>
+  <ul>
+    <li><b>Open a buyer:</b> click their name. Their page opens with everything an admin sees there, apart from the role and Delete (chapter 5).</li>
+    <li><b>Nicknames:</b> type a short name, such as <code>HHP</code>, and press <span class="ui">Save</span>. The nickname is how the buyer is chosen when uploading. No two buyers can share one, whatever the capitals.</li>
+    <li><b>Filter:</b> by name, login or nickname. The heading counts the buyers, and how many have no nickname yet.</li>
+  </ul>
+  <p>Deactivated buyers aren't listed here. Admins see them in Logins.</p>
+
+  <h2>Adding a New Customer</h2>
+  <p>Staff use <span class="ui">New Customer</span> in the top bar. Admins use <span class="ui">New Login</span> on the Logins page, with Customer selected. The form is the same.</p>
+  <div class="side">
+    <div>
+      <table>
+        <thead><tr><th style="width:30%">Field</th><th>What to Enter</th></tr></thead>
+        <tbody>
+          <tr><td>Full Name</td><td>The buyer's contact person.</td></tr>
+          <tr><td>Email (Login ID)</td><td>The address they'll log in with. The setup link and report notices go here. One login per email.</td></tr>
+          <tr><td>Company</td><td>Required for customers. This is the name shown across the portal and in Finance.</td></tr>
+          <tr><td>Nickname</td><td>Optional. The team's short name for them, e.g. <code>LLL</code>. It picks them when uploading.</td></tr>
+          <tr><td>Price per Call ($)</td><td>What each charged call costs them, e.g. 36.00.</td></tr>
+          <tr><td>Opening Balance ($)</td><td>Where their account stands on the start date. Negative = they owe us (e.g. -1250 for an unpaid amount from before). Positive = credit they've already paid (e.g. 500). Use 0 for a fresh start.</td></tr>
+          <tr><td>Billing Starts</td><td>The first day they're billed for. Today or earlier.</td></tr>
+          <tr><td>Days Counted In</td><td>The buyer's time zone. Their "day" runs midnight to midnight here, which decides which day each call and payment lands on. The default is America/New York.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <figure class="w70"><img src="shots/new-customer.jpg" alt=""><figcaption>The New Customer form, filled in.</figcaption></figure>
+  </div>
+  <div class="side">
+    <div>
+      <p>Press <span class="ui">Create Login and Send Link</span>. The buyer is emailed a single-use setup link that works for 7 days. The page shows the link too, with a <span class="ui">Copy Link</span> button, so you can also send it by Telegram or another channel.</p>
+      <div class="box warn"><span class="t">"Not Emailed"</span><p>If the box turns amber and says <span class="ui">Not emailed</span>, the email could not be sent. Copy the link and send it to the buyer yourself. It still works once, until the date shown.</p></div>
+      <p>Afterwards, staff can open the new buyer from Customers to correct their price, opening balance or start date under Billing Terms.</p>
+    </div>
+    <figure class="w80"><img src="shots/new-customer-link.jpg" alt=""><figcaption>After creating the login: the link was emailed, and can be copied.</figcaption></figure>
+  </div>
+</section>
+
+<!-- ───────────────────────── 4 ───────────────────────── -->
+<section class="chapter">
+  <h1><span class="n">4</span>Your Settings</h1>
+  <p class="lead">Open Settings in the top bar, or click your initial at the top right.</p>
+  <figure><img src="shots/settings.jpg" alt=""><figcaption>Settings for a staff login.</figcaption></figure>
+  <ul>
+    <li><b>Profile Photo:</b> JPG, PNG or WebP, cropped to a square. It's shown next to your name in the portal.</li>
+    <li><b>Your Login:</b> your name, Login ID, company and access level. Ask an admin to change your name or role.</li>
+    <li><b>Change Password:</b> type your current password and the new one twice, press <span class="ui">Continue</span>, then confirm with your authenticator code.</li>
+    <li><b>Log Out:</b> always log out on a shared computer.</li>
+  </ul>
+  <p>Admins also see Billing Notifications here (chapter 10).</p>
+</section>
+
+<!-- ───────────────────────── 5 ───────────────────────── -->
+<section class="chapter">
+  <h1><span class="n">5</span>A Buyer's Page</h1>
+  <p class="lead">One page holds everything about a buyer, in three tabs: <b>Calls &amp; Replacements</b> (the day-to-day work), <b>Billing &amp; Payments</b>, and <b>Account</b> (their login, contact methods, recent activity and the red Danger Zone). Admins open it from Logins. Staff open it from Customers.</p>
+
+  <h2>Logins (Admins)</h2>
+  <figure><img src="shots/logins.jpg" alt=""><figcaption>Logins. The heading counts customers, staff and admins, and how many haven't set up yet.</figcaption></figure>
+  <p>Use <span class="ui">Everyone</span>, <span class="ui">Customers</span>, <span class="ui">Staff</span> and <span class="ui">Admins</span> to filter, or search by name, email, company or nickname. A buyer's nickname shows after their company. The Status column shows where each login stands:</p>
+  <table>
+    <thead><tr><th style="width:24%">Status</th><th>Meaning</th></tr></thead>
+    <tbody>
+      <tr><td>Active</td><td>Set up and able to log in.</td></tr>
+      <tr><td>Link Sent</td><td>Created, but they haven't used their setup link yet. The link is still valid.</td></tr>
+      <tr><td>Link Expired</td><td>The setup link ran out (after 7 days) before they used it. Open the login and send a new one.</td></tr>
+      <tr><td>Deactivated</td><td>Turned off. They can't log in, and nothing is deleted.</td></tr>
+    </tbody>
+  </table>
+  <div class="side">
+    <div>
+      <h3>New Login</h3>
+      <p>Press <span class="ui">New Login</span> and pick Customer, Staff or Admin. Customer logins need the billing fields described in chapter 3. Staff and admin logins only need a name and email. Company is optional for them.</p>
+      <p>Staff can upload and remove reports, add customers and work customers' pages. They can't open staff or admin logins, change roles, delete logins, or see Finance and the Audit Log. Admins can do everything.</p>
+    </div>
+    <figure class="w95"><img src="shots/new-login.jpg" alt=""><figcaption>New Login with Customer selected.</figcaption></figure>
+  </div>
+
+  <h2>The Tabs</h2>
+  <figure><img src="shots/buyer-tabs.jpg" alt=""><figcaption>The page opens on Calls &amp; Replacements. The badge at the right shows what they owe today, or their credit.</figcaption></figure>
+  <table>
+    <thead><tr><th style="width:26%">Tab</th><th>What it holds</th></tr></thead>
+    <tbody>
+      <tr><td>Calls &amp; Replacements</td><td>Replaced Calls with its date filter (chapter 7), the Calls form and the daily table.</td></tr>
+      <tr><td>Billing &amp; Payments</td><td>Billing Terms, Record a Payment, and the payments of the shown days.</td></tr>
+      <tr><td>Account</td><td>Details, Access, Contact Methods, Recent Activity, and the Danger Zone.</td></tr>
+    </tbody>
+  </table>
+  <p>The tab is kept in the address (for example <span class="ui">?tab=account</span>), so a reload or a shared link opens the same tab. On a phone the tabs read Calls, Billing and Account.</p>
+
+  <h2>Account</h2>
+  <figure><img src="shots/buyer-top.jpg" alt=""><figcaption>The Account tab as an admin sees it: Details and Access.</figcaption></figure>
+  <ul>
+    <li><b>Details:</b> name, company and nickname, and for admins the role.</li>
+    <li><b>Access:</b> when the login was created, set up and last used, and how long its setup link is valid.</li>
+  </ul>
+
+  <h2>The Danger Zone</h2>
+  <figure><img src="shots/danger-zone.jpg" alt=""><figcaption>The Danger Zone, in red at the foot of the Account tab.</figcaption></figure>
+  <p>Everything that locks a person out or removes them sits apart, in red, at the foot of the Account tab. Each one asks you to confirm first.</p>
+  <ul>
+    <li><span class="ui">Send a New Setup Link</span> is for someone who hasn't set up yet. Once they have, it becomes <span class="ui">Reset Login</span> (<span class="ui">Reset and Send Link</span>): their password and authenticator stop working until they use the new link.</li>
+    <li><span class="ui">Deactivate Login</span> blocks sign-in and keeps everything. On a deactivated login it becomes <span class="ui">Reactivate Login</span>.</li>
+    <li><span class="ui">Delete Login</span> (admins only) removes the login and all its billing, payments and reports, and can't be undone.</li>
+  </ul>
+  <figure><img src="shots/staff-customer.jpg" alt=""><figcaption>The same buyer's Account tab as staff see it: All Customers to go back, no role, and no Delete Login in the Danger Zone.</figcaption></figure>
+  <figure><img src="shots/contacts.jpg" alt=""><figcaption>Contact Methods are set by the buyer. We're emailed when they change.</figcaption></figure>
+  <p><b>Contact Methods:</b> extra channels the buyer added in their own Settings (Telegram, WhatsApp, Element X, Zangi, Signal, another email), and whether they connected Telegram for notices. Telegram and WhatsApp open as links.</p>
+
+  <h2>Billing Terms and Recording a Payment</h2>
+  <figure><img src="shots/terms-payment.jpg" alt=""><figcaption>Billing Terms (left) and Record a Payment (right).</figcaption></figure>
+  <p><b>Billing Terms</b> are the price per call, the opening balance on the start date, the start date and the time zone. A new price only applies to days entered from then on. Days already entered keep the price they were saved with (see Q&amp;A).</p>
+  <p><b>Record a Payment</b> is for money that didn't come in through the buyer's own USDT Pay button, for example a bank transfer. Enter the amount and the day it was received. <span class="ui">Shown to Customer</span> is the label the buyer sees, e.g. "Bank transfer". <span class="ui">Reference</span> is for our own records. Set Status:</p>
+  <ul>
+    <li><b>Completed:</b> counted in the balance on the day received. The team and the buyer are told, depending on Billing Notifications.</li>
+    <li><b>Pending:</b> on its way but not counted yet. Finance shows it as "confirming".</li>
+    <li><b>Failed:</b> kept on record only. Never counted.</li>
+  </ul>
+  <div class="box warn"><span class="t">Don't Record USDT Deposits by Hand</span><p>A buyer's USDT payments through Pay Now are found and added automatically once confirmed on the blockchain. Recording the same payment by hand would count it twice.</p></div>
+
+  <h2>Calls</h2>
+  <div class="side">
+    <div>
+      <p>Most days now get their calls from the buyer's Call Summary (chapter 6). The Calls card is for the days that have none, and for a day's price.</p>
+      <ol class="steps">
+        <li>Pick the Day, or click a day in the table below to load it.</li>
+        <li>For a day with no Call Summary, enter the day's <span class="ui">Total Calls</span>.</li>
+        <li>Check the line underneath. It shows exactly what will be charged, with any replaced calls taken off, e.g. <span class="ui">Shown as 23: 23 charged &times; $28.00 = $644.00</span>.</li>
+        <li>Leave <span class="ui">Price per Call</span> empty to use the day's existing price, or the buyer's current price for a new day. Type a price only for a one-off different rate.</li>
+        <li>Press <span class="ui">Save Calls</span>. <span class="ui">Clear This Day</span> removes the day's calls completely.</li>
+      </ol>
+      <p>A day with a Call Summary shows <span class="ui">from its Call Summaries</span> beside Total Calls, which can't be typed over. Only its price can change (<span class="ui">Save Price</span>), and it can't be cleared. To change its calls, upload the corrected call log, or delete the wrong one.</p>
+      <p>Replacements are no longer typed here. They are the calls replaced one by one under Replaced Calls (chapter 7). You can change any day, even weeks later. That day's balance and every balance after it are recalculated straight away.</p>
+    </div>
+    <figure class="w95"><img src="shots/calls-logged.jpg" alt=""><figcaption>Calls, with Oct 26 picked from the table: its 23 calls come from its Call Summary.</figcaption></figure>
+  </div>
+
+  <h2>The Daily Table and Payments</h2>
+  <figure><img src="shots/ledger.jpg" alt=""><figcaption>The buyer's days since billing started (up to 31), newest first. Buyers themselves only see the last five.</figcaption></figure>
+  <p>Each row reads left to right as a small sum: <span class="ui">Opening - Charges + Paid = Balance</span>, and the next day opens on that balance. The row for today is marked <span class="ui">Today</span> and changes as the day's call logs come in. <span class="ui">Call log</span> under a day's calls means they were counted from its Call Summaries. "23 &minus; 2" means 23 calls with 2 replaced. Below the table, Payments lists the payments of those days with their status. Press &times; to delete one that was entered by mistake.</p>
+  <figure class="w95"><img src="shots/payments.jpg" alt=""><figcaption>Payments in the shown days.</figcaption></figure>
+  <figure><img src="shots/activity.jpg" alt=""><figcaption>Recent Activity: the latest changes to this buyer and who made them.</figcaption></figure>
+  <p><b>Recent Activity</b> at the bottom lists the latest changes to this buyer and who made them, staff and admins alike. Admins can press <span class="ui">Open in Audit Log</span> for the full history.</p>
+</section>
+
+<!-- ───────────────────────── 6 ───────────────────────── -->
+<section class="chapter">
+  <h1><span class="n">6</span>Calls from the Call Logs<span class="new">NEW</span></h1>
+  <p class="lead">A buyer's Call Summary is the record of their calls, so the portal bills from it. Uploading the day's call log sets that day's calls, and the balance follows at once. Nobody types the day's total.</p>
+
+  <h2>How a Day Is Counted</h2>
+  <ul>
+    <li>When a Call Summary is uploaded, the portal reads every call in it (its time and caller) and sets the day's <b>Total Calls</b> to the number of different calls in all of that buyer's Call Summaries for the day.</li>
+    <li>That day's charges, its balance and every later balance change straight away. A buyer with their Billing page open sees it within 30 seconds.</li>
+    <li>The team sees <span class="ui">Call log</span> under the day's calls in the daily table. The buyer sees <span class="ui">From your call log</span> under Total Calls on their bill.</li>
+    <li>Replaced calls are still counted among the day's calls, and taken off what is charged: "23 &minus; 2" (chapter 7).</li>
+  </ul>
+  <div class="sum">Day's calls = every different call (time and caller) in the buyer's Call Summaries for that day<br>Charged calls = Day's calls - Replaced calls</div>
+
+  <h2>What Happens When...</h2>
+  <table>
+    <thead><tr><th style="width:38%">You...</th><th>The day's calls</th></tr></thead>
+    <tbody>
+      <tr><td>Upload the morning's export, then the afternoon's</td><td>Both are counted, with no call twice. In the example, Harbor's Oct 28 had 11 calls from the morning file. The afternoon file added 9, making 20.</td></tr>
+      <tr><td>Upload the same file twice by mistake</td><td>Nothing changes: its calls are already counted. Delete the extra copy so the buyer doesn't see it twice.</td></tr>
+      <tr><td>Upload a corrected log that drops a wrong call</td><td>The wrong call still counts while the old log is there. Delete the wrong log first, then upload the corrected one.</td></tr>
+      <tr><td>Delete a Call Summary</td><td>Its days are counted again from the buyer's other Call Summaries. A day left with no calls is removed, unless it has replaced calls (they stay on record).</td></tr>
+      <tr><td>Upload a file in another layout</td><td>It is filed as it is, and the buyer can open it, but its calls aren't counted. The day keeps what it had.</td></tr>
+      <tr><td>Upload a file whose calls fall outside From and To</td><td>The upload is refused, naming the day. Correct From and To, or check the file.</td></tr>
+      <tr><td>Upload for a buyer with no billing terms yet</td><td>The calls are kept, and counted once the terms are set.</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Days With No Call Log</h2>
+  <p>Days before call logs were uploaded, or days a log is missing for, are typed in on the buyer's page under Calls, as before. Typed days and call-log days can sit side by side. In the example, Harbor's days up to Oct 23 were typed in, and Oct 24 onwards come from their logs.</p>
+
+  <h2>Call Summaries Uploaded Before Version 2</h2>
+  <div class="side">
+    <div>
+      <p>Call Summaries uploaded before this change were filed, but their calls were never read. On the buyer's page, under Replaced Calls, pick a day it covers: such a report says <span class="ui">Not in billing yet</span> and has a <span class="ui">Read Calls</span> button. Press it to count its calls for those days, as a new upload would. Until then, those days keep the calls that were typed in, so past balances never change on their own.</p>
+      <p>Check the typed figure against the log before pressing it. If they differ, the log wins.</p>
+    </div>
+  </div>
+
+  <div class="box">
+    <span class="t">In the Audit Log</span>
+    <p>Each upload, Read Calls and deleted Call Summary records how it changed billing, one day per line, for example <span class="ui">2026-10-28: 11 to 20 calls</span>, under <span class="ui">Billing Days</span>. "Who changed this day's calls?" always has an answer.</p>
+  </div>
+</section>
+
+<!-- ───────────────────────── 7 ───────────────────────── -->
+<section class="chapter">
+  <h1><span class="n">7</span>Replaced Calls<span class="new">NEW</span></h1>
+  <p class="lead">When a buyer disputes a call, they ask for a replacement in the portal chat. The team finds that call in the buyer's Call Summary and replaces it. It comes off that day's bill, and the record is kept on both sides.</p>
+
+  <h2>How Buyers Ask</h2>
+  <p>Buyers use <span class="ui">Chat With Us</span>, at the bottom right of their portal, giving the call's time and caller number. The chat works as it always has: their messages reach the team as before, and the team answers in the chat. Their Billing page reminds them: "To have a call replaced, send us its time and caller number in the chat."</p>
+
+  <h2>When They Ask</h2>
+  <p>Buyers usually ask a day after the calls (within 24 hours). Some, such as HOZ, take up to 48 hours. Friday's calls are replaced on Monday and can run into Tuesday. So the card works from <b>the day the calls were made</b>, not the day the buyer asks.</p>
+
+  <h2>Replacing Calls</h2>
+  <ol class="steps">
+    <li>Open the buyer's page (staff: Customers, then the buyer's name. Admins: Logins, then the buyer).</li>
+    <li>On <span class="ui">Calls &amp; Replacements</span>, the <span class="ui">Replaced Calls</span> card shows the last 7 days to start with. To change the dates, press the date button at its top right. Pick a preset (Today, Yesterday, Last 7 Days, Last 30 Days, Last 90 Days, This Month, Last Month), or click the first and last day in the calendar and press <span class="ui">Apply</span>. Click a day twice for that day alone.</li>
+    <li><span class="ui">Call Summaries</span> lists the logs of those dates, latest day first. Each shows its day with the calls in billing and how many are already replaced. Press <span class="ui">Choose Calls</span> beside the day the buyer means. If it isn't listed, upload that day's call log first; the card links to the upload page.</li>
+    <li>The log opens. Type the caller number or the time the buyer sent into <span class="ui">Search caller or time</span>: "(574) 344-7831", "5743447831" and "15:22" all work. Tick the call. Repeat for each call they listed. The box at the top of the column ticks every call shown.</li>
+    <li>Check the ticked calls listed above the Replace button (press &times; on one to untick it).</li>
+    <li>Optional: type a reason. <b>The buyer sees it</b>, so keep it plain, e.g. "Under 30 seconds".</li>
+    <li>Press <span class="ui">Replace 2 Calls</span>. A green message confirms it. Close the log.</li>
+  </ol>
+  <p>A Call Summary that covers several days shows only the chosen day's calls; press <span class="ui">All Days</span> to see the rest.</p>
+  <figure><img src="shots/replace-pick.jpg" alt=""><figcaption>Two of Harbor's Oct 26 calls ticked, with the reason the buyer will see.</figcaption></figure>
+  <figure class="w95"><img src="shots/replace-done.jpg" alt=""><figcaption>The confirmation. Calls already replaced are counted apart and never replaced twice.</figcaption></figure>
+
+  <h2>What It Changes</h2>
+  <p>Each replaced call comes off the day's bill. In the example, Harbor's Oct 26 had 23 calls at $28. With 2 replaced it reads <b>23 &minus; 2</b>: 21 charged, $588.00 instead of $644.00. That day's balance and every later one go up by $56.00 at once. This is exactly the "125 &minus; 2" of the old Telegram bill, now with the two calls named.</p>
+
+  <h2>The Record</h2>
+  <figure><img src="shots/replaced-card.jpg" alt=""><figcaption>Replaced Calls on Harbor's page: the day of the calls, that day's Call Summary, then the calls replaced in the chosen period, by day, with who replaced them and when.</figcaption></figure>
+  <ul>
+    <li><b>On the buyer's page</b> (team): under <span class="ui">Replaced on These Days</span>, the calls replaced on the card's dates, grouped by the day of the call. Each shows its time, caller, duration and reason, who replaced it and when. Search by caller, time or reason. <span class="ui">Only This Day</span> beside a day narrows the whole card to it.</li>
+    <li><b>In the buyer's portal:</b> a Replaced Calls list on their Billing page, and the calls marked <span class="ui">Replaced</span> when they open that Call Summary (chapter 11). They don't see who replaced them.</li>
+    <li><b>In the Audit Log</b> (admins): each replacement, with its calls, day and reason, and each one put back.</li>
+  </ul>
+
+  <h2>Putting a Call Back</h2>
+  <p>Press <span class="ui">Put Back</span> beside a replaced call and confirm. It is charged again, and the day goes back from "23 &minus; 2" to "23 &minus; 1". Use it only for a call replaced by mistake. The Audit Log keeps both steps.</p>
+
+  <h2>The Rules</h2>
+  <ul>
+    <li>Replacements aren't typed in any more. They come from calls chosen this way, or from a billing report's "125 &minus; 2" (chapter 8).</li>
+    <li>The same call (time and caller) is never replaced twice, even from a re-uploaded or corrected log.</li>
+    <li>The call's day must have calls in billing, and a day can't have more replaced calls than calls. Either way, nothing is saved and the message says why.</li>
+    <li>A day with replaced calls can't be cleared, and its calls can't be set below them, until those calls are put back.</li>
+    <li>Deleting a Call Summary keeps its replaced calls on record, so the bill still explains itself.</li>
+  </ul>
+</section>
+
+<!-- ───────────────────────── 8 ───────────────────────── -->
+<section class="chapter">
+  <h1><span class="n">8</span>Entering Calls from a Billing Report</h1>
+  <p class="lead">For days with no call log, the team can upload a billing report and let the portal enter its calls, after checking them day by day. Staff and admins can both do it.</p>
+  <div class="side">
+    <div>
+      <ol class="steps">
+        <li>Open Reports, choose <span class="ui">Billing Report</span> and the buyer.</li>
+        <li>Choose the file: our Excel template, or a Financial Overview report.</li>
+        <li>The portal reads each day's calls, replacements and price, and sets them against what the buyer's billing has now.</li>
+        <li>Check the table. If it's right, tick <span class="ui">Enter these calls in the customer's billing</span>.</li>
+        <li>Press <span class="ui">Upload Billing Report</span>. The report is filed, then the ticked days are saved. Each save is in the Audit Log.</li>
+      </ol>
+      <p>Only calls, replacements and price are read. The portal works out the charges and balances itself. Payments are never taken from a file. USDT deposits come in on their own and the team records the others, so reading payments from the file would count them twice.</p>
+    </div>
+    <figure class="w70"><img src="shots/upload-billing.jpg" alt=""><figcaption>Bluepeak's report for Oct 21&ndash;23, set against their billing.</figcaption></figure>
+  </div>
+  <table>
+    <thead><tr><th style="width:14%">Mark</th><th>Meaning</th><th style="width:22%">Saved When Ticked?</th></tr></thead>
+    <tbody>
+      <tr><td><b>Same</b></td><td>The file matches what billing already has.</td><td>No need, nothing changes</td></tr>
+      <tr><td><b>Changes</b></td><td>Billing has different figures for this day. The file's figures will replace them. In the example, Oct 22 gains 2 replacements: 40 becomes "40 &minus; 2".</td><td>Yes</td></tr>
+      <tr><td><b>New</b></td><td>Billing has nothing for this day yet (Oct 23 in the example), or the day is older than 30 days and isn't compared.</td><td>Yes</td></tr>
+      <tr><td><b>Skipped</b></td><td>The day is before the buyer's billing start date, or in the future.</td><td>No</td></tr>
+    </tbody>
+  </table>
+  <p>Rows that can't be read, such as a non-date or non-whole numbers, are listed under the table as <span class="ui">Not read: row 7 (reason)</span>. In the file, a day's calls can be written as 125 with a separate Replacements column, or as 125 - 2 meaning 125 calls with 2 replaced. If the price cell is empty or 0, the day keeps the price billing already has.</p>
+  <div class="box warn">
+    <span class="t">Days That Have a Call Log</span>
+    <p>A day counted from its Call Summaries keeps their calls. If a billing report has a different total for it, that day is refused and listed after the upload as not entered. A report also can't lower a day's replacements below its replaced calls. Fix the call log instead, or put the calls back first.</p>
+  </div>
+  <div class="box">
+    <span class="t">If Someone Else Changed a Day Meanwhile</span>
+    <p>That day is refused, not overwritten, and listed after the upload as not entered. Look at the buyer's page, then enter that day again.</p>
+  </div>
+</section>
+
+<!-- ───────────────────────── 9 ───────────────────────── -->
+<section class="chapter">
+  <h1><span class="n">9</span>The Finance Page (Admins)</h1>
+  <p class="lead">Finance shows the money across all buyers, or one buyer, for any period of up to two years: what was billed, what came in, and who owes what. It follows exactly the same rules as each buyer's own bill, call logs and replaced calls included, so the two always agree.</p>
+  <p>Pick the period at the top: <span class="ui">7 Days</span>, <span class="ui">30 Days</span>, <span class="ui">90 Days</span>, <span class="ui">This Month</span>, <span class="ui">Last Month</span>, or <span class="ui">Custom</span> dates. Use the customer menu to look at one buyer. Each buyer's days are counted in their own time zone.</p>
+
+  <h2>The Period in Figures</h2>
+  <figure><img src="shots/finance-figures.jpg" alt=""><figcaption>Sep 29 to Oct 28, 2026, all customers. The strip reads as one sum.</figcaption></figure>
+  <div class="sum">Opening Balance - Billed + Collected = Closing Balance<br>$1,250.00 - $132,927.00 + $121,600.00 = -$10,077.00</div>
+  <table>
+    <thead><tr><th style="width:20%">Figure</th><th>What It Is</th><th style="width:30%">In the Example</th></tr></thead>
+    <tbody>
+      <tr><td>Opening Balance</td><td>All buyers' balances added together on the day before the period starts. A buyer whose billing started inside the period counts with their own opening balance.</td><td>Bluepeak -$1,250 + Harbor +$500 + Crestline +$2,000 = $1,250</td></tr>
+      <tr><td>Billed</td><td>Charges for the period: charged calls &times; each day's price. The small line shows how many calls were charged.</td><td>$132,927.00 for 3,531 calls</td></tr>
+      <tr><td>Collected</td><td>Completed payments received during the period. Pending and failed payments are not included. The percentage is Collected &divide; Billed.</td><td>$121,600 &divide; $132,927 = 91.5%</td></tr>
+      <tr><td>Closing Balance</td><td>All buyers' balances on the last day of the period. Negative means owed to us, positive means credit.</td><td>-$10,077.00, owed to us</td></tr>
+    </tbody>
+  </table>
+  <p>The line under the strip adds:</p>
+  <ul>
+    <li><b>Owed to us now:</b> today's amounts due, added up over the buyers who owe. Buyers in credit don't reduce it ($13,112.00).</li>
+    <li><b>Pending / paid:</b> how many buyers owe money today, and how many don't (3 pending, 5 paid).</li>
+    <li><b>Held in credit:</b> today's credit, added up over the buyers in credit ($3,035.00).</li>
+    <li><b>Payments still pending:</b> payments on their way, not yet counted ($2,500.00).</li>
+    <li><b>Average per charged call:</b> Billed &divide; charged calls ($132,927 &divide; 3,531 = $37.65).</li>
+    <li><b>Calls replaced, not charged:</b> total replacements in the period (36), typed in earlier or replaced from a call log.</li>
+  </ul>
+
+  <h2>Charts</h2>
+  <figure><img src="shots/finance-charts.jpg" alt=""><figcaption>Billed and Collected as running totals, and Calls per Day. Each card can switch to a Table.</figcaption></figure>
+  <p><b>Billed and Collected</b> adds up both amounts day by day. The gap between the two lines is what has gone unpaid in the period. Collected moves in steps because payments arrive on some days only. <b>Calls per Day</b> shows charged calls, with replaced calls stacked on top in amber. Hover a day to see its exact figures, or press <span class="ui">Table</span> to read the numbers.</p>
+
+  <h2>Owed Now and Payments</h2>
+  <figure><img src="shots/finance-owed.jpg" alt=""><figcaption>Who owes most today, and the period's payments newest first.</figcaption></figure>
+  <p><b>Owed Now</b> lists today's balance due by buyer. <b>Payments</b> lists every payment in the period with its method, note and status. Click a buyer's name to open their page.</p>
+
+  <h2>By Customer</h2>
+  <figure><img src="shots/finance-customers.jpg" alt=""><figcaption>One row per buyer, whoever owes most first, with the total at the bottom.</figcaption></figure>
+  <table>
+    <thead><tr><th style="width:22%">Column</th><th>Meaning</th></tr></thead>
+    <tbody>
+      <tr><td>Status</td><td><b>Pending</b> means the buyer owes money today. The line under it shows how many calls that amount stands for, plus any payment still "confirming". <b>Paid</b> means they owe nothing today, and shows how many more calls their credit covers. Status is always as of today, whatever period you picked.</td></tr>
+      <tr><td>Calls</td><td>All calls in the period. The small figure beside them (+15 for Bluepeak) is the replaced calls among them, which aren't charged.</td></tr>
+      <tr><td>Opening / Closing</td><td>The buyer's balance at the start and end of the period.</td></tr>
+      <tr><td>Billed / Collected</td><td>Their charges and completed payments in the period.</td></tr>
+      <tr><td>Owed Now</td><td>What they owe today: today's balance turned positive, or $0 if they're in credit.</td></tr>
+    </tbody>
+  </table>
+  <p>Each row checks the same way as the totals. For Bluepeak: -$1,250.00 - $38,598.00 + $36,000.00 = -$3,848.00. At $42 a call, $3,848 stands for 3,848 &divide; 42 = 91.6, rounded up to 92 calls unpaid. Crestline is Paid with $2,150 of credit: 2,150 &divide; 45 = 47.8, so it covers 47 more calls. The Net for the period under the table is Collected - Billed: $121,600 - $132,927 = -$11,327.</p>
+
+  <h2>Downloads</h2>
+  <div class="side">
+    <div>
+      <p><span class="ui">Download</span> gives the figures for the period and customer you picked:</p>
+      <ul>
+        <li><b>Finance Report (PDF):</b> the figures, the chart and every table.</li>
+        <li><b>By Customer (CSV):</b> one row per buyer, including Status and Calls Left.</li>
+        <li><b>Per Day (CSV):</b> calls, replaced, charged, billed and collected for each day.</li>
+        <li><b>Payments (CSV):</b> every payment in the period.</li>
+      </ul>
+      <p>Every download is recorded in the Audit Log.</p>
+    </div>
+    <figure class="w70"><img src="shots/finance-download.jpg" alt=""><figcaption>The Download menu.</figcaption></figure>
+  </div>
+</section>
+
+<!-- ───────────────────────── 10 ───────────────────────── -->
+<section class="chapter">
+  <h1><span class="n">10</span>Audit Log and Billing Notifications (Admins)</h1>
+  <h2>Audit Log</h2>
+  <p>Every change made in the portal, every sign-in and every download, with who did it, when and from which address. Entries are kept for good and can't be edited.</p>
+  <figure><img src="shots/audit.jpg" alt=""><figcaption>The Audit Log. All the sample activity here happened on one day.</figcaption></figure>
+  <ul>
+    <li>Filter by period, kind of activity (Sign-Ins, Logins and Access, Billing, Reports and Downloads), person, or Unsuccessful Only. Search by email, name, action or IP.</li>
+    <li>Open an entry to see everything recorded about it.</li>
+    <li>Days are counted in your own time zone.</li>
+    <li>Staff actions are logged under the staff member's email, just like an admin's.</li>
+    <li>Use it to answer "who changed this buyer's calls on Oct 22?", "who replaced this call?" or "did the buyer actually log in?"</li>
+  </ul>
+  <p>New entries in this version: <span class="ui">Replaced Calls</span> and <span class="ui">Put Back a Replaced Call</span> (with the calls, day and reason), <span class="ui">Read a Call Summary into Billing</span>, and the <span class="ui">Billing Days</span> an upload or deleted Call Summary changed.</p>
+  <figure><img src="shots/audit-entries.jpg" alt=""><figcaption>Entries, newest first, each marked Successful or not.</figcaption></figure>
+
+  <h2>Billing Notifications</h2>
+  <p>Admins choose who is told about buyers' payments, under Settings.</p>
+  <figure><img src="shots/notifications.jpg" alt=""><figcaption>Billing Notifications in an admin's Settings.</figcaption></figure>
+  <ul>
+    <li><b>Each Payment Received:</b> posted in the team's billing chat on Telegram when a USDT deposit completes or someone records a payment. It shows the buyer, the amount, their new balance and whether they're now Paid or still Pending.</li>
+    <li><b>Email Each Payment to the Team:</b> the same details by email.</li>
+    <li><b>Confirm Each Payment to the Buyer:</b> an email to the buyer, plus Telegram if they connected it, with the amount, how it was paid and their new balance. Only buyers with an active login are told.</li>
+    <li><b>Daily Paid and Pending Summary:</b> once a day at the time you set (EST), every buyer as Paid (and how many calls their credit covers) or Pending (what they owe and how many calls that is). <span class="ui">Post Summary Now</span> sends it immediately. Typing <code>/buyers</code> in the billing chat gives the same summary as of that moment.</li>
+  </ul>
+  <p>Notices never show a buyer's price per call, only call counts and amounts. Payments recorded by staff are announced the same way as an admin's.</p>
+</section>
+
+<!-- ───────────────────────── 11 ───────────────────────── -->
+<section class="chapter">
+  <h1><span class="n">11</span>What Buyers See</h1>
+  <p class="lead">Knowing the buyer's screen makes their questions easier to answer. Buyers see only their own account.</p>
+      <ul>
+        <li><b>Wallet Balance:</b> their balance now. When it's negative, the page says how much will settle it and shows a red Due badge in the top bar.</li>
+        <li><b>Make a Payment:</b> the amount, with shortcuts for the full balance and fixed sums, paid in USDT on the TRON network (TRC-20). Pressing Pay shows their own deposit address and QR code. The funds count once the blockchain confirms the transaction.</li>
+        <li><b>Financial Overview:</b> today's bill, live, with the opening balance, calls, price, charges, payment received and balance now. <span class="ui">From your call log</span> under Total Calls means the calls were counted from their Call Summary.</li>
+        <li><b>Last days and Billing History:</b> the previous days' bills and a 5-day history table with a total row. A day with replaced calls reads "23 &minus; 2" and says how many weren't charged.</li>
+        <li><b>Replaced Calls:</b> each call replaced in those 5 days, with its time, caller, duration and the reason given, marked Not charged.</li>
+        <li><b>Reports:</b> their Call Summaries to view in the browser or download. A number next to Reports in the top bar counts new ones.</li>
+        <li><b>Chat With Us:</b> where they ask questions, and ask for replacements.</li>
+        <li><b>Settings:</b> their contact methods, Connect Telegram (for report and payment notices), photo and password.</li>
+      </ul>
+      <p>The page refreshes itself every 30 seconds while it's open, and whenever they come back to it, so a new call log, a replaced call or a recorded payment shows up without them doing anything.</p>
+  <figure class="tall"><img src="shots/buyer-billing.jpg" alt=""><figcaption>Harbor's Billing page: new-report banner, latest Call Summaries, wallet balance, today's live bill, the last days, Billing History, Replaced Calls and Payments. Chat With Us sits at the bottom right.</figcaption></figure>
+  <figure><img src="shots/buyer-history.jpg" alt=""><figcaption>Billing History, Replaced Calls and Payments, as the buyer sees them.</figcaption></figure>
+  <figure><img src="shots/buyer-report.jpg" alt=""><figcaption>A Call Summary opened by the buyer: the two replaced calls are marked, and the note above says they weren't charged.</figcaption></figure>
+</section>
+
+<!-- ───────────────────────── 12 ───────────────────────── -->
+<section class="chapter">
+  <h1><span class="n">12</span>How the Money Is Worked Out</h1>
+  <p class="lead">There are only four rules. The buyer's bill, the buyer's page, the Finance page, the downloads and the Telegram notices all use them, so they always agree.</p>
+  <div class="sum">1. Charged calls = Total calls - Replacements<br>2. Day's charges = Charged calls &times; Price per call (that day's price)<br>3. Day's balance = Opening balance - Charges + Completed payments received that day<br>4. Next day's opening balance = this day's balance<br>Amount due = the balance with its minus sign removed, when it is negative; otherwise $0.</div>
+  <p>Where the numbers come from: <b>Total calls</b> is counted from the day's Call Summaries, or typed in for a day without one. <b>Replacements</b> are the calls replaced at the buyer's request.</p>
+
+  <h2>Reading the Sign</h2>
+  <table>
+    <thead><tr><th style="width:30%">Balance</th><th>Means</th><th style="width:24%">Shown As</th></tr></thead>
+    <tbody>
+      <tr><td>Negative, e.g. -$3,336.00</td><td>The buyer owes us $3,336.00.</td><td>Due / Owes / Pending</td></tr>
+      <tr><td>Zero</td><td>Nothing owed, no credit.</td><td>Paid</td></tr>
+      <tr><td>Positive, e.g. $2,150.00</td><td>The buyer has $2,150.00 of credit for future calls.</td><td>In Credit / Paid</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Worked Example: Harbor Health Partners, $28.00 per Call</h2>
+  <table>
+    <thead><tr><th>Day</th><th class="r">Opening</th><th class="r">Calls</th><th class="r">Charged</th><th class="r">Charges</th><th class="r">Paid</th><th class="r">Balance</th></tr></thead>
+    <tbody>
+      <tr><td>Oct 24</td><td class="r neg">-$2,716.00</td><td class="r">25</td><td class="r">25</td><td class="r neg">-$700.00</td><td class="r pos">+$2,600.00</td><td class="r neg">-$816.00</td></tr>
+      <tr><td>Oct 25</td><td class="r neg">-$816.00</td><td class="r">25 &minus; 2</td><td class="r">23</td><td class="r neg">-$644.00</td><td class="r">$0.00</td><td class="r neg">-$1,460.00</td></tr>
+      <tr><td>Oct 26</td><td class="r neg">-$1,460.00</td><td class="r">23 &minus; 2</td><td class="r">21</td><td class="r neg">-$588.00</td><td class="r">$0.00</td><td class="r neg">-$2,048.00</td></tr>
+      <tr><td>Oct 27</td><td class="r neg">-$2,048.00</td><td class="r">26</td><td class="r">26</td><td class="r neg">-$728.00</td><td class="r">$0.00</td><td class="r neg">-$2,776.00</td></tr>
+      <tr><td>Oct 28 (today, live)</td><td class="r neg">-$2,776.00</td><td class="r">20</td><td class="r">20</td><td class="r neg">-$560.00</td><td class="r">$0.00</td><td class="r neg">-$3,336.00</td></tr>
+      <tr class="total"><td>5-day total</td><td></td><td class="r">119 &minus; 4</td><td class="r">115</td><td class="r neg">-$3,220.00</td><td class="r pos">+$2,600.00</td><td></td></tr>
+    </tbody>
+  </table>
+  <p>All five days come from Harbor's call logs. <b>Oct 25:</b> "25 &minus; 2" means 25 calls, 2 of them replaced at Harbor's request, so 23 &times; $28 = $644 is charged. The 2 replaced calls cost nothing: without them the day would have cost $700.</p>
+  <p><b>Oct 24:</b> -$2,716 - $700 + $2,600 = -$816. The payment covered most of what was owed.</p>
+  <p><b>Today:</b> Harbor's morning log had 11 calls and the afternoon log 9, so today has 20 so far: 20 &times; $28 = $560, and -$2,776 - $560 = -$3,336. The buyer sees "Due $3,336.00", and paying $3,336 brings them back to $0.</p>
+  <p><b>Check from the totals:</b> start -$2,716 - charges $3,220 + paid $2,600 = -$3,336. The same answer.</p>
+  <p>On Finance today, Harbor is Pending, 120 calls unpaid: $3,336 &divide; $28 = 119.1, rounded up to 120.</p>
+
+  <h2>Days and Time Zones</h2>
+  <ul>
+    <li>A buyer's day runs midnight to midnight in their time zone (Days Counted In on their terms). A payment counts on the day it arrived in that zone.</li>
+    <li>A call counts on the day written at the start of its row in the Call Summary.</li>
+    <li>A payment the team records counts on the Day Received they choose.</li>
+    <li>Team notices and the daily summary use EST. The Audit Log uses your own time zone.</li>
+  </ul>
+</section>
+
+<!-- ───────────────────────── 13 ───────────────────────── -->
+<section class="chapter">
+  <h1><span class="n">13</span>Questions and Answers</h1>
+
+  <div class="qa-head">Finance and Balances</div>
+  <div class="qa"><div class="q">A buyer says their balance is wrong. How do I check it?</div>
+    <p>Open the buyer (staff: Customers; admins: Logins) and go down the daily table from the oldest day that looks wrong. For each row check: the calls (a <span class="ui">Call log</span> day against its Call Summaries, a typed day against our report), the replaced calls, the price, whether a payment is on the right day, and that each opening balance equals the day before's balance. Then check the Payments list for anything pending or failed. Those are never counted. Recent Activity on the page, and the Audit Log for admins, show who changed what and when.</p></div>
+  <div class="qa"><div class="q">The buyer paid, but their balance hasn't changed.</div>
+    <ul>
+      <li><b>USDT through Pay Now:</b> it's added automatically once the blockchain confirms it. Until then it shows as pending ("confirming" on Finance). This usually takes minutes. A deposit sent on another network (not TRC-20) won't arrive.</li>
+      <li><b>Bank transfer or other:</b> someone in the team has to record it under Record a Payment with status Completed. A payment recorded as Pending doesn't count until it's changed. To change it, delete the payment and record it again as Completed.</li>
+      <li>Check it was recorded on the right buyer, and on the day it actually arrived.</li>
+    </ul></div>
+  <div class="qa"><div class="q">Why does a minus sign mean the buyer owes us?</div>
+    <p>The balance is from the buyer's side: what is left of the money they've paid in. Calls take money out, payments put money in. Below zero, they've used more than they paid. See "Reading the Sign" in chapter 12.</p></div>
+  <div class="qa"><div class="q">We replaced a call from last week. Why did today's balance change?</div>
+    <p>Each day opens on the day before's balance. Taking a call off one day's charges raises that day's balance and every balance after it, including today's, by the same amount. For example, replacing 2 calls at $28 makes that day $56 cheaper, and today's balance goes up by $56.</p></div>
+  <div class="qa"><div class="q">We changed a buyer's price. What happens to earlier days?</div>
+    <p>Nothing. Every day keeps the price it was saved with, so past bills don't change. The new price applies to new days. When you re-save an older day without typing a price, it keeps its old one. To bill a specific day at a different rate, type the price on that day under Calls (Save Price, for a call-log day).</p></div>
+  <div class="qa"><div class="q">What should the opening balance be for a new buyer?</div>
+    <p>Where they stand on the billing start date. Use a negative amount if they already owe us from before (e.g. -1250). Use a positive amount if they prepaid (e.g. 500). Otherwise use 0. Don't enter a prepayment as both an opening balance and a payment.</p></div>
+  <div class="qa"><div class="q">On Finance, a buyer is "Pending" but there's no pending payment. Why?</div>
+    <p>"Pending" is used in two ways. The Status Pending means the buyer owes money today. A pending payment is money on its way, shown as "$X confirming" under the status and in "payments still pending". A buyer can be Pending (owes) with no payment confirming, or have a payment confirming while still being Paid.</p></div>
+  <div class="qa"><div class="q">How are "92 calls unpaid" and "covers 47 more calls" worked out?</div>
+    <p>The amount is divided by the buyer's current price per call. What they owe is rounded up, because even part of a call is unpaid. Credit is rounded down, so only whole calls are covered. Bluepeak owes $3,848 at $42, which gives 91.6, shown as 92 calls unpaid. Crestline's credit of $2,150 at $45 gives 47.8, shown as covers 47 more calls.</p></div>
+  <div class="qa"><div class="q">What is the Opening Balance on Finance? It isn't any one buyer's balance.</div>
+    <p>It's every buyer's balance added together on the day before the period starts. Buyers who started inside the period count with their own opening balance. In the example, Bluepeak started at -$1,250, Harbor at +$500 and Crestline at +$2,000, the others at $0, giving $1,250. Closing Balance is the same total on the last day of the period.</p></div>
+  <div class="qa"><div class="q">Why is "Owed to us now" different from the Closing Balance?</div>
+    <p>For two reasons. First, Closing Balance is the end of the period you picked, while Owed Now is always today. Second, Closing Balance adds credit and debt together, so a buyer with credit cancels debt owed by another. Owed Now adds up only what the owing buyers owe ($13,112), and credit is shown separately as "held in credit" ($3,035). Here $3,035 - $13,112 = -$10,077, the Closing Balance, because the period ends today.</p></div>
+  <div class="qa"><div class="q">What is the collection rate, and can it be over 100%?</div>
+    <p>Collected &divide; Billed for the period: $121,600 &divide; $132,927 = 91.5%. Yes, it can be over 100%, for example when buyers pay off older debt or prepay during the period. Under 100% means less came in than was billed in that period.</p></div>
+  <div class="qa"><div class="q">What is "Net for the period"?</div>
+    <p>Collected - Billed. Negative (-$11,327 in the example) means the buyers' balances went down by that much during the period, so more is owed at the end than at the start. Positive means debts were paid down or credit built up. It always equals Closing Balance - Opening Balance.</p></div>
+  <div class="qa"><div class="q">Why don't Finance's figures match an Excel report someone made?</div>
+    <ul>
+      <li>Different period, or the report doesn't include today's live calls.</li>
+      <li>Days are counted in each buyer's time zone. A late-evening payment may fall on a different day in a sheet kept in our time.</li>
+      <li>The sheet counts pending payments, or misses a call replaced later.</li>
+      <li>The sheet was made from a partial call log, while the portal counts every Call Summary uploaded for the day.</li>
+      <li>Finance never reads payments from billing reports. Only recorded and confirmed payments count.</li>
+    </ul>
+    <p>Download Per Day and Payments (CSV) for the same period and compare day by day.</p></div>
+  <div class="qa"><div class="q">Today's figures keep changing. Is that right?</div>
+    <p>Yes. Today is live: each call log uploaded during the day adds its calls, so today's charges and balance grow until the day ends. Finance totals for a period that includes today change too.</p></div>
+  <div class="qa"><div class="q">Does a pending or failed payment ever affect the balance?</div>
+    <p>No. Only completed payments count, on the day they were received. Pending ones are shown so everyone knows money is on its way. Failed ones are kept for the record.</p></div>
+
+  <div class="qa-head">Call Logs and Replaced Calls</div>
+  <div class="qa"><div class="q">Why can't I type the calls for this day?</div>
+    <p>Its calls come from its Call Summaries (<span class="ui">from its Call Summaries</span> beside Total Calls). The log is the record, so it decides. To change the count, upload the corrected call log, or delete the wrong one. You can still change that day's price.</p></div>
+  <div class="qa"><div class="q">A day's calls look too low.</div>
+    <p>Usually only part of the day's log was uploaded, for example a morning export. Upload the rest: only its new calls are added. If it's today, the day isn't over yet.</p></div>
+  <div class="qa"><div class="q">A day's calls look too high.</div>
+    <p>Check the buyer's Call Summaries for that day. A wrong file, or one uploaded for the wrong buyer, still counts until it's deleted. Delete it and the day is counted again without it.</p></div>
+  <div class="qa"><div class="q">A buyer asks for a replacement in the chat. What do I need from them?</div>
+    <p>The day, the call's time and the caller's number. Under Replaced Calls, choose the dates of the call, open that day's Call Summary, search for the caller number, tick it and replace it (chapter 7). Reply in the chat once it's done. Their bill already shows it.</p></div>
+  <div class="qa"><div class="q">The call they mean isn't in any Call Summary.</div>
+    <p>Then it isn't billed from a log. Check the day: if it was typed in (no Call log under its calls), there is nothing to tick. A replacement on a typed day can only come from a billing report's "125 &minus; 2" (chapter 8). Upload the day's call log first if you have it.</p></div>
+  <div class="qa"><div class="q">I replaced the wrong call.</div>
+    <p>Press Put Back beside it under Replaced Calls, then replace the right one. Both steps are in the Audit Log.</p></div>
+  <div class="qa"><div class="q">Can a buyer have more replacements than calls?</div>
+    <p>No. The portal refuses a replacement above the day's calls, whether chosen from a log or read from a billing report.</p></div>
+  <div class="qa"><div class="q">What happened to the Replacements box on Calls?</div>
+    <p>It's gone. Replacements now name the calls they take off, so the buyer and the team see the same thing. They come from Replaced Calls, or from a billing report.</p></div>
+
+  <div class="qa-head">Buyers' Questions</div>
+  <div class="qa"><div class="q">Why can the buyer only see five days?</div>
+    <p>Their Billing page shows the last five days, today included. Older days are in their Call Summary reports, and our team keeps the billing reports. If they need older figures, an admin can download Finance for that buyer and period.</p></div>
+  <div class="qa"><div class="q">What does "125 &minus; 2" mean on the bill?</div>
+    <p>125 calls that day, 2 of them replaced. Replaced calls aren't charged, so the buyer pays for 123. The 2 calls are listed under Replaced Calls on their Billing page, and marked in that day's Call Summary.</p></div>
+  <div class="qa"><div class="q">How does a buyer pay?</div>
+    <p>Pay Now in their portal, in USDT on the TRON network (TRC-20), to their own deposit address. They should send on TRC-20 only. The balance updates once the transaction is confirmed. For any other method, the team records the payment by hand once the money has arrived.</p></div>
+  <div class="qa"><div class="q">The buyer didn't get the report email.</div>
+    <p>Check the email went to their Login ID, and ask them to check spam. The email has a button that opens the report, and the file isn't attached. The report is in their portal under Reports either way. For Telegram notices, they have to connect Telegram under Settings in their portal first. The buyer list on the upload form shows <span class="ui">&middot; Telegram</span> for those who have.</p></div>
+
+  <div class="qa-head">Reports</div>
+  <div class="qa"><div class="q">I uploaded the wrong file, or for the wrong buyer.</div>
+    <p>Delete it from the Uploaded list straight away with &times; and confirm. The buyer can no longer see it, and its calls come off their billing. Upload the right one. Untick the email if they've already been told about the date.</p></div>
+  <div class="qa"><div class="q">Can I upload several days at once?</div>
+    <p>Yes. Choose several files together. Each file keeps its own name as the title, each sets its own days, and the buyer gets one notice for the whole upload.</p></div>
+  <div class="qa"><div class="q">The file won't upload.</div>
+    <p>Only .xlsx, .xls and .csv files of 3 MB or less are accepted, and From must not be after To. A Call Summary whose calls fall on days outside From and To is refused: the message names the day. If the button says <span class="ui">Reading the File...</span>, wait. The first file of a session takes a moment longer.</p></div>
+  <div class="qa"><div class="q">As staff, can I enter calls from a billing report?</div>
+    <p>Yes, since version 2. Staff can tick Enter these calls in the customer's billing, just as admins can.</p></div>
+
+  <div class="qa-head">Logins and Access</div>
+  <div class="qa"><div class="q">I lost my phone or my authenticator codes don't work.</div>
+    <p>First check your phone's clock is set automatically, because codes depend on the time. If that doesn't help, ask an admin to reset your login (your page &rarr; Account &rarr; Danger Zone). You'll set a new password and scan a new QR code. Admins can't reset their own login, so another admin has to do it.</p></div>
+  <div class="qa"><div class="q">A buyer's setup link expired.</div>
+    <p>Open the buyer (staff: Customers; admins: Logins), go to <span class="ui">Account</span> and press <span class="ui">Send Setup Link</span> in the Danger Zone.</p></div>
+  <div class="qa"><div class="q">A buyer stops working with us. Should we delete them?</div>
+    <p>Usually Deactivate. They can't log in, but their billing, payments and reports stay for our records and Finance. Delete removes all of that for good, and only admins can do it.</p></div>
+  <div class="qa"><div class="q">I saved a change and got "Someone else saved a change here a moment ago".</div>
+    <p>Someone else changed the same thing at the same moment. Your change was not saved, and the page now shows the latest. Check it, then make your change again.</p></div>
+  <div class="qa"><div class="q">How do I find out who changed something?</div>
+    <p>Recent Activity at the bottom of the buyer's page shows the latest changes and who made them. Admins have the full history in the Audit Log: filter by the buyer or the person, or press Open in Audit Log on the buyer's page.</p></div>
+</section>
+
+<!-- ───────────────────────── 14 ───────────────────────── -->
+<section class="chapter">
+  <h1><span class="n">14</span>Quick Reference</h1>
+  <h2>Where to Find Things</h2>
+  <table>
+    <thead><tr><th style="width:40%">I Want To...</th><th>Go To</th></tr></thead>
+    <tbody>
+      <tr><td>Upload a Call Summary or billing report</td><td>Reports &rarr; Upload a Report</td></tr>
+      <tr><td>Add a buyer</td><td>Staff: New Customer &middot; Admins: Logins &rarr; New Login &rarr; Customer</td></tr>
+      <tr><td>Open a buyer's page</td><td>Staff: Customers &rarr; the buyer's name &middot; Admins: Logins &rarr; the buyer</td></tr>
+      <tr><td>Give a buyer a nickname</td><td>Staff: Customers &middot; Admins: the buyer &rarr; Details</td></tr>
+      <tr><td>Replace a call the buyer asked about</td><td>The buyer &rarr; Calls &amp; Replacements &rarr; the dates of the calls &rarr; Choose Calls</td></tr>
+      <tr><td>Put a replaced call back</td><td>The buyer &rarr; Replaced Calls &rarr; Put Back beside the call</td></tr>
+      <tr><td>Count an old Call Summary's calls</td><td>The buyer &rarr; Replaced Calls &rarr; Read Calls</td></tr>
+      <tr><td>Enter or correct a day with no call log</td><td>The buyer &rarr; Calls, or a billing report upload</td></tr>
+      <tr><td>Correct a day from a call log</td><td>Reports: delete the wrong Call Summary, upload the right one</td></tr>
+      <tr><td>Record a bank transfer</td><td>The buyer &rarr; Record a Payment</td></tr>
+      <tr><td>Change a buyer's price</td><td>The buyer &rarr; Billing Terms</td></tr>
+      <tr><td>Reset a buyer's login</td><td>The buyer &rarr; Account &rarr; Danger Zone &rarr; Reset and Send Link</td></tr>
+      <tr><td>Add a staff member or admin</td><td>Logins &rarr; New Login &rarr; Staff / Admin (admins)</td></tr>
+      <tr><td>See who owes what</td><td>Finance &rarr; Owed Now / By Customer (admins)</td></tr>
+      <tr><td>Download figures for accounts</td><td>Finance &rarr; Download (admins)</td></tr>
+      <tr><td>See who changed something</td><td>The buyer &rarr; Recent Activity &middot; Audit Log (admins)</td></tr>
+      <tr><td>Turn payment notices on or off</td><td>Settings &rarr; Billing Notifications (admins)</td></tr>
+      <tr><td>Change my password or photo</td><td>Settings</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Glossary</h2>
+  <table>
+    <tbody>
+      <tr><td style="width:28%"><b>Login ID</b></td><td>The email someone logs in with. Report notices and setup links go to it.</td></tr>
+      <tr><td><b>Nickname</b></td><td>The team's short name for a buyer, e.g. HHP. It picks them when uploading.</td></tr>
+      <tr><td><b>Call Summary</b></td><td>The day's call log, shown to the buyer. Its calls set the day's calls in billing.</td></tr>
+      <tr><td><b>Call-log day</b></td><td>A day whose calls are counted from its Call Summaries, marked "Call log" (team) or "From your call log" (buyer).</td></tr>
+      <tr><td><b>Billing Report</b></td><td>The team's own record of daily bills. Never shown to the buyer.</td></tr>
+      <tr><td><b>Replaced call</b></td><td>A call the buyer asked about and the team took off the bill. Written "125 &minus; 2". Listed for the buyer and the team.</td></tr>
+      <tr><td><b>Read Calls</b></td><td>Counts the calls of a Call Summary uploaded before version 2 into billing.</td></tr>
+      <tr><td><b>Charged calls</b></td><td>Total calls minus replaced calls.</td></tr>
+      <tr><td><b>Opening balance</b></td><td>The balance at the start of a day: the day before's balance, or the starting balance on the first day.</td></tr>
+      <tr><td><b>Balance</b></td><td>Opening - charges + completed payments. Negative means owed to us, positive means credit.</td></tr>
+      <tr><td><b>Amount due / Owed now</b></td><td>A negative balance without its minus sign. $0 when in credit.</td></tr>
+      <tr><td><b>Paid / Pending (status)</b></td><td>Whether a buyer owes nothing (Paid) or owes money (Pending) today.</td></tr>
+      <tr><td><b>Pending payment</b></td><td>A payment on its way, not counted yet. Shown as "confirming".</td></tr>
+      <tr><td><b>Collected</b></td><td>Completed payments received in a period.</td></tr>
+      <tr><td><b>Collection rate</b></td><td>Collected &divide; Billed for the period.</td></tr>
+      <tr><td><b>Net for the period</b></td><td>Collected - Billed. Equals Closing - Opening.</td></tr>
+      <tr><td><b>Days Counted In</b></td><td>The buyer's time zone. It decides which day calls and payments fall on.</td></tr>
+      <tr><td><b>Setup link</b></td><td>A single-use link, valid 7 days, to choose a password and add the authenticator app.</td></tr>
+    </tbody>
+  </table>
+
+  <div class="box">
+    <span class="t">Need Help?</span>
+    <p>Staff and admins can trace every figure through the buyer's daily table, their Call Summaries, their Replaced Calls and Recent Activity. Admins also have the Audit Log. Questions about roles or deleting a login go to an admin.</p>
+  </div>
+</section>
+
+</body>
+</html>

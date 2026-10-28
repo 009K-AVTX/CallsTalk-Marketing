@@ -44,6 +44,8 @@ export const clearDay = (id, date, version) => authed(`${user(id)}/days/${date}$
 // Calls the buyer asked (in the portal chat) to have replaced, picked in one of their Call Summaries: each is taken off
 // its day's bill. `calls`: [{ date, called_at, caller, duration }] as the log shows them (call-summary.js callOf).
 // -> the billing, with `replaced`: how many were newly replaced.
+// The calls replaced on the days from `from` to `to`, latest day first.
+export const fetchReplacedCalls = async (id, { from, to }) => (await authed(`${user(id)}/replaced-calls${query({ from, to })}`)).results;
 export const replaceCalls = (id, report, calls, reason) => authed(`${user(id)}/replaced-calls`, json('POST', { report, calls, reason }));
 export const undoReplacedCall = (id, callId) => authed(`${user(id)}/replaced-calls/${encodeURIComponent(callId)}`, json('DELETE'));
 export const addPayment = (id, payment) => authed(`${user(id)}/payments`, json('POST', payment));

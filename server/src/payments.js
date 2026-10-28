@@ -13,6 +13,7 @@ import QRCode from 'qrcode';
 import { config } from './config.js';
 import { findWalletOwners, getUser, getWallet, saveProviderPayment, saveWallet } from './portal-db.js';
 import { recordAudit } from './audit.js';
+import { buyerName } from './format.js';
 import { paymentReceived } from './billing-notices.js';
 
 const PROVIDER = 'wellwallet';
@@ -172,7 +173,7 @@ export async function syncDeposits({ search } = {}) {
       // its status changes; the log shows older entries with the payment's status now (audit.js).
       const owner = await getUser(userId);
       await recordAudit('payment.deposit', {
-        target: { id: userId, label: owner?.company || owner?.name || owner?.email || '' },
+        target: { id: userId, label: buyerName(owner) },
         details: { amount: Number(t.amount).toFixed(2), status, reference: t.hash, method: 'USDT (TRC-20)' },
       });
     }

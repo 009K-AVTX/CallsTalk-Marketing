@@ -289,7 +289,7 @@ const USER_ROW = `
     (SELECT max(i.expires_at) FROM portal_invites i WHERE i.user_id = u.id AND i.used_at IS NULL AND i.expires_at > now()) AS invite_expires_at,
     a.price_per_call, a.currency, a.start_date::text AS start_date, ${AVATAR_VERSION}
   FROM portal_users u LEFT JOIN billing_accounts a ON a.user_id = u.id`;
-const USER_ORDER = "ORDER BY u.role = 'admin' DESC, u.role = 'staff' DESC, lower(coalesce(nullif(u.company, ''), u.name, u.email)), u.id";
+const USER_ORDER = "ORDER BY u.role = 'admin' DESC, u.role = 'staff' DESC, lower(coalesce(nullif(u.nickname, ''), nullif(u.name, ''), u.email)), u.id";
 
 // Everyone (the server's own uses: staff's customer list).
 export const listUsers = () => all(`${USER_ROW} ${USER_ORDER}`);
@@ -500,7 +500,7 @@ export const addPayment = (userId, { amount, currency, status, reference, note, 
 
 // For reports across customers: three queries in all, however many customers there are.
 export const listBillingCustomers = (userId = null) => all(`
-  SELECT u.id, u.email, u.name, u.company, u.status, a.currency, a.price_per_call, a.opening_balance,
+  SELECT u.id, u.email, u.name, u.company, u.nickname, u.status, a.currency, a.price_per_call, a.opening_balance,
     a.start_date::text AS start_date, a.timezone
   FROM portal_users u JOIN billing_accounts a ON a.user_id = u.id
   WHERE u.role = 'customer' AND ($1::uuid IS NULL OR u.id = $1)`, [userId]);
@@ -588,9 +588,9 @@ export const deleteReportAndSync = (id) => inTransaction(async (db) => {
 
 const REPLACED_FIELDS = `id, report_id, date::text AS date, called_at, caller, duration, reason, replaced_by_email, created_at`;
 
-// From `from` on, the latest day first.
-export const listReplacedCalls = (userId, from) => all(`SELECT ${REPLACED_FIELDS} FROM replaced_calls
-  WHERE user_id = $1 AND date >= $2 ORDER BY date DESC, called_at DESC`, [userId, from]);
+// From `from` on (to `to`, when given), the latest day first.
+export const listReplacedCalls = (userId, from, to = null) => all(`SELECT ${REPLACED_FIELDS} FROM replaced_calls
+  WHERE user_id = $1 AND date >= $2 AND ($3::date IS NULL OR date <= $3) ORDER BY date DESC, called_at DESC`, [userId, from, to]);
 export const getReplacedCall = (userId, id) => one(`SELECT ${REPLACED_FIELDS} FROM replaced_calls WHERE user_id = $1 AND id = $2`, [userId, id]);
 export const countReplacedCalls = async (userId, date) =>
   Number((await one('SELECT count(*) FROM replaced_calls WHERE user_id = $1 AND date = $2', [userId, date])).count);
@@ -666,7 +666,7 @@ export const findWalletOwners = async (addresses) => new Map(
 // `replaced`: for a Call Summary, the calls replaced on the days it covers ({ called_at, caller }), so its viewer can
 // mark them.
 // `calls`: for a Call Summary, how many calls it lists (null: never read, uploaded before calls were read).
-const REPORT_FIELDS = `r.id, u.email AS customer, r.user_id, r.kind, r.title, r.note, r.period_from::text AS period_from,
+const REPORT_FIELDS = `r.id, u.email AS customer, coalesce(nullif(u.nickname, ''), nullif(u.name, ''), u.email) AS customer_name, r.user_id, r.kind, r.title, r.note, r.period_from::text AS period_from,
   r.period_to::text AS period_to, r.filename, r.size, r.uploaded_at, r.calls,
   (SELECT coalesce(json_agg(json_build_object('called_at', c.called_at, 'caller', c.caller)), '[]') FROM replaced_calls c
     WHERE r.kind = 'calls' AND c.user_id = r.user_id AND c.date BETWEEN r.period_from AND r.period_to) AS replaced`;

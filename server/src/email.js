@@ -5,7 +5,7 @@
 import { readFileSync } from 'node:fs';
 import nodemailer from 'nodemailer';
 import { config, emailEnabled } from './config.js';
-import { accessDetails, chatKind, clip, escapeHtml, formatClock, shortId, transcriptLines, visitorDetails } from './format.js';
+import { accessDetails, buyerName, chatKind, clip, escapeHtml, formatClock, shortId, transcriptLines, visitorDetails } from './format.js';
 import { replyLink } from './reply.js';
 
 const { to, from, smtp } = config.email;
@@ -22,7 +22,7 @@ const domain = (/<([^>]+)>/.exec(from)?.[1] ?? from).split('@').pop();
 
 const html = (s) => escapeHtml(s).replace(/\n/g, '<br>');
 // Chats from a local copy of the server (NODE_ENV=development) say so, so the team can tell them from real ones.
-const subject = (session) => `${config.isDev ? '[Local test] ' : ''}${chatKind(session) === 'customer' ? 'Customer' : 'Website'} chat: ${session.company || session.name} (#${shortId(session)})`;
+const subject = (session) => `${config.isDev ? '[Local test] ' : ''}${chatKind(session) === 'customer' ? 'Customer' : 'Website'} chat: ${session.name} (#${shortId(session)})`;
 const threadId = (session) => `<chat-${session.id}@${domain}>`;
 
 // Sent as inline (cid:) images, since Gmail shows neither SVG nor images from localhost.
@@ -157,8 +157,9 @@ export function newChatMail(chat, link) {
   const details = visitorDetails(chat);
   const history = transcriptLines(chat.transcript);
 
-  // The heading already names the visitor, so the grid leaves the name out.
-  const shown = details.filter(([label]) => label !== 'Name');
+  // The heading already names the visitor, so the grid leaves the name out (but not a customer's own name beside
+  // their nickname).
+  const shown = details.filter(([label, value]) => label !== 'Name' || value !== chat.name);
   const earlier = (chat.transcript ?? []).map((m) => `<p style="margin:0 0 6px;font:400 13px/1.55 ${BODY};color:${c.body};overflow-wrap:anywhere">`
     + `<b style="font-weight:600;color:${m.from === 'visitor' ? c.accentDeep : c.muted}">${m.from === 'visitor' ? 'Visitor' : 'Assistant'}:</b> ${html(m.text)}</p>`).join('');
 
@@ -242,7 +243,7 @@ export async function emailVisitorMessage(session, message, messageId) {
 
 // A customer changed their contact methods in portal Settings: every method, before and now, changes in bold.
 export function contactsChangedMail({ user, before, after, changed, labels }) {
-  const who = user.company || user.name || user.email;
+  const who = buyerName(user);
   const show = (v) => (v ? html(v) : `<span style="color:${c.muted}">not given</span>`);
   const cell = 'padding:9px 10px 9px 0;border-top:1px solid ' + c.rule + ';font:400 13px/1.45 ' + BODY + ';vertical-align:top;overflow-wrap:anywhere';
   const rows = Object.keys(labels).map((k) => {

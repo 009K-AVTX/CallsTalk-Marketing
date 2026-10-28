@@ -745,6 +745,7 @@ h3 { font-size: 1.5rem; }
 .bill__table tfoot td.is-pos { color: var(--pos); }
 
 .billing__history { margin-bottom: 56px; }
+.billing__replaced { margin-bottom: 56px; }
 .billing__history-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 24px; margin-bottom: 16px; }
 .billing__history-head h2 { margin: 0; }
 .history { overflow-x: auto; border-radius: 16px; border: 1px solid #2c2632; background: #0e0b12; }

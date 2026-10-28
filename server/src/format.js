@@ -6,6 +6,9 @@ export const escapeHtml = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(
 export const clip = (s, n) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
 // Name used when a visitor starts chatting without leaving their details.
 export const ANONYMOUS_NAME = 'Visitor';
+// How the team knows a buyer everywhere (portal, Telegram, team emails, Audit Log): their nickname ("Q10"), else
+// their name.
+export const buyerName = (u) => u?.nickname || u?.name || u?.email || '';
 
 // The visitor's address. Behind nginx it is the real one (trust proxy in index.js), not the server's.
 export const clientIp = (req) => (req.ip || '').replace(/^::ffff:/, '');
@@ -22,10 +25,12 @@ export function formatClock(date = new Date()) {
   }).format(date);
 }
 
-// [label, value] pairs describing a new visitor, as plain text.
-export function visitorDetails({ name, email, anonymous, company, portal }) {
+// [label, value] pairs describing a new visitor, as plain text. A signed-in customer's chat is named by their
+// nickname (`name`), with their own name (`fullName`) beside it.
+export function visitorDetails({ name, fullName, nickname, email, anonymous, company, portal }) {
   return [
-    ['Name', !anonymous && name],
+    ['Nickname', nickname],
+    ['Name', !anonymous && (fullName || name)],
     ['Company', company],
     ['Email', email],
     ['From', portal && 'Customer portal (signed in)'],

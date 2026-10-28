@@ -8,7 +8,7 @@ import { DownloadMenu, period, Period } from '../components/Filters.jsx';
 import Icon from '../components/Icons.jsx';
 import { ErrorNote, PageHead } from '../components/Shell.jsx';
 import { downloadCsv, downloadPdf } from '../exports.js';
-import { addDays, dayLabel } from '../format.js';
+import { addDays, buyerName, dayLabel } from '../format.js';
 import { Link, navigate } from '../router.jsx';
 import useLoad from '../useLoad.js';
 import Select from '../../../src/components/Select.jsx';
@@ -25,6 +25,8 @@ const localDay = (ts) => {
   const d = new Date(ts);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 };
+// A login in the Done By filter: a customer's nickname with it, so buyers are found by it.
+const login = (u) => (u?.nickname ? `${u.nickname} · ${u.email}` : u?.email);
 const plural = (k, word) => `${k.toLocaleString('en-US')} ${word}${k === 1 ? '' : 's'}`;
 
 // The four groups per day, every day of the period shown (quiet days as zero).
@@ -172,7 +174,7 @@ export default function AdminAudit({ onSignedOut }) {
   const total = knownTotal;
   const offset = cursors.length * PAGE;
   const chart = perDay(s, range.from, range.to);
-  const aboutName = about && (people.data?.find((u) => u.id === about)?.company || people.data?.find((u) => u.id === about)?.name || 'one login');
+  const aboutName = about && (buyerName(people.data?.find((u) => u.id === about)) || 'one login');
   const span = range.from === range.to ? dayLabel(range.from) : `${dayLabel(range.from)} to ${dayLabel(range.to)}`;
   const clearAbout = () => {
     setAbout('');
@@ -187,7 +189,7 @@ export default function AdminAudit({ onSignedOut }) {
     days[days.length - 1].rows.push(r);
   }
 
-  const scope = [GROUPS.find((g) => g.key === group)?.label, person && people.data?.find((u) => u.id === person)?.email,
+  const scope = [GROUPS.find((g) => g.key === group)?.label, person && login(people.data?.find((u) => u.id === person)),
     about && `about ${aboutName}`, onlyFailed && 'unsuccessful only', q && `matching "${q}"`].filter(Boolean).join(' · ');
   const stem = `callstalk-audit-log-${range.from}-to-${range.to}`;
   const everything = async (format) => {
@@ -242,7 +244,7 @@ export default function AdminAudit({ onSignedOut }) {
           <span className="sr-only">Done by</span>
           <Select value={person} onChange={(e) => setPerson(e.target.value)}>
             <option value="">Anyone</option>
-            {(people.data || []).map((u) => <option key={u.id} value={u.id}>{u.email}</option>)}
+            {(people.data || []).map((u) => <option key={u.id} value={u.id}>{login(u)}</option>)}
           </Select>
         </label>
         <label className={`p-toggle${onlyFailed ? ' is-on' : ''}`}>

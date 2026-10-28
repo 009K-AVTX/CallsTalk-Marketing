@@ -755,9 +755,12 @@ Customers log in at **https://portal.callstalk.com** (the website's Log In goes 
 - **New login:** Logins → New Login. Customers also get their price per call, opening balance and start date, and
   an optional **Nickname** (e.g. `Q10`). The setup link is emailed to them (it works once, for 7 days); the page
   also shows it to copy.
-- **Nicknames:** the team's short name for a customer. When uploading a report, customers are picked by nickname
-  (`Q10 · Company`, in order, Q2 before Q10); those without one come last, by login. No two customers can share
-  one. Admins change it on the customer's page (Details); staff on **Customers**.
+- **Nicknames:** the team's short name for a customer, and how the team sees them everywhere: logins and customer
+  pages, Finance, the Audit Log, report uploads (`Q10 · Name`, in order, Q2 before Q10; those without one come
+  last, by name), the support bot's chats and Telegram topics, `/buyers` and payment notices, and the team's emails.
+  Without one, their name is used (`buyerName` in `server/src/format.js` and `portal/src/format.js`). Customers
+  themselves never see it. No two customers can share one. Admins change it on the customer's page (Details);
+  staff on **Customers**. Chats and Audit Log entries keep the name they were made with.
 - **Roles:** **Customer** sees their own billing and Call Summaries. **Staff** can upload and remove customer
   reports (they land on `/upload`), add customers and change their nicknames, and open any customer's page from
   **Customers** (`/customers/<id>`) to work it as an admin does: their login (details, setup link, deactivate),
@@ -775,14 +778,18 @@ Customers log in at **https://portal.callstalk.com** (the website's Log In goes 
   Call Summary are entered by hand as before. Call Summaries uploaded before this have **Read Calls** on the
   customer's page (Replaced Calls) to bring their calls into billing; until then those days stay as entered. Staff
   uploads count too. Each change is in the Audit Log with the upload (Billing Days). Table `report_calls`.
-- **Replaced calls:** buyers ask for a call to be replaced in the portal chat (the chat itself is unchanged). On the
-  customer's page, under **Replaced Calls**, press **Choose Calls** by the day's Call Summary, tick the calls, add a
-  reason if you like (the buyer sees it) and press **Replace**. Each call comes off its day's bill: the day reads
+- **Replaced calls:** buyers ask for a call to be replaced in the portal chat (the chat itself is unchanged), usually
+  24 to 48 hours after it; Friday's calls are replaced on Monday or Tuesday. So the customer's page works from the days
+  of the calls: on its first tab (**Calls & Replacements**), **Replaced Calls** has a date filter (presets or a
+  calendar range, last 7 days by default) over its Call Summaries and replaced calls; press **Choose Calls** by the
+  day's Call Summary, find each call by caller number or time, tick it, add a reason if you
+  like (the buyer sees it) and press **Replace**. Each call comes off its day's bill: the day reads
   "125 − 2" and that day's balance and every later one move by the call's price, at once. Replacements are not
   typed in: they come only from calls chosen this way, or a billing report's "125 − 2". The day needs its calls
   entered first. The buyer sees the calls under **Replaced Calls** on their Billing page, and marked **Replaced** in
-  their Call Summary; the team sees them on the customer's page with who replaced them, and the Audit Log has each
-  one. The **×** beside a call puts it back on the bill. A day with replaced calls cannot be cleared, or its calls
+  their Call Summary; the team sees them on the customer's page under **Replaced on These Days**, by day, for the
+  filter's dates (`GET /api/admin/users/:id/replaced-calls?from=&to=`), with who replaced them, and the
+  Audit Log has each one. **Put Back** beside a call puts it back on the bill. A day with replaced calls cannot be cleared, or its calls
   set below them, until they are put back. The same call (time and caller) is never replaced twice, even from a
   corrected log. Admins and staff; table `replaced_calls`.
 - **Two kinds of report:** the upload form asks for the **Report Type**, and picks it from the file when it can.
@@ -807,9 +814,9 @@ Customers log in at **https://portal.callstalk.com** (the website's Log In goes 
   changed meanwhile is left alone and named in the result. Payments in the file are never read (deposits come in
   on their own; record others as usual). An empty or 0 price keeps the day's price. The file's days also set the
   report's period. Staff can do this too.
-- **Lost phone or forgotten password:** open the login → **Reset Login and Send Link**. Their old password and
+- **Lost phone or forgotten password:** open the login → **Account** → **Danger Zone** → **Reset and Send Link**. Their old password and
   code app stop working at once.
-- **Someone leaves:** **Turn Login Off** signs them out everywhere and blocks logging in.
+- **Someone leaves:** **Account** → **Danger Zone** → **Deactivate** signs them out everywhere and blocks logging in.
 - **Finance:** billed, collected and owed across all customers (or one) for any period, with charts and a table per
   customer. **Download** gives a PDF report or CSVs (by customer, per day, payments). The figures follow the same
   rules as each customer's own bill.
