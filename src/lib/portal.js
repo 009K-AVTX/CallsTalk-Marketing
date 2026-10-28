@@ -104,7 +104,7 @@ export async function verifyCode(tempToken, code, email) {
 }
 
 export const isAdmin = () => loadSession()?.role === 'admin';
-// Staff upload customer reports and nothing else; admins can too.
+// Staff upload customer reports and work customers' pages (logins, billing, calls, payments); admins can too.
 export const canUploadReports = () => ['staff', 'admin'].includes(loadSession()?.role);
 
 // The one-use setup link from the email: set a password and add the authenticator app.

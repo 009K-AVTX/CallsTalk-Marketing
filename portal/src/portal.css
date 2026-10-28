@@ -130,6 +130,19 @@
 .p-table--sheet thead th { position: sticky; top: 0; z-index: 1; letter-spacing: .02em; text-transform: none; font-size: .8rem; }
 .p-table--sheet tbody tr:nth-child(even) { background: rgba(255, 255, 255, .015); }
 
+/* Replaced calls: marked in a Call Summary, and chosen there by admins (SheetViewer pick) */
+.p-viewer__mark { width: 1%; white-space: nowrap; text-align: center; }
+.p-viewer__mark input { width: 16px; height: 16px; accent-color: var(--accent); cursor: pointer; }
+.p-viewer__sheet tr:has(.p-viewer__mark input) { cursor: pointer; }
+.p-table--sheet tr.is-replaced td:not(.p-viewer__mark) { color: var(--slate); }
+.p-table--sheet tbody tr.is-picked { background: rgba(214, 163, 255, .08); }
+.p-viewer__pick.p-form { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 12px; margin-top: 14px; }
+.p-viewer__pick label { flex: 1 1 260px; }
+.p-viewer__pick .p-ok, .p-viewer__pick .access-card__error { flex-basis: 100%; }
+.p-replaced__reports { margin-bottom: 18px; }
+.p-calls__log { display: block; font-size: .7rem; color: var(--slate); }
+.p-replaced__title { margin: 0 0 10px; font-size: .92rem; font-weight: 600; color: var(--white); }
+
 /* Upload page (billing team) */
 .p-up .p-top__inner { justify-content: space-between; }
 .p-up__out { margin-left: auto; }
@@ -771,3 +784,7 @@ html { font-size: 15px; }
 .p-check.is-off { opacity: .6; }
 .p-check input:disabled { cursor: not-allowed; }
 .p-contacts__bot { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 16px 0 0; }
+/* Staff Customers: a nickname saved in its row. */
+.p-form.p-nick { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.p-form.p-nick input:not([type="file"]) { width: 140px; flex: none; }
+.p-nick__note { display: inline-flex; align-items: center; gap: 4px; margin: 0; font-size: .8rem; }

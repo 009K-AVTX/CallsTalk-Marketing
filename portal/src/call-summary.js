@@ -1,7 +1,9 @@
-// Call Summary reports: the day's call log, as the dialer exports it, one call a row and no header:
+// Call Summary reports: the day's call log, as the dialer exports it, one call a row, usually with no header:
 //   2026-10-26 15:22:51 | 5743447831 | 18779642010 | 00:19:37 | Completed - With Conversion | Caller
-// (when, the caller, the number they called, how long, the outcome, who hung up). This is the report buyers view
-// and download; billing reports stay with the team.
+// (when, the caller, the number they called, how long, the outcome, who hung up). Some exports have a header row and
+// more columns ("Call Date | Caller Id | Destination | ... | Duration"); the time comes first either way. This is the
+// report buyers view and download, and where the calls they ask to have replaced are chosen; billing reports stay
+// with the team.
 
 // The columns the viewer shows over a log that has no header row of its own.
 export const CALL_COLUMNS = ['Date & Time', 'Caller', 'Number Called', 'Duration', 'Status', 'Hung Up By'];
@@ -56,6 +58,31 @@ export async function readCallSummary(files) {
     to: found.map((r) => r.to).sort().at(-1),
     unread: [...files].filter((f, i) => !read[i]).map((f) => f.name),
   };
+}
+
+// A row's call, from the row as the viewer reads it (formatted text): { date, called_at, caller, duration }, or null
+// when the row is not a call. The time is the first filled cell, the caller the next one, and the duration the
+// first h:mm:ss after the caller. The time and caller are what make a call one call (a replaced call is matched by them).
+export function callOf(cells) {
+  const text = cells.map((c) => String(c ?? '').trim());
+  const at = text.findIndex(Boolean);
+  const date = at < 0 ? null : callDay(text[at]);
+  if (!date) return null;
+  const rest = text.slice(at + 1);
+  const by = rest.findIndex(Boolean);
+  return {
+    date, called_at: text[at], caller: by < 0 ? '' : rest[by], duration: rest.slice(by + 1).find((c) => /^\d{1,2}:\d{2}:\d{2}$/.test(c)) || '',
+  };
+}
+export const callKey = (c) => `${c.called_at}|${c.caller}`;
+
+// Every call in a file's contents (ArrayBuffer), read exactly as the viewer reads it (SheetViewer), so a call is the
+// same time and caller in billing, in the viewer and when it is replaced. -> [{ date, called_at, caller, duration }]
+export async function callsIn(data) {
+  const XLSX = await import('xlsx');
+  const wb = XLSX.read(data, { type: 'array', cellDates: true });
+  return wb.SheetNames.flatMap((name) => XLSX.utils.sheet_to_json(wb.Sheets[name], { header: 1, raw: false, blankrows: false, defval: '' }))
+    .map(callOf).filter(Boolean);
 }
 
 // A sheet's rows (as the viewer reads them, formatted text) with the log's column names over them when it has none,

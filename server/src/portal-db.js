@@ -60,6 +60,7 @@ const SCHEMA = `
     email       text NOT NULL DEFAULT '',
     updated_at  timestamptz NOT NULL DEFAULT now()
   );
+  ALTER TABLE customer_contacts ADD COLUMN IF NOT EXISTS whatsapp text NOT NULL DEFAULT '';
 
   -- The Telegram chat a customer linked in Settings (Connect Telegram), where the bot sends them their own
   -- notices, such as a new report. One login has one chat; one person may link the same chat to several logins.
@@ -118,6 +119,10 @@ const SCHEMA = `
   ALTER TABLE billing_accounts ADD COLUMN IF NOT EXISTS version integer NOT NULL DEFAULT 1;
   ALTER TABLE billing_days ADD COLUMN IF NOT EXISTS version integer NOT NULL DEFAULT 1;
 
+  -- A customer's short name for the team ("Q10"): how they are picked when uploading reports. One per customer.
+  ALTER TABLE portal_users ADD COLUMN IF NOT EXISTS nickname text NOT NULL DEFAULT '';
+  CREATE UNIQUE INDEX IF NOT EXISTS portal_users_nickname ON portal_users (lower(nickname)) WHERE nickname <> '';
+
   CREATE TABLE IF NOT EXISTS billing_payments (
     id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id     uuid NOT NULL REFERENCES portal_users (id) ON DELETE CASCADE,
@@ -161,6 +166,43 @@ const SCHEMA = `
   -- view and download.
   ALTER TABLE portal_reports ADD COLUMN IF NOT EXISTS kind text NOT NULL DEFAULT 'billing';
 
+  -- Replaced calls: calls a buyer asked (in the portal chat) to have replaced, picked by an admin in a Call Summary.
+  -- Each is taken off its day's bill, and the day's billing_days.replacements counts it. A call is the time and
+  -- caller as the log shows them, so the same call in a corrected log is not replaced twice, and the record stays
+  -- readable after its Call Summary is deleted.
+  CREATE TABLE IF NOT EXISTS replaced_calls (
+    id                 uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id            uuid NOT NULL REFERENCES portal_users (id) ON DELETE CASCADE,
+    report_id          uuid REFERENCES portal_reports (id) ON DELETE SET NULL,
+    date               date NOT NULL,
+    called_at          text NOT NULL,
+    caller             text NOT NULL DEFAULT '',
+    duration           text NOT NULL DEFAULT '',
+    reason             text NOT NULL DEFAULT '',
+    replaced_by        uuid REFERENCES portal_users (id) ON DELETE SET NULL,
+    replaced_by_email  text NOT NULL DEFAULT '',
+    created_at         timestamptz NOT NULL DEFAULT now()
+  );
+  CREATE UNIQUE INDEX IF NOT EXISTS replaced_calls_call ON replaced_calls (user_id, date, called_at, caller);
+
+  -- The calls each Call Summary lists, read in the browser as its viewer shows them (call-summary.js callOf). A day
+  -- with any is billed from them (syncCallDays): its calls are every distinct call in the buyer's logs for that day,
+  -- replaced ones included, so a corrected or second log of the same day never counts a call twice.
+  -- portal_reports.calls: how many it lists; null for a report whose calls were never read (uploaded before this).
+  CREATE TABLE IF NOT EXISTS report_calls (
+    report_id  uuid NOT NULL REFERENCES portal_reports (id) ON DELETE CASCADE,
+    user_id    uuid NOT NULL REFERENCES portal_users (id) ON DELETE CASCADE,
+    date       date NOT NULL,
+    called_at  text NOT NULL,
+    caller     text NOT NULL DEFAULT '',
+    duration   text NOT NULL DEFAULT ''
+  );
+  CREATE INDEX IF NOT EXISTS report_calls_day ON report_calls (user_id, date);
+  CREATE INDEX IF NOT EXISTS report_calls_report ON report_calls (report_id);
+  ALTER TABLE portal_reports ADD COLUMN IF NOT EXISTS calls integer;
+  -- A day whose calls come from its Call Summaries rather than being typed in.
+  ALTER TABLE billing_days ADD COLUMN IF NOT EXISTS from_calls boolean NOT NULL DEFAULT false;
+
   -- Audit trail (audit.js): who did what, and when. One row per signed-in change, plus sign-ins, failed
   -- sign-ins and deposits. The person's email and role, and the target's name, are copied in when the row is
   -- written, so the trail still reads properly after a login is deleted. Never pruned.
@@ -194,22 +236,26 @@ const all = async (sql, params) => (await pool.query(sql, params)).rows;
 
 // ── users ────────────────────────────────────────────────────────────────────
 
-const USER_FIELDS = 'id, email, name, company, role, status, created_at, activated_at, last_login_at, version';
+const USER_FIELDS = 'id, email, name, company, nickname, role, status, created_at, activated_at, last_login_at, version';
 
 export const findUserByEmail = (email) => one('SELECT * FROM portal_users WHERE email = $1', [email.toLowerCase()]);
+// Whoever else has this nickname (any case), if anyone.
+export const findUserByNickname = (nickname, exceptId = null) =>
+  one('SELECT id, email, name, company FROM portal_users WHERE lower(nickname) = lower($1) AND ($2::uuid IS NULL OR id <> $2)', [nickname, exceptId]);
 export const getUser = (id) => one('SELECT * FROM portal_users WHERE id = $1', [id]);
 export const countAdmins = async () => Number((await one("SELECT count(*) FROM portal_users WHERE role = 'admin' AND status <> 'disabled'")).count);
 
-export const createUser = ({ email, name, company, role }) => one(
-  `INSERT INTO portal_users (email, name, company, role) VALUES ($1, $2, $3, $4) RETURNING ${USER_FIELDS}`,
-  [email.toLowerCase(), name, company, role]);
+export const createUser = ({ email, name, company, nickname = '', role }) => one(
+  `INSERT INTO portal_users (email, name, company, nickname, role) VALUES ($1, $2, $3, $4, $5) RETURNING ${USER_FIELDS}`,
+  [email.toLowerCase(), name, company, nickname, role]);
 
 // `expected`: the version the change was made from (null: whatever is there). Returns nothing when it was out of
 // date. `db` is a transaction's client, for withAdminLock.
-export const updateUser = async (id, { name, company, role, status }, expected = null, db = pool) => (await db.query(
-  `UPDATE portal_users SET name = coalesce($2, name), company = coalesce($3, company), role = coalesce($4, role),
-     status = coalesce($5, status), version = version + 1 WHERE id = $1 AND ($6::int IS NULL OR version = $6) RETURNING ${USER_FIELDS}`,
-  [id, name ?? null, company ?? null, role ?? null, status ?? null, expected])).rows[0];
+export const updateUser = async (id, { name, company, nickname, role, status }, expected = null, db = pool) => (await db.query(
+  `UPDATE portal_users SET name = coalesce($2, name), company = coalesce($3, company), nickname = coalesce($7, nickname),
+     role = coalesce($4, role), status = coalesce($5, status), version = version + 1
+   WHERE id = $1 AND ($6::int IS NULL OR version = $6) RETURNING ${USER_FIELDS}`,
+  [id, name ?? null, company ?? null, role ?? null, status ?? null, expected, nickname ?? null])).rows[0];
 
 // Changes that could leave no admin run one at a time (a transaction lock), each seeing the count as it is then:
 // two admins demoting each other at the same moment cannot both pass "keep at least one admin".
@@ -249,24 +295,24 @@ const USER_ORDER = "ORDER BY u.role = 'admin' DESC, u.role = 'staff' DESC, lower
 export const listUsers = () => all(`${USER_ROW} ${USER_ORDER}`);
 export const getUserRow = (id) => one(`${USER_ROW} WHERE u.id = $1`, [id]);
 
-// A page of logins for the admin's list: optionally one role, and matching `q` in name, email or company.
+// A page of logins for the admin's list: optionally one role, and matching `q` in name, email, company or nickname.
 export async function listUsersPage({ q = '', role = null, limit, offset }) {
   const like = q ? `%${q.replace(/[\\%_]/g, '\\$&')}%` : null;
   const where = `WHERE ($1::text IS NULL OR u.role = $1)
-    AND ($2::text IS NULL OR u.name ILIKE $2 OR u.email ILIKE $2 OR u.company ILIKE $2)`;
+    AND ($2::text IS NULL OR u.name ILIKE $2 OR u.email ILIKE $2 OR u.company ILIKE $2 OR u.nickname ILIKE $2)`;
   const [rows, counts] = await Promise.all([
     all(`${USER_ROW} ${where} ${USER_ORDER} LIMIT $3 OFFSET $4`, [role, like, limit, offset]),
     // Per role for the filter tabs (with the search, without the role), and how many are still to set up.
     all(`SELECT u.role, count(*)::int AS n, count(*) FILTER (WHERE u.status = 'invited')::int AS waiting
-      FROM portal_users u WHERE ($1::text IS NULL OR u.name ILIKE $1 OR u.email ILIKE $1 OR u.company ILIKE $1) GROUP BY u.role`, [like]),
+      FROM portal_users u WHERE ($1::text IS NULL OR u.name ILIKE $1 OR u.email ILIKE $1 OR u.company ILIKE $1 OR u.nickname ILIKE $1) GROUP BY u.role`, [like]),
   ]);
   const byRole = Object.fromEntries(counts.map((c) => [c.role, c.n]));
   const total = role ? byRole[role] || 0 : counts.reduce((a, c) => a + c.n, 0);
   return { results: rows, total, counts: byRole, waiting: counts.reduce((a, c) => a + c.waiting, 0) };
 }
 
-// Just enough to choose someone in a filter: id, name, company, email and role.
-export const listUserOptions = () => all(`SELECT u.id, u.name, u.company, u.email, u.role FROM portal_users u ${USER_ORDER} LIMIT 5000`);
+// Just enough to choose someone in a filter: id, name, company, nickname, email and role.
+export const listUserOptions = () => all(`SELECT u.id, u.name, u.company, u.nickname, u.email, u.role FROM portal_users u ${USER_ORDER} LIMIT 5000`);
 
 export const setTotpStep = (id, step) => pool.query('UPDATE portal_users SET totp_last_step = $2 WHERE id = $1 AND totp_last_step < $2', [id, step]);
 export const setPassword = (id, hash) => pool.query('UPDATE portal_users SET password_hash = $2 WHERE id = $1', [id, hash]);
@@ -357,13 +403,13 @@ export const findSessionUser = (accessHash) => one(`
 
 // ── contact methods ──────────────────────────────────────────────────────────
 
-const CONTACT_FIELDS = 'telegram, element, zangi, signal, email, updated_at';
+const CONTACT_FIELDS = 'telegram, whatsapp, element, zangi, signal, email, updated_at';
 export const getContacts = (userId) => one(`SELECT ${CONTACT_FIELDS} FROM customer_contacts WHERE user_id = $1`, [userId]);
 export const saveContacts = (userId, c) => one(`
-  INSERT INTO customer_contacts (user_id, telegram, element, zangi, signal, email) VALUES ($1, $2, $3, $4, $5, $6)
-  ON CONFLICT (user_id) DO UPDATE SET telegram = excluded.telegram, element = excluded.element, zangi = excluded.zangi,
-    signal = excluded.signal, email = excluded.email, updated_at = now()
-  RETURNING ${CONTACT_FIELDS}`, [userId, c.telegram, c.element, c.zangi, c.signal, c.email]);
+  INSERT INTO customer_contacts (user_id, telegram, whatsapp, element, zangi, signal, email) VALUES ($1, $2, $3, $4, $5, $6, $7)
+  ON CONFLICT (user_id) DO UPDATE SET telegram = excluded.telegram, whatsapp = excluded.whatsapp, element = excluded.element,
+    zangi = excluded.zangi, signal = excluded.signal, email = excluded.email, updated_at = now()
+  RETURNING ${CONTACT_FIELDS}`, [userId, c.telegram, c.whatsapp, c.element, c.zangi, c.signal, c.email]);
 
 // ── the customer's Telegram chat with the bot (telegram-link.js) ─────────────
 
@@ -425,7 +471,7 @@ export const saveAccount = (userId, { currency, price_per_call, opening_balance,
   WHERE $7::int IS NULL OR billing_accounts.version = $7
   RETURNING ${ACCOUNT_FIELDS}`, [userId, currency, price_per_call, opening_balance, start_date, timezone, expected]);
 
-const DAY_FIELDS = 'date::text AS date, calls, replacements, price_per_call, version';
+const DAY_FIELDS = 'date::text AS date, calls, replacements, price_per_call, from_calls, version';
 
 export const listDays = (userId, upTo) =>
   all(`SELECT ${DAY_FIELDS} FROM billing_days WHERE user_id = $1 AND date <= $2 ORDER BY date`, [userId, upTo]);
@@ -465,6 +511,137 @@ export const listPaymentsOf = (userIds) =>
 
 export const deletePayment = (userId, id) => pool.query('DELETE FROM billing_payments WHERE user_id = $1 AND id = $2', [userId, id]);
 
+// ── call records (report_calls) and replaced calls ───────────────────────────
+
+// Bills these days from the buyer's call records, inside the caller's transaction (`db`). A day is billed from them
+// once any Call Summary lists calls on it, and stays so: its calls are the distinct calls (time and caller) in their
+// logs and their replaced calls; with none left, the day is removed. Days typed in and never in a log are left
+// alone, as are days before billing starts. -> [{ date, before, after }] for each day that changed (null: none).
+export async function syncCallDays(db, userId, dates) {
+  const account = (await db.query('SELECT start_date::text AS start_date, price_per_call FROM billing_accounts WHERE user_id = $1', [userId])).rows[0];
+  if (!account) return [];
+  const changes = [];
+  for (const date of [...new Set(dates)].sort()) {
+    if (date < account.start_date) continue;
+    const day = (await db.query('SELECT calls, from_calls FROM billing_days WHERE user_id = $1 AND date = $2 FOR UPDATE', [userId, date])).rows[0];
+    const { logged, calls } = (await db.query(`SELECT EXISTS (SELECT 1 FROM report_calls WHERE user_id = $1 AND date = $2) AS logged,
+      (SELECT count(*)::int FROM (SELECT called_at, caller FROM report_calls WHERE user_id = $1 AND date = $2
+        UNION SELECT called_at, caller FROM replaced_calls WHERE user_id = $1 AND date = $2) c) AS calls`, [userId, date])).rows[0];
+    if (!logged && !day?.from_calls) continue;
+    if (calls > 0) {
+      if (day?.from_calls && day.calls === calls) continue;
+      await db.query(`INSERT INTO billing_days (user_id, date, calls, replacements, price_per_call, from_calls) VALUES ($1, $2, $3, 0, $4, true)
+        ON CONFLICT (user_id, date) DO UPDATE SET calls = excluded.calls, from_calls = true, updated_at = now(), version = billing_days.version + 1`,
+      [userId, date, calls, account.price_per_call]);
+    } else {
+      await db.query('DELETE FROM billing_days WHERE user_id = $1 AND date = $2', [userId, date]);
+    }
+    changes.push({ date, before: day?.calls ?? null, after: calls || null });
+  }
+  return changes;
+}
+
+// Runs fn(client) in a transaction.
+async function inTransaction(fn) {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const result = await fn(client);
+    await client.query('COMMIT');
+    return result;
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+// A Call Summary's calls ([{ date, called_at, caller, duration }]), replacing any it had, and its days billed from
+// them. -> the days that changed, as syncCallDays.
+export const setReportCalls = (report, calls) => inTransaction(async (db) => {
+  const before = (await db.query('DELETE FROM report_calls WHERE report_id = $1 RETURNING date::text AS date', [report.id])).rows.map((r) => r.date);
+  await db.query(`INSERT INTO report_calls (report_id, user_id, date, called_at, caller, duration)
+    SELECT $1::uuid, $2::uuid, * FROM unnest($3::date[], $4::text[], $5::text[], $6::text[])`,
+  [report.id, report.user_id, calls.map((c) => c.date), calls.map((c) => c.called_at), calls.map((c) => c.caller), calls.map((c) => c.duration)]);
+  await db.query('UPDATE portal_reports SET calls = $2 WHERE id = $1', [report.id, calls.length]);
+  return syncCallDays(db, report.user_id, [...before, ...calls.map((c) => c.date)]);
+});
+
+// Every day the buyer's call records touch, again: after their billing terms are set (or start on another day).
+export const syncAllCallDays = (userId) => inTransaction(async (db) => {
+  const dates = (await db.query(`SELECT date::text AS date FROM report_calls WHERE user_id = $1
+    UNION SELECT date::text FROM billing_days WHERE user_id = $1 AND from_calls`, [userId])).rows.map((r) => r.date);
+  return syncCallDays(db, userId, dates);
+});
+
+// Deletes a report; days billed from its calls are counted again without them. -> the days that changed.
+export const deleteReportAndSync = (id) => inTransaction(async (db) => {
+  const report = (await db.query('SELECT user_id FROM portal_reports WHERE id = $1 FOR UPDATE', [id])).rows[0];
+  if (!report) return [];
+  const dates = (await db.query('SELECT DISTINCT date::text AS date FROM report_calls WHERE report_id = $1', [id])).rows.map((r) => r.date);
+  await db.query('DELETE FROM portal_reports WHERE id = $1', [id]);
+  return syncCallDays(db, report.user_id, dates);
+});
+
+// ── replaced calls ───────────────────────────────────────────────────────────
+
+const REPLACED_FIELDS = `id, report_id, date::text AS date, called_at, caller, duration, reason, replaced_by_email, created_at`;
+
+// From `from` on, the latest day first.
+export const listReplacedCalls = (userId, from) => all(`SELECT ${REPLACED_FIELDS} FROM replaced_calls
+  WHERE user_id = $1 AND date >= $2 ORDER BY date DESC, called_at DESC`, [userId, from]);
+export const getReplacedCall = (userId, id) => one(`SELECT ${REPLACED_FIELDS} FROM replaced_calls WHERE user_id = $1 AND id = $2`, [userId, id]);
+export const countReplacedCalls = async (userId, date) =>
+  Number((await one('SELECT count(*) FROM replaced_calls WHERE user_id = $1 AND date = $2', [userId, date])).count);
+
+// Takes calls off their days' bills, all or none: each day's replacements go up by its newly replaced calls.
+// Calls already replaced are left as they are. -> { replaced } (how many were new), or { refused: { date, calls,
+// replacements, adding } } when a day has no calls entered (calls null) or too few for them, and nothing is saved.
+// A refusal stops the transaction without saving anything.
+class Refused extends Error {
+  constructor(refused) {
+    super('refused');
+    this.refused = refused;
+  }
+}
+
+export const replaceCalls = (userId, calls, { reportId, reason, by }) => inTransaction(async (db) => {
+  const perDay = new Map();
+  for (const c of calls) {
+    const { rows } = await db.query(`
+      INSERT INTO replaced_calls (user_id, report_id, date, called_at, caller, duration, reason, replaced_by, replaced_by_email)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) ON CONFLICT (user_id, date, called_at, caller) DO NOTHING RETURNING date::text AS date`,
+    [userId, reportId, c.date, c.called_at, c.caller, c.duration, reason, by.id, by.email]);
+    if (rows[0]) perDay.set(rows[0].date, (perDay.get(rows[0].date) || 0) + 1);
+  }
+  // A replaced call missing from the day's logs still counts as one of its calls.
+  await syncCallDays(db, userId, [...perDay.keys()]);
+  for (const [date, adding] of perDay) {
+    const { rows } = await db.query(`UPDATE billing_days SET replacements = replacements + $3, updated_at = now(), version = version + 1
+      WHERE user_id = $1 AND date = $2 AND replacements + $3 <= calls RETURNING date`, [userId, date, adding]);
+    if (!rows[0]) {
+      const day = (await db.query('SELECT calls, replacements FROM billing_days WHERE user_id = $1 AND date = $2', [userId, date])).rows[0];
+      throw new Refused({ date, calls: day?.calls ?? null, replacements: day?.replacements ?? 0, adding });
+    }
+  }
+  return { replaced: [...perDay.values()].reduce((a, n) => a + n, 0) };
+}).catch((err) => {
+  if (err instanceof Refused) return { refused: err.refused };
+  throw err;
+});
+
+// Puts a replaced call back on its day's bill. Returns the call, or nothing when it was not replaced.
+export const undoReplacedCall = (userId, id) => inTransaction(async (db) => {
+  const call = (await db.query(`DELETE FROM replaced_calls WHERE user_id = $1 AND id = $2 RETURNING ${REPLACED_FIELDS}`, [userId, id])).rows[0];
+  if (call) {
+    await db.query(`UPDATE billing_days SET replacements = greatest(replacements - 1, 0), updated_at = now(), version = version + 1
+      WHERE user_id = $1 AND date = $2`, [userId, call.date]);
+    await syncCallDays(db, userId, [call.date]);
+  }
+  return call;
+});
+
 // A deposit seen by the payment check: new, or moving on from pending. Returns true when something changed.
 // A completed payment is never changed back.
 export const saveProviderPayment = async (userId, { provider, reference, amount, currency, status, note, paid_at }) => Boolean(await one(`
@@ -486,8 +663,13 @@ export const findWalletOwners = async (addresses) => new Map(
 
 // ── reports ──────────────────────────────────────────────────────────────────
 
+// `replaced`: for a Call Summary, the calls replaced on the days it covers ({ called_at, caller }), so its viewer can
+// mark them.
+// `calls`: for a Call Summary, how many calls it lists (null: never read, uploaded before calls were read).
 const REPORT_FIELDS = `r.id, u.email AS customer, r.user_id, r.kind, r.title, r.note, r.period_from::text AS period_from,
-  r.period_to::text AS period_to, r.filename, r.size, r.uploaded_at`;
+  r.period_to::text AS period_to, r.filename, r.size, r.uploaded_at, r.calls,
+  (SELECT coalesce(json_agg(json_build_object('called_at', c.called_at, 'caller', c.caller)), '[]') FROM replaced_calls c
+    WHERE r.kind = 'calls' AND c.user_id = r.user_id AND c.date BETWEEN r.period_from AND r.period_to) AS replaced`;
 
 // `kind`: 'billing' or 'calls' only, or null for both.
 export const listReports = (userId = null, kind = null) => all(`
@@ -504,7 +686,6 @@ export const addReport = (r) => one(`
   SELECT ${REPORT_FIELDS} FROM r JOIN portal_users u ON u.id = r.user_id`,
   [r.userId, r.kind, r.title, r.note, r.periodFrom, r.periodTo, r.filename, r.contentType, r.content.length, r.content]);
 
-export const deleteReport = (id) => pool.query('DELETE FROM portal_reports WHERE id = $1', [id]);
 
 export const getReportInfo = (id) => one(`SELECT ${REPORT_FIELDS} FROM portal_reports r JOIN portal_users u ON u.id = r.user_id WHERE r.id = $1`, [id]);
 export const getPayment = (userId, id) =>

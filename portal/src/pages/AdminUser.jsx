@@ -1,9 +1,13 @@
 import { useCallback, useEffect, useState } from 'react';
-import { loadSession } from '../../../src/lib/portal.js';
+import { isAdmin, loadSession } from '../../../src/lib/portal.js';
 import {
-  addPayment, clearDay, fetchAudit, fetchBilling, getUser, isConflict, removePayment, removeUser, saveDay, saveTerms, sendLink, signedIn,
-  TIME_ZONES, updateUser,
+  addPayment, clearDay, fetchActivity, fetchBilling, getUser, isConflict, removePayment, removeUser, replaceCalls, saveDay, saveTerms, sendLink, signedIn,
+  TIME_ZONES, undoReplacedCall, updateUser,
 } from '../admin.js';
+import SheetViewer from '../components/SheetViewer.jsx';
+import { callsIn } from '../call-summary.js';
+import { fetchFile, listCallSummariesOf, setReportCalls } from '../reports.js';
+import { period } from './Reports.jsx';
 import { actor, describe, failed, groupOf, outcome, stamp } from '../audit-text.js';
 import Icon from '../components/Icons.jsx';
 import { CONTACT_METHODS, contactLink } from '../contacts.js';
@@ -44,21 +48,30 @@ function Note({ f }) {
   return null;
 }
 
+// Staff (on a customer's page) see no role: only admins change one.
 function Profile({ user, onSaved, onConflict }) {
-  const f = useForm({ name: user.name, company: user.company, role: user.role }, onConflict);
+  const f = useForm({ name: user.name, company: user.company, nickname: user.nickname || '', role: user.role }, onConflict);
   const self = user.email === loadSession()?.email;
+  const customer = user.role === 'customer';
+  const admin = isAdmin();
+  // Only customers have a nickname; it is sent only while they are one.
+  const { role, ...details } = f.form;
+  const change = { ...(customer ? details : { name: details.name, company: details.company }), ...(admin && { role }) };
   return (
-    <form className="p-card p-form" onSubmit={(e) => f.run(e, async () => onSaved((await updateUser(user.id, { ...f.form, version: user.version })).user), 'Saved.')}>
+    <form className="p-card p-form" onSubmit={(e) => f.run(e, async () => onSaved((await updateUser(user.id, { ...change, version: user.version })).user), 'Saved.')}>
       <header className="p-card__head"><div><h2>Details</h2><p>Login ID: <b>{user.email}</b></p></div></header>
       <label>Full Name<input required value={f.form.name} onChange={f.set('name')} maxLength={100} /></label>
       <label>Company<input value={f.form.company} onChange={f.set('company')} maxLength={120} /></label>
-      <label>Role
-        <Select value={f.form.role} onChange={f.set('role')} disabled={self}>
-          <option value="customer">Customer</option>
-          <option value="staff">Staff (report uploads and new customers)</option>
-          <option value="admin">Admin</option>
-        </Select>
-      </label>
+      {customer && <label><span>Nickname <i className="p-optional">picks them when uploading reports</i></span><input value={f.form.nickname} onChange={f.set('nickname')} maxLength={40} placeholder="e.g. Q10" /></label>}
+      {admin && (
+        <label>Role
+          <Select value={f.form.role} onChange={f.set('role')} disabled={self}>
+            <option value="customer">Customer</option>
+            <option value="staff">Staff (reports, and customers' logins and billing)</option>
+            <option value="admin">Admin</option>
+          </Select>
+        </label>
+      )}
       <Note f={f} />
       <button type="submit" className="btn btn--light btn--sm" disabled={f.status === 'sending'}>{f.status === 'sending' ? 'Saving…' : 'Save Details'}</button>
     </form>
@@ -109,7 +122,7 @@ function Access({ user, onSaved, onConflict }) {
             </button>
           )}
           <button type="button" className="btn btn--quiet btn--sm" onClick={toggle} disabled={f.status === 'sending'}>{user.status === 'disabled' ? 'Reactivate Login' : 'Deactivate Login'}</button>
-          <button type="button" className="btn btn--quiet btn--sm p-danger" onClick={remove} disabled={f.status === 'sending'}><Icon name="close" />Delete</button>
+          {isAdmin() && <button type="button" className="btn btn--quiet btn--sm p-danger" onClick={remove} disabled={f.status === 'sending'}><Icon name="close" />Delete</button>}
         </div>
       )}
       <Note f={f} />
@@ -175,40 +188,123 @@ function Terms({ id, account, onSaved, onConflict }) {
   );
 }
 
-// A day's calls and replacements. Replacements (calls not charged) are often added after the day, which
-// changes that day's balance and every day after it, as on the "125 - 2" bill sheets.
+// A day's total calls. A day with a Call Summary is counted from it and cannot be typed over (only its price can
+// change). Replacements (calls not charged) are not typed here: they are the calls replaced one by one under Replaced
+// Calls, or a billing report's "125 - 2". They are often added after the day, which changes that day's balance and
+// every day after it. `days`: the shown days as the statement has them.
 // `versions`: each shown day's version (0 for a shown day with nothing entered); older days are not checked.
-function Calls({ id, account, picked, versions, shown, onSaved, onConflict }) {
-  const f = useForm({ date: today(), calls: '', replacements: '0', price: '' }, onConflict);
-  const versionOf = (date) => versions?.[date] ?? (shown.includes(date) ? 0 : undefined);
+function Calls({ id, account, picked, versions, days, onSaved, onConflict }) {
+  const f = useForm({ date: today(), calls: '', price: '' }, onConflict);
+  const shown = days.find((d) => d.date === f.form.date);
+  const logged = Boolean(shown?.from_call_log);
+  const typed = logged ? String(shown.calls) : f.form.calls;
+  const versionOf = (date) => versions?.[date] ?? (days.some((d) => d.date === date) ? 0 : undefined);
   useEffect(() => {
-    if (picked) f.setForm({ date: picked.date, calls: String(picked.calls), replacements: String(picked.replacements || 0), price: '' });
+    if (picked) f.setForm({ date: picked.date, calls: String(picked.calls), price: '' });
   }, [picked]); // eslint-disable-line react-hooks/exhaustive-deps
-  const calls = Number(f.form.calls) || 0;
-  const replaced = Number(f.form.replacements) || 0;
-  const price = f.form.price !== '' ? Number(f.form.price) : Number(picked?.date === f.form.date ? picked.price_per_call : account.price_per_call);
+  const calls = Number(typed) || 0;
+  const replaced = shown?.replacements || 0;
+  const price = Number(f.form.price !== '' ? f.form.price : shown?.price_per_call ?? account.price_per_call);
   const charged = Math.max(calls - replaced, 0);
   return (
-    <form className="p-card p-form p-admin__calls" onSubmit={(e) => f.run(e, async () => onSaved(await saveDay(id, f.form.date, f.form.calls, f.form.price, f.form.replacements, versionOf(f.form.date))), `Calls saved for ${dayLabel(f.form.date)}.`)}>
-      <header className="p-card__head"><div><h2>Calls and Replacements</h2><p>The day's total calls, and how many were replaced (not charged). Pick a day in the table to change it, even days later.</p></div></header>
-      <div className="p-form__row p-form__row--3">
+    <form className="p-card p-form p-admin__calls" onSubmit={(e) => f.run(e, async () => onSaved(await saveDay(id, f.form.date, typed, f.form.price, undefined, versionOf(f.form.date))), `Calls saved for ${dayLabel(f.form.date)}.`)}>
+      <header className="p-card__head"><div><h2>Calls</h2><p>The day's total calls. A day with a Call Summary is counted from it. Pick a day in the table to change it, even days later. Calls the buyer asks to have replaced are taken off under Replaced Calls.</p></div></header>
+      <div className="p-form__row">
         <label>Day<input required type="date" value={f.form.date} min={account.start_date} max={today()} onChange={f.set('date')} /></label>
-        <label>Total Calls<input required type="number" min="0" step="1" value={f.form.calls} onChange={f.set('calls')} placeholder="0" /></label>
-        <label><span>Replacements <i className="p-optional">not charged</i></span><input type="number" min="0" max={calls || undefined} step="1" value={f.form.replacements} onChange={f.set('replacements')} placeholder="0" /></label>
+        <label>
+          <span>Total Calls {logged && <i className="p-optional">from its Call Summaries</i>}</span>
+          <input required type="number" min="0" step="1" value={typed} onChange={f.set('calls')} placeholder="0" readOnly={logged} />
+        </label>
       </div>
-      {f.form.calls !== '' && (
+      {logged && <p className="p-admin__note">To change these calls, upload the corrected call log under Reports, or delete the wrong one.</p>}
+      {typed !== '' && (
         <p className="p-admin__note p-calls__sum">
-          Shown as <b>{replaced ? `${calls} − ${replaced}` : calls}</b>: {charged} charged × {money(price)} = <b>{money(charged * price)}</b>
-          {replaced > calls && <span className="is-neg"> (more replacements than calls)</span>}
+          Shown as <b>{replaced ? `${calls} − ${replaced}` : calls}</b>{replaced > 0 && ` (${replaced} replaced)`}: {charged} charged × {money(price)} = <b>{money(charged * price)}</b>
+          {replaced > calls && <span className="is-neg"> (fewer calls than the {replaced} replaced)</span>}
         </p>
       )}
       <label><span>Price per Call ($) <i className="p-optional">optional, default {money(account.price_per_call)}</i></span><input type="number" min="0" step="0.01" value={f.form.price} onChange={f.set('price')} /></label>
       <Note f={f} />
       <div className="p-admin__actions">
-        <button type="submit" className="btn btn--light btn--sm" disabled={f.status === 'sending'}>{f.status === 'sending' ? 'Saving…' : 'Save Calls'}</button>
-        <button type="button" className="btn btn--quiet btn--sm" disabled={f.status === 'sending'} onClick={(e) => f.run(e, async () => onSaved(await clearDay(id, f.form.date, versionOf(f.form.date))), `Calls cleared for ${dayLabel(f.form.date)}.`)}>Clear This Day</button>
+        <button type="submit" className="btn btn--light btn--sm" disabled={f.status === 'sending'}>{f.status === 'sending' ? 'Saving…' : logged ? 'Save Price' : 'Save Calls'}</button>
+        <button type="button" className="btn btn--quiet btn--sm" disabled={f.status === 'sending' || logged} onClick={(e) => f.run(e, async () => onSaved(await clearDay(id, f.form.date, versionOf(f.form.date))), `Calls cleared for ${dayLabel(f.form.date)}.`)}>Clear This Day</button>
       </div>
     </form>
+  );
+}
+
+// Calls the buyer asked (in the portal chat) to have replaced. Chosen in their Call Summary, each one comes off its
+// day's bill: the day reads "125 − 2", and that day's balance and every one after it move by the call's price. The
+// buyer sees the same list on their Billing page, and the calls marked in their Call Summary. Undo puts a call back.
+// A Call Summary uploaded before calls were read into billing has "Read Calls": its file is read here and its days
+// counted from it, as a new upload's are. `onBilling`: loads the billing again.
+function ReplacedCalls({ id, calls, days, onSaved, onBilling, onSignedOut }) {
+  const reports = useLoad(signedIn(onSignedOut, () => listCallSummariesOf(id)), [id]);
+  const [open, setOpen] = useState(null); // the Call Summary being picked from
+  const [reading, setReading] = useState(null);
+  const [error, setError] = useState('');
+  const readCalls = async (r) => {
+    setError('');
+    setReading(r.id);
+    try {
+      await setReportCalls(r.id, await callsIn(await fetchFile(r)));
+      reports.reload();
+      onBilling();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setReading(null);
+    }
+  };
+  const close = useCallback(() => setOpen(null), []);
+  const report = reports.data?.find((r) => r.id === open);
+  const replace = async (picked, reason) => {
+    const result = await replaceCalls(id, open, picked, reason);
+    onSaved(result);
+    reports.reload();
+    return result.replaced;
+  };
+  const undo = async (c) => {
+    if (!window.confirm(`Put back the call ${c.called_at}${c.caller ? ` from ${c.caller}` : ''}? It is charged again on ${dayLabel(c.date)}.`)) return;
+    setError('');
+    try {
+      onSaved(await undoReplacedCall(id, c.id));
+      reports.reload();
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+  return (
+    <section className="p-card">
+      <header className="p-card__head">
+        <div><h2>Replaced Calls</h2><p>Calls the buyer asked to have replaced in the chat. Choose them in their Call Summary: each one comes off that day's bill, and the buyer sees it on their Billing page.</p></div>
+      </header>
+      <ErrorNote error={error || reports.error} onRetry={reports.error ? reports.reload : null} />
+      {reports.data?.length ? (
+        <ul className="p-admin__payments p-admin__payments--flush p-replaced__reports">
+          {reports.data.slice(0, 5).map((r) => (
+            <li key={r.id}>
+              <span>{r.title}<small>{period(r)}{r.calls === null ? ' · calls not read into billing' : ` · ${r.calls} call${r.calls === 1 ? '' : 's'}`}{r.replaced.length > 0 && ` · ${r.replaced.length} replaced`}</small></span>
+              {r.calls === null && <button type="button" className="btn btn--quiet btn--sm" disabled={reading === r.id} onClick={() => readCalls(r)}>{reading === r.id ? 'Reading…' : 'Read Calls'}</button>}
+              <button type="button" className="btn btn--quiet btn--sm" onClick={() => setOpen(r.id)}>Choose Calls</button>
+            </li>
+          ))}
+        </ul>
+      ) : reports.data && <p className="p-admin__note">No Call Summaries for this buyer yet. Upload the day's call log under Reports, then choose its calls here.</p>}
+      <h3 className="p-replaced__title">Replaced in the Last {days} Days</h3>
+      {calls.length ? (
+        <ul className="p-admin__payments">
+          {calls.map((c) => (
+            <li key={c.id}>
+              <span>{dayLabel(c.date)} · {c.called_at}<small>{[c.caller, c.duration, c.reason].filter(Boolean).join(' · ')}</small></span>
+              <small>{c.replaced_by_email || 'Our team'}, {when(c.created_at)}</small>
+              <button type="button" className="p-iconbtn" aria-label={`Put back the call ${c.called_at}`} title="Put back on the bill" onClick={() => undo(c)}><Icon name="close" /></button>
+            </li>
+          ))}
+        </ul>
+      ) : <p className="p-empty">No calls replaced on these days.</p>}
+      {report && <SheetViewer report={report} onClose={close} pick={{ onReplace: replace }} />}
+    </section>
   );
 }
 
@@ -261,7 +357,9 @@ function Ledger({ id, statement, onPick, onSaved }) {
                 <tr key={d.date} tabIndex={0} onClick={() => onPick(d)} onKeyDown={(e) => e.key === 'Enter' && onPick(d)}>
                   <th scope="row">{dayLabel(d.date)}{d.is_today && <span className="bill__live"><i aria-hidden="true" />Today</span>}</th>
                   <td className={Number(d.opening_balance) < 0 ? 'is-neg' : ''}>{money(d.opening_balance, currency)}</td>
-                  <td title={d.replacements ? `${d.replacements} replaced, not charged` : undefined}>{callsLabel(d)}</td>
+                  <td title={[d.from_call_log && 'Counted from the Call Summaries', d.replacements && `${d.replacements} replaced, not charged`].filter(Boolean).join('. ') || undefined}>
+                    {callsLabel(d)}{d.from_call_log && <small className="p-calls__log">Call log</small>}
+                  </td>
                   <td>{money(d.price_per_call, currency)}</td>
                   <td className={Number(d.charges) ? 'is-neg' : ''}>{Number(d.charges) ? `-${money(d.charges, currency)}` : money(0, currency)}</td>
                   <td className={Number(d.payment_received) ? 'is-pos' : ''}>{Number(d.payment_received) ? `+${money(d.payment_received, currency)}` : money(0, currency)}</td>
@@ -295,13 +393,13 @@ function Ledger({ id, statement, onPick, onSaved }) {
 
 // The latest audit entries by or about this login, refreshed after each change made on this page.
 function Activity({ id, onSignedOut, watch }) {
-  const log = useLoad(signedIn(onSignedOut, () => fetchAudit({ about: id }, { limit: 8 })), [id, ...watch]);
+  const log = useLoad(signedIn(onSignedOut, () => fetchActivity(id)), [id, ...watch]);
   const rows = log.data?.rows || [];
   return (
     <section className="p-card p-card--flush">
       <header className="p-card__head">
         <div><h2>Recent Activity</h2><p>Changes to this login and what it did, newest first.</p></div>
-        <Link to={`/admin/audit?about=${id}`} className="btn btn--quiet btn--sm"><Icon name="audit" />Open in Audit Log</Link>
+        {isAdmin() && <Link to={`/admin/audit?about=${id}`} className="btn btn--quiet btn--sm"><Icon name="audit" />Open in Audit Log</Link>}
       </header>
       <ErrorNote error={log.error} onRetry={log.reload} />
       {rows.length ? (
@@ -319,7 +417,9 @@ function Activity({ id, onSignedOut, watch }) {
   );
 }
 
+// One login's page. Staff open customers' pages here too (from Customers), with all but the role and Delete.
 export default function AdminUser({ id, onSignedOut }) {
+  const home = isAdmin() ? { to: '/admin', label: 'All Logins' } : { to: '/customers', label: 'All Customers' };
   // Just this login (not the whole list); null once it no longer exists.
   const person = useLoad(signedIn(onSignedOut, () => getUser(id)), [id]);
   const user = person.data;
@@ -336,8 +436,8 @@ export default function AdminUser({ id, onSignedOut }) {
   }, [customer, loadBilling]);
 
   useEffect(() => {
-    if (user === null && !person.loading && !person.error) navigate('/admin', { replace: true });
-  }, [user, person.loading, person.error]);
+    if (user === null && !person.loading && !person.error) navigate(home.to, { replace: true });
+  }, [user, person.loading, person.error, home.to]);
 
   // Someone else saved first: show the latest of everything on the page.
   const latest = () => {
@@ -345,13 +445,13 @@ export default function AdminUser({ id, onSignedOut }) {
     if (customer) loadBilling();
   };
 
-  if (!user) return <ErrorNote error={person.error} onRetry={person.reload} />;
+  if (!user) return <><p className="p-crumb"><Link to={home.to}><Icon name="back" />{home.label}</Link></p><ErrorNote error={person.error} onRetry={person.reload} /></>;
   const s = billing?.statement;
   const owes = s && Number(s.balance) < 0;
 
   return (
     <>
-      <p className="p-crumb"><Link to="/admin"><Icon name="back" />All Logins</Link></p>
+      <p className="p-crumb"><Link to={home.to}><Icon name="back" />{home.label}</Link></p>
       <PageHead title={<span className="p-person p-person--head"><Avatar userId={user.id} version={user.avatar_version} name={user.name || user.email} size="lg" />{user.company || user.name}</span>} sub={<>{user.name}{user.company ? ` · ${user.email}` : ''} · {ROLE_LABEL[user.role] || user.role}</>}>
         {s && (
           <span className={`p-balance ${owes ? 'is-due' : 'is-ok'}`}>
@@ -375,7 +475,8 @@ export default function AdminUser({ id, onSignedOut }) {
           </div>
           {billing?.account && (
             <>
-              <Calls id={id} account={billing.account} picked={picked} versions={billing.day_versions} shown={s.days.map((d) => d.date)} onSaved={setBilling} onConflict={latest} />
+              <Calls id={id} account={billing.account} picked={picked} versions={billing.day_versions} days={s.days} onSaved={setBilling} onConflict={latest} />
+              <ReplacedCalls id={id} calls={billing.replaced_calls || []} days={s.days.length} onSaved={setBilling} onBilling={loadBilling} onSignedOut={onSignedOut} />
               <Ledger id={id} statement={s} onPick={(d) => { setPicked(d); window.scrollTo({ top: document.querySelector('.p-admin__calls')?.offsetTop ?? 0, behavior: 'smooth' }); }} onSaved={setBilling} />
             </>
           )}

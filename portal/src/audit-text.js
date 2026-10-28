@@ -32,12 +32,15 @@ export const ACTIONS = {
   'billing.terms': 'Changed Billing Terms',
   'calls.save': 'Entered Calls',
   'calls.clear': 'Cleared a Day',
+  'calls.replace': 'Replaced Calls',
+  'calls.unreplace': 'Put Back a Replaced Call',
   'payment.create': 'Recorded a Payment',
   'payment.delete': 'Deleted a Payment',
   'payment.deposit': 'Deposit Received',
   'payment.address': 'Opened Pay',
   'report.upload': 'Uploaded a Report',
   'report.delete': 'Deleted a Report',
+  'report.calls': 'Read a Call Summary into Billing',
   'report.notify': 'Notified a Customer of Reports',
   'notify.settings': 'Changed Billing Notifications',
   'notify.test': 'Posted the Billing Summary',
@@ -67,7 +70,7 @@ export const actor = (row) => row.user_email || (row.action === 'payment.deposit
 
 const REASON = { password: 'wrong password', code: 'wrong code', 'turned off': 'login turned off' };
 const FIELD = {
-  name: 'Name', company: 'Company', role: 'Role', status: 'Status', calls: 'Calls', replacements: 'Replaced',
+  name: 'Name', company: 'Company', nickname: 'Nickname', role: 'Role', status: 'Status', calls: 'Calls', replacements: 'Replaced',
   price_per_call: 'Price per Call', opening_balance: 'Opening Balance', start_date: 'Billing Starts', timezone: 'Time Zone',
   currency: 'Currency', amount: 'Amount', reference: 'Reference', note: 'Note', date: 'Day', telegram: 'Telegram',
   whatsapp: 'WhatsApp', element: 'Element X', zangi: 'Zangi', signal: 'Signal', email: 'Email', title: 'Title', filename: 'File',
@@ -75,7 +78,8 @@ const FIELD = {
   file_bytes: 'File Size', emailed: 'Emailed', telegram_sent: 'Sent on Telegram', reports: 'Reports', payments: 'Each Payment',
   summary: 'Daily Summary', summary_time: 'Summary Time', username: 'Telegram User', via: 'Via', reason: 'Reason', customer: 'Customer', kind: 'Groups', q: 'Search',
   outcome: 'Outcome', user: 'Person', target: 'About', about: 'By or About', action: 'Action', method: 'Method',
-  paid_at: 'Paid', report_id: 'Report',
+  paid_at: 'Paid', report_id: 'Report', report: 'Report', replaced: 'Calls Replaced', called_at: 'Call Time', caller: 'Caller',
+  duration: 'Duration', billing_days: 'Billing Days',
 };
 const REPORT_KINDS = { calls: 'Call Summary', billing: 'Billing Report' };
 const MONEY = new Set(['price_per_call', 'opening_balance', 'amount']);
@@ -123,7 +127,7 @@ export function describe(row) {
     case 'auth.login_failed': return `Failed sign-in${d.reason ? ` (${REASON[d.reason] || d.reason})` : ''}${row.user_id ? '' : ', no such login'}`;
     case 'login.create': return `Created a ${roleName(d.role)?.toLowerCase() || 'customer'} login for ${who || d.email || 'someone'}`;
     case 'login.update': {
-      const parts = ['name', 'company', 'role', 'status'].filter((k) => k in d && b[k] !== undefined && d[k] !== b[k])
+      const parts = ['name', 'company', 'nickname', 'role', 'status'].filter((k) => k in d && b[k] !== undefined && d[k] !== b[k])
         .map((k) => `${fieldName(k).toLowerCase()} ${show(k, b[k])} to ${show(k, d[k])}`);
       return `Changed ${who}${parts.length ? `: ${parts.join(', ')}` : ' (nothing different)'}`;
     }
@@ -136,6 +140,11 @@ export function describe(row) {
       return `Entered ${now} for ${who}${on}${was}`;
     }
     case 'calls.clear': return `Cleared the calls of ${who}${on}${b.calls !== undefined ? ` (${b.calls})` : ''}`;
+    case 'calls.replace': {
+      const n = d.replaced ?? d.calls?.length ?? 0;
+      return `Replaced ${n} call${n === 1 ? '' : 's'} of ${who}${on}${d.reason ? ` (${d.reason})` : ''}`;
+    }
+    case 'calls.unreplace': return `Put back the replaced call ${[b.called_at, b.caller && `from ${b.caller}`].filter(Boolean).join(' ')} of ${who}${b.date ? ` on ${dayLabel(b.date)}` : ''}`;
     case 'payment.create': return `Recorded ${d.amount ? money(d.amount) : 'a payment'}${d.status && d.status !== 'completed' ? ` (${d.status})` : ''} from ${who}${d.date ? ` on ${dayLabel(d.date)}` : ''}`;
     case 'payment.delete': return `Deleted ${b.amount ? `the ${money(b.amount)} payment` : 'a payment'} from ${who}`;
     case 'payment.deposit': {
@@ -146,6 +155,7 @@ export function describe(row) {
     }
     case 'payment.address': return `Opened Pay${d.amount ? ` for ${money(d.amount)}` : ''}`;
     case 'report.upload': return `Uploaded ${d.kind === 'calls' ? 'the Call Summary' : 'the billing report'} "${d.title || d.filename || 'a report'}" for ${who}`;
+    case 'report.calls': return `Read ${d.calls ?? 'the'} call${d.calls === 1 ? '' : 's'} of "${b.title || 'a Call Summary'}" into the billing of ${who}`;
     case 'report.delete': return `Deleted ${b.kind === 'calls' ? 'the Call Summary' : 'the billing report'} "${b.title || 'a report'}" from ${who}`;
     case 'audit.export': return `Downloaded ${d.rows ?? ''} audit entr${d.rows === 1 ? 'y' : 'ies'} (${String(d.format || '').toUpperCase()})`;
     case 'finance.export': return `Downloaded the finance report for ${dayLabel(d.from)} to ${dayLabel(d.to)}${who ? `, ${who}` : ''} (${String(d.format || '').toUpperCase()})`;

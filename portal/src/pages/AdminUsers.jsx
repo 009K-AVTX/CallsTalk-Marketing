@@ -42,7 +42,7 @@ export function LinkResult({ result, email }) {
   );
 }
 
-const BLANK = { role: 'customer', name: '', email: '', company: '', price_per_call: '', opening_balance: '0', start_date: '', timezone: TIME_ZONES[0] };
+const BLANK = { role: 'customer', name: '', email: '', company: '', nickname: '', price_per_call: '', opening_balance: '0', start_date: '', timezone: TIME_ZONES[0] };
 
 // `roles`: the kinds of login this person may add (staff: customers only).
 export function NewLogin({ onCreated, roles = ['customer', 'staff', 'admin'] }) {
@@ -87,9 +87,12 @@ export function NewLogin({ onCreated, roles = ['customer', 'staff', 'admin'] }) 
         <label>Full Name<input required value={form.name} onChange={set('name')} maxLength={100} autoComplete="off" /></label>
         <label>Email (Login ID)<input required type="email" value={form.email} onChange={set('email')} maxLength={200} autoComplete="off" /></label>
       </div>
-      <label><span>Company {!customer && <i className="p-optional">optional</i>}</span><input required={customer} value={form.company} onChange={set('company')} maxLength={120} autoComplete="off" /></label>
       {customer ? (
         <>
+          <div className="p-form__row">
+            <label>Company<input required value={form.company} onChange={set('company')} maxLength={120} autoComplete="off" /></label>
+            <label><span>Nickname <i className="p-optional">picks them when uploading reports</i></span><input value={form.nickname} onChange={set('nickname')} maxLength={40} placeholder="e.g. Q10" autoComplete="off" /></label>
+          </div>
           <div className="p-form__row">
             <label>Price per Call ($)<input required type="number" min="0" step="0.01" value={form.price_per_call} onChange={set('price_per_call')} placeholder="35.00" /></label>
             <label><span>Opening Balance ($) <i className="p-optional">negative = owes us</i></span><input required type="number" step="0.01" value={form.opening_balance} onChange={set('opening_balance')} /></label>
@@ -99,9 +102,9 @@ export function NewLogin({ onCreated, roles = ['customer', 'staff', 'admin'] }) 
             <label>Days Counted In<Select value={form.timezone} onChange={set('timezone')}>{TIME_ZONES.map((z) => <option key={z} value={z}>{z.replace(/_/g, ' ')}</option>)}</Select></label>
           </div>
         </>
-      ) : <p className="p-admin__note">{form.role === 'staff'
+      ) : <><label><span>Company <i className="p-optional">optional</i></span><input value={form.company} onChange={set('company')} maxLength={120} autoComplete="off" /></label><p className="p-admin__note">{form.role === 'staff'
         ? 'Staff can upload and remove customer reports and add customers; they cannot see billing, payments or logins.'
-        : 'Admins can add and turn off logins, enter calls and payments, and upload reports for every customer.'}</p>}
+        : 'Admins can add and turn off logins, enter calls and payments, and upload reports for every customer.'}</p></>}
       {status === 'error' && <p className="access-card__error" role="alert">{error}</p>}
       <button type="submit" className="btn btn--light" disabled={status === 'sending'}>{status === 'sending' ? 'Creating…' : 'Create Login and Send Link'}</button>
       {result && <LinkResult result={result} email={result.email} />}
@@ -160,7 +163,7 @@ export default function AdminUsers({ onSignedOut }) {
                 </button>
               ))}
             </div>
-            <label className="p-search"><span className="sr-only">Filter</span><input type="search" placeholder="Name, email or company" value={filter} onChange={(e) => setFilter(e.target.value)} /></label>
+            <label className="p-search"><span className="sr-only">Filter</span><input type="search" placeholder="Name, email, company or nickname" value={filter} onChange={(e) => setFilter(e.target.value)} /></label>
           </div>
         </header>
         <div className="p-tablewrap">
@@ -174,7 +177,7 @@ export default function AdminUsers({ onSignedOut }) {
                     <th scope="row">
                       <span className="p-person">
                         <Avatar userId={u.id} version={u.avatar_version} name={u.name || u.email} size="sm" />
-                        <span>{u.name || '—'}{u.company && <small className="p-up__file">{u.company}</small>}</span>
+                        <span>{u.name || '—'}{(u.company || u.nickname) && <small className="p-up__file">{[u.company, u.nickname].filter(Boolean).join(' · ')}</small>}</span>
                       </span>
                     </th>
                     <td>{u.email}</td>

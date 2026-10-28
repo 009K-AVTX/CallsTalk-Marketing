@@ -4,7 +4,7 @@ import { isAdmin } from '../../../src/lib/portal.js';
 import { fetchBilling } from '../admin.js';
 import { Avatar } from '../avatar.jsx';
 import { enterBillingDays, planBillingDays, readBillingDays, toEnter } from '../billing-import.js';
-import { readCallSummary } from '../call-summary.js';
+import { callsIn, readCallSummary } from '../call-summary.js';
 import Icon from '../components/Icons.jsx';
 import { ErrorNote } from '../components/Shell.jsx';
 import { addDays, dayLabel, money, today } from '../format.js';
@@ -137,8 +137,8 @@ function CallsFromFile({ read, billing, plan, enter, onEnter }) {
 
 // What each kind of report is for, under the choice.
 const KIND_NOTES = {
-  calls: 'The day\'s call log. The customer can view and download it in their portal, and is told about it.',
-  billing: 'For our team only: the customer does not see it. An admin can enter its calls in the customer\'s billing.',
+  calls: 'The day\'s call log. Its calls are the customer\'s calls in billing for those days. The customer can view and download it in their portal, and is told about it.',
+  billing: 'For our team only: the customer does not see it. Its calls can be entered in the customer\'s billing.',
 };
 
 function UploadForm({ customers, onDone }) {
@@ -157,13 +157,18 @@ function UploadForm({ customers, onDone }) {
   // Whether the chosen customer has connected Telegram in their Settings (only they can turn it on).
   const chosen = customers.find((c) => c.id === form.customer);
   const telegramReady = Boolean(chosen?.telegram);
+  // On our server customers are picked by nickname ("Q10", in order, Q2 before Q10); those without one come last,
+  // by their login. Demo and local: the login is typed.
+  const picking = customers.some((c) => c.id !== c.login);
+  const byNickname = useMemo(() => [...customers].sort((a, b) => (!a.nickname - !b.nickname)
+    || (a.nickname || '').localeCompare(b.nickname || '', 'en', { numeric: true, sensitivity: 'base' })), [customers]);
 
   // The chosen files, read both ways. A billing report's days (Excel template or Financial Overview format) set its
-  // period, and admins can enter them in the buyer's billing with the upload; only admins change billing. A Call
-  // Summary's calls, when it lists them as the dialer exports them, set its period and count; any other layout is
+  // period, and the team (admins and staff, on our server) can enter them in the buyer's billing with the upload. A
+  // Call Summary's calls, when it lists them as the dialer exports them, set its period and count; any other layout is
   // uploaded as it is. The type follows what the files turn out to be. Upload waits until the files have been read
   // (the first time, the spreadsheet reader itself has to load).
-  const canEnterCalls = canNotify && isAdmin();
+  const canEnterCalls = canNotify;
   const [read, setRead] = useState(null); // billing days: { days, skipped } or null
   const [log, setLog] = useState(null); // calls: { calls, from, to, unread } or null
   const [reading, setReading] = useState(false);
@@ -221,8 +226,12 @@ function UploadForm({ customers, onDone }) {
       // single Call Summary without one is "Call Summary, 72 calls" when its calls could be counted.
       const counted = kind === 'calls' && log && !log.unread.length ? `Call Summary, ${log.calls} call${log.calls === 1 ? '' : 's'}` : '';
       const single = files.length === 1 && (form.title.trim() || counted);
-      for (const file of files) uploaded.push(await uploadReport({ ...form, kind, title: single || '', file }));
-      const who = customers.find((c) => c.id === form.customer)?.login || form.customer.trim().toLowerCase();
+      // A Call Summary's calls go with it, read as its viewer reads them: they set the customer's calls in billing.
+      for (const file of files) {
+        const calls = kind === 'calls' ? await callsIn(await file.arrayBuffer()) : null;
+        uploaded.push(await uploadReport({ ...form, kind, title: single || '', file, calls }));
+      }
+      const who = chosen?.nickname || chosen?.login || form.customer.trim().toLowerCase();
       // Only what went wrong is added to the message.
       let notes = '';
       if (kind === 'billing' && enterCalls && plan && toEnter(plan).length) {
@@ -265,11 +274,11 @@ function UploadForm({ customers, onDone }) {
         </div>
         <small className="p-up__hint">{KIND_NOTES[kind]}</small>
       </div>
-      <label>Customer Login ID
-        {customers.some((c) => c.id !== c.login) ? (
+      <label>{picking ? 'Customer' : 'Customer Login ID'}
+        {picking ? (
           <Select required value={form.customer} onChange={set('customer')}>
             <option value="">Choose a customer</option>
-            {customers.map((c) => <option key={c.id} value={c.id}>{c.name} ({c.login}){c.telegram ? ' · Telegram' : ''}</option>)}
+            {byNickname.map((c) => <option key={c.id} value={c.id}>{c.nickname ? `${c.nickname} · ${c.name}` : `${c.name} (${c.login})`}{c.telegram ? ' · Telegram' : ''}</option>)}
           </Select>
         ) : (
           <>
@@ -352,7 +361,7 @@ export function ReportManager({ onSignedOut }) {
   useEffect(() => { load(); }, [load]);
 
   const remove = async (r) => {
-    const seen = r.kind === 'calls' ? ' The customer will no longer be able to see it.' : '';
+    const seen = r.kind === 'calls' ? ' The customer will no longer be able to see it, and its calls come off their billing.' : '';
     if (!window.confirm(`Delete "${r.title}" for ${r.customer}?${seen}`)) return;
     try {
       await deleteReport(r.id);

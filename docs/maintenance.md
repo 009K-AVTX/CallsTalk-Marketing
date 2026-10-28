@@ -752,12 +752,39 @@ Customers log in at **https://portal.callstalk.com** (the website's Log In goes 
 
 ### 16.2 Day to day (in the portal, as an admin)
 
-- **New login:** Logins → New Login. Customers also get their price per call, opening balance and start date.
-  The setup link is emailed to them (it works once, for 7 days); the page also shows it to copy.
-- **Roles:** **Customer** sees their own billing and Call Summaries. **Staff** can only upload and remove customer
-  reports (they land on `/upload`; no billing, payments or logins). **Admin** can do everything.
+- **New login:** Logins → New Login. Customers also get their price per call, opening balance and start date, and
+  an optional **Nickname** (e.g. `Q10`). The setup link is emailed to them (it works once, for 7 days); the page
+  also shows it to copy.
+- **Nicknames:** the team's short name for a customer. When uploading a report, customers are picked by nickname
+  (`Q10 · Company`, in order, Q2 before Q10); those without one come last, by login. No two customers can share
+  one. Admins change it on the customer's page (Details); staff on **Customers**.
+- **Roles:** **Customer** sees their own billing and Call Summaries. **Staff** can upload and remove customer
+  reports (they land on `/upload`), add customers and change their nicknames, and open any customer's page from
+  **Customers** (`/customers/<id>`) to work it as an admin does: their login (details, setup link, deactivate),
+  billing terms, calls, replaced calls, payments and recent activity. Staff cannot change a role, delete a login,
+  or open staff and admin logins, Finance or the Audit Log (the server refuses: `STAFF_ROUTES` in
+  `server/src/admin.js`). **Admin** can do everything.
 - **Billing:** open a customer → enter each day's **billable calls** and **payments** received. Customers see
   their balance and the last five days.
+- **Calls from the call logs:** uploading a Call Summary sets the customer's calls in billing for its days: each
+  day's calls are every distinct call (time and caller) in their Call Summaries for that day, so a second log of the
+  same day (an evening export) adds only its new calls, and a corrected one never counts a call twice. Their
+  balance, that day's and every later one, changes at once, and their Billing page shows "From your call log".
+  Deleting a Call Summary counts its days again without it. Such a day cannot be typed over or cleared on the
+  customer's page (its price can still change): upload the corrected log, or delete the wrong one. Days with no
+  Call Summary are entered by hand as before. Call Summaries uploaded before this have **Read Calls** on the
+  customer's page (Replaced Calls) to bring their calls into billing; until then those days stay as entered. Staff
+  uploads count too. Each change is in the Audit Log with the upload (Billing Days). Table `report_calls`.
+- **Replaced calls:** buyers ask for a call to be replaced in the portal chat (the chat itself is unchanged). On the
+  customer's page, under **Replaced Calls**, press **Choose Calls** by the day's Call Summary, tick the calls, add a
+  reason if you like (the buyer sees it) and press **Replace**. Each call comes off its day's bill: the day reads
+  "125 − 2" and that day's balance and every later one move by the call's price, at once. Replacements are not
+  typed in: they come only from calls chosen this way, or a billing report's "125 − 2". The day needs its calls
+  entered first. The buyer sees the calls under **Replaced Calls** on their Billing page, and marked **Replaced** in
+  their Call Summary; the team sees them on the customer's page with who replaced them, and the Audit Log has each
+  one. The **×** beside a call puts it back on the bill. A day with replaced calls cannot be cleared, or its calls
+  set below them, until they are put back. The same call (time and caller) is never replaced twice, even from a
+  corrected log. Admins and staff; table `replaced_calls`.
 - **Two kinds of report:** the upload form asks for the **Report Type**, and picks it from the file when it can.
   - **Call Summary**: the day's call log as the dialer exports it, one call a row with no header (date and time,
     caller, number called, duration, status, who hung up; e.g. `C4V - 72.xlsx`). This is the only report the
@@ -768,7 +795,7 @@ Customers log in at **https://portal.callstalk.com** (the website's Log In goes 
   - **Billing Report**: for the team only. The customer never sees it and is not told about it. It is where an admin
     can enter calls in the customer's billing (next point). Reports uploaded before this change count as billing
     reports, so customers no longer see them.
-- **Calls from a billing report:** a report itself never changes the balance. When an admin uploads one in the **Excel
+- **Calls from a billing report:** a report itself never changes the balance. When the team uploads one in the **Excel
   Template** format (a **Daily Bills** sheet, or any sheet with **Date** and **Total Calls** columns) or the team's
   **Financial Overview** format (a box per day titled "Oct 22, 2026 · Financial Overview", on one sheet or several,
   whose **Total No.** is read as the calls: "125 - 2" is 125 calls, 2 replaced; it has no price, so each day keeps
@@ -779,7 +806,7 @@ Customers log in at **https://portal.callstalk.com** (the website's Log In goes 
   uploaded. Each is saved as if entered on the customer's page, so it is in the Audit Log, and a day someone
   changed meanwhile is left alone and named in the result. Payments in the file are never read (deposits come in
   on their own; record others as usual). An empty or 0 price keeps the day's price. The file's days also set the
-  report's period. Staff upload as before and do not see this.
+  report's period. Staff can do this too.
 - **Lost phone or forgotten password:** open the login → **Reset Login and Send Link**. Their old password and
   code app stop working at once.
 - **Someone leaves:** **Turn Login Off** signs them out everywhere and blocks logging in.

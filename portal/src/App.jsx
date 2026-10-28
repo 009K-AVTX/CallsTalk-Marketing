@@ -16,6 +16,7 @@ import AdminUsers, { NewLogin } from './pages/AdminUsers.jsx';
 import AdminUser from './pages/AdminUser.jsx';
 import AdminFinance from './pages/AdminFinance.jsx';
 import AdminAudit from './pages/AdminAudit.jsx';
+import Customers from './pages/Customers.jsx';
 import SupportChat from './components/SupportChat.jsx';
 
 const PAGES = { '/': Billing, '/reports': Reports, '/settings': Settings };
@@ -83,21 +84,25 @@ function Admin({ path }) {
   );
 }
 
-// Signed in as staff: customer reports (/upload), adding customers (/customers/new) and their own settings, in the
-// same frame as admins. Nothing else.
-const STAFF_TITLES = { '/upload': 'Reports', '/customers/new': 'New Customer', '/settings': 'Settings' };
+// Signed in as staff: customer reports (/upload), customers (/customers) and each one's page (/customers/<id>: their
+// login, billing, calls, replaced calls and payments, as admins have it), adding customers (/customers/new) and their
+// own settings, in the same frame as admins. Nothing else.
+const STAFF_TITLES = { '/upload': 'Reports', '/customers': 'Customers', '/customers/new': 'New Customer', '/settings': 'Settings' };
 
 function Staff({ path }) {
-  const known = Boolean(STAFF_TITLES[path]);
+  const customerId = /^\/customers\/([0-9a-f-]{36})$/.exec(path)?.[1];
+  const title = customerId ? 'Customer' : STAFF_TITLES[path];
   useEffect(() => {
-    if (known) document.title = `${STAFF_TITLES[path]} | CallsTalk Staff`;
+    if (title) document.title = `${title} | CallsTalk Staff`;
     else navigate('/upload', { replace: true });
-  }, [path, known]);
+  }, [path, title]);
 
-  if (!known) return null;
+  if (!title) return null;
   return (
-    <Shell path={path} nav={STAFF_NAV} team="staff">
+    <Shell path={customerId ? '/customers' : path} nav={STAFF_NAV} team="staff">
       {path === '/settings' ? <Settings team="staff" />
+        : customerId ? <AdminUser id={customerId} onSignedOut={toLogin} />
+        : path === '/customers' ? <Customers />
         : path === '/customers/new' ? <><PageHead title="New Customer" /><NewLogin roles={['customer']} onCreated={() => {}} /></>
         : <ReportManager onSignedOut={toLogin} />}
     </Shell>

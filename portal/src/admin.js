@@ -29,16 +29,23 @@ export const sendLink = (id) => authed(`${user(id)}/invite`, json('POST'));
 export const removeUser = (id) => authed(user(id), json('DELETE'));
 
 export const fetchBilling = (id) => authed(`${user(id)}/billing`);
+// The latest audit entries by or about a login: { rows }. Staff get these for customers too.
+export const fetchActivity = (id, limit = 8) => authed(`${user(id)}/activity?limit=${limit}`);
 export const saveTerms = (id, terms) => authed(`${user(id)}/billing`, json('PUT', terms));
-// `replacements`: calls from that day that are not charged (shown as "125 - 2").
+// `replacements`: calls from that day that are not charged (shown as "125 - 2"); undefined keeps what the day has.
 // `version`: the day's version as shown (0: no calls entered yet; undefined: not known, the save wins).
 export const saveDay = (id, date, calls, price, replacements, version) => authed(`${user(id)}/days/${date}`, json('PUT', {
   calls: Number(calls),
-  replacements: Number(replacements || 0),
+  ...(replacements !== undefined && { replacements: Number(replacements || 0) }),
   ...(price !== '' && price != null && { price_per_call: price }),
   ...(Number.isInteger(version) && { version }),
 }));
 export const clearDay = (id, date, version) => authed(`${user(id)}/days/${date}${Number.isInteger(version) ? `?version=${version}` : ''}`, json('DELETE'));
+// Calls the buyer asked (in the portal chat) to have replaced, picked in one of their Call Summaries: each is taken off
+// its day's bill. `calls`: [{ date, called_at, caller, duration }] as the log shows them (call-summary.js callOf).
+// -> the billing, with `replaced`: how many were newly replaced.
+export const replaceCalls = (id, report, calls, reason) => authed(`${user(id)}/replaced-calls`, json('POST', { report, calls, reason }));
+export const undoReplacedCall = (id, callId) => authed(`${user(id)}/replaced-calls/${encodeURIComponent(callId)}`, json('DELETE'));
 export const addPayment = (id, payment) => authed(`${user(id)}/payments`, json('POST', payment));
 export const removePayment = (id, paymentId) => authed(`${user(id)}/payments/${encodeURIComponent(paymentId)}`, json('DELETE'));
 

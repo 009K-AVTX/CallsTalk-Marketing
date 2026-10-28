@@ -19,11 +19,14 @@ Sign-in, billing and payments use the endpoints in [customer-billing-api.md](cus
 {
   "id": "7c1d…", "customer": "bills@q32.com", "kind": "calls", "title": "Call Summary, 72 calls",
   "note": "", "period_from": "2026-10-26", "period_to": "2026-10-26",
-  "filename": "C4V - 72.xlsx", "size": 11516, "uploaded_at": "2026-10-27T14:48:00Z"
+  "filename": "C4V - 72.xlsx", "size": 11516, "uploaded_at": "2026-10-27T14:48:00Z", "calls": 72,
+  "replaced": [{ "called_at": "2026-10-26 15:22:51", "caller": "5743447831" }]
 }
 ```
 
-`kind` is `calls` (a Call Summary, the buyer's to see) or `billing` (a billing report, for the team only). `period_from` / `period_to` are the days the report covers (`YYYY-MM-DD`). The portal groups reports by the month of `period_to`, newest first, and marks a report "New" for 3 days after `uploaded_at`.
+`calls`: for a Call Summary, how many calls it lists (`null` when they were never read: uploaded before calls were read into billing).
+
+`kind` is `calls` (a Call Summary, the buyer's to see) or `billing` (a billing report, for the team only). `period_from` / `period_to` are the days the report covers (`YYYY-MM-DD`). The portal groups reports by the month of `period_to`, newest first, and marks a report "New" for 3 days after `uploaded_at`. `replaced`: for a Call Summary, the buyer's calls replaced on the days it covers, by the time and caller the log shows (`[]` for none, and always for a billing report); the viewer marks those rows **Replaced**.
 
 ## Customer endpoints (buyer login, Bearer token)
 
@@ -39,9 +42,12 @@ The upload page signs in with `POST /accounts/login` (staff account) and sends t
 | Call | Body / Returns |
 |---|---|
 | `GET /staff/customers` | `{ "results": [{ "id": "<buyer id>", "name": "Q32", "login": "bills@q32.com" }] }`, the buyers who have a portal login |
-| `GET /staff/reports` | `{ "results": [report, …] }`, every report of both kinds, newest first |
-| `POST /staff/reports` | `{ customer, kind, title, note, period_from, period_to, filename, content_base64 }` → 201 with the report |
-| `DELETE /staff/reports/{id}` | `{ "ok": true }`; the customer stops seeing it |
+| `GET /staff/reports?customer=&kind=` | `{ "results": [report, …] }`, every report of both kinds, newest first; `customer` (a buyer id) and `kind` narrow it |
+| `POST /staff/reports` | `{ customer, kind, title, note, period_from, period_to, filename, content_base64, calls }` → 201 with the report and `billing_days` |
+| `PUT /staff/reports/{id}/calls` | `{ calls }` → the report and `billing_days`: a Call Summary's calls read now (one uploaded before calls were read) |
+| `DELETE /staff/reports/{id}` | `{ "ok": true, "billing_days": […] }`; the customer stops seeing it, and its calls come off their billing |
+
+A Call Summary's `calls` (`[{ date, called_at, caller, duration }]`, up to 5,000, each on a day from `period_from` to `period_to`) are read in the browser exactly as the report viewer reads the file (`portal/src/call-summary.js` `callsIn`). They bill their days: a day's calls become every distinct call (time and caller) in the buyer's Call Summaries for that day, with their replaced calls, so a second or corrected log never counts a call twice. Such a day cannot be typed over on the customer's page; a corrected log, or deleting the wrong one, changes it. `billing_days`: `[{ date, before, after }]` for each day whose calls changed (`null`: none). The Audit Log keeps the same.
 
 For `POST`:
 - `customer` is the buyer `id` from `/staff/customers`.

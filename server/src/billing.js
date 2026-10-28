@@ -1,4 +1,5 @@
-// A customer's statement, worked out from their billing terms, daily calls and payments.
+// A customer's statement, worked out from their billing terms, daily calls and payments. A day's calls come from
+// its Call Summaries when it has any (portal-db.js syncCallDays), otherwise from what the team typed in.
 // The shape and the rules are the ones in docs/customer-billing-api.md:
 //   charges = (calls - replacements) x price per call; balance = opening - charges + completed payments;
 //   each day opens on the previous day's balance; amount_due = max(-balance, 0).
@@ -61,6 +62,8 @@ export function statement({ user, account, days, payments, from, now = new Date(
       out.push({
         date, is_today: date === today, opening_balance: money(opening), calls, replacements, billable_calls: billable, price_per_call: money(price),
         charges: money(charges), payment_received: money(received), balance: money(balance),
+        // The calls were counted from the day's Call Summaries, not typed in.
+        from_call_log: Boolean(row?.from_calls),
       });
     }
   }
