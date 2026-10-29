@@ -36,6 +36,7 @@ export const ACTIONS = {
   'calls.unreplace': 'Put Back a Replaced Call',
   'payment.create': 'Recorded a Payment',
   'payment.delete': 'Deleted a Payment',
+  'payment.report': 'Payment from a Billing Report',
   'payment.deposit': 'Deposit Received',
   'payment.address': 'Opened Pay',
   'report.upload': 'Uploaded a Report',
@@ -147,6 +148,11 @@ export function describe(row) {
     case 'calls.unreplace': return `Put back the replaced call ${[b.called_at, b.caller && `from ${b.caller}`].filter(Boolean).join(' ')} of ${who}${b.date ? ` on ${dayLabel(b.date)}` : ''}`;
     case 'payment.create': return `Recorded ${d.amount ? money(d.amount) : 'a payment'}${d.status && d.status !== 'completed' ? ` (${d.status})` : ''} from ${who}${d.date ? ` on ${dayLabel(d.date)}` : ''}`;
     case 'payment.delete': return `Deleted ${b.amount ? `the ${money(b.amount)} payment` : 'a payment'} from ${who}`;
+    case 'payment.report': {
+      const kept = d.recorded === undefined ? '' : Number(d.recorded) === Number(d.was) ? ', already recorded'
+        : `, recorded ${money(d.recorded)}${Number(d.was) ? ` (was ${money(d.was)})` : ''}`;
+      return `Billing report shows ${d.amount !== undefined ? money(d.amount) : 'a payment'} received from ${who}${d.date ? ` on ${dayLabel(d.date)}` : ''}${kept}`;
+    }
     case 'payment.deposit': {
       // payment_status: where an entry written while it was confirming stands now (server/src/audit.js).
       const then = d.status || 'pending';

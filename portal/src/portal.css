@@ -152,6 +152,11 @@
 .p-up__kind { display: grid; gap: 6px; justify-items: start; }
 .p-up__label { font-size: .8rem; font-weight: 500; letter-spacing: .01em; }
 .p-up__kind .p-up__hint { font-size: .76rem; }
+/* Upload: a billing report sent as text, pasted in */
+.p-up__paste-open { justify-self: start; }
+.p-up__paste { display: grid; gap: 8px; }
+.p-form .p-up__paste textarea { resize: vertical; min-height: 150px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .82rem; line-height: 1.5; white-space: pre; }
+.p-up__paste-actions { display: flex; gap: 8px; }
 /* Upload: the report's days, to enter in the buyer's billing (admins) */
 .p-import { display: grid; gap: 10px; }
 .p-import__table { max-height: 260px; border: 1px solid var(--line); border-radius: 12px; }
@@ -163,8 +168,17 @@
 .p-import__table td:last-child { white-space: normal; }
 .p-import tr.is-same td, .p-import tr.is-skip td { color: var(--slate); }
 .p-import__why { display: block; font-size: .76rem; color: var(--slate); white-space: normal; }
-.p-form select, .p-form input:not([type="file"]), .p-search input { width: 100%; font: inherit; font-size: .9rem; padding: 10px 13px; border-radius: 11px; border: 1px solid #2c2632; background: #0a080c; color: var(--white); }
-.p-form input:focus, .p-form select:focus, .p-search input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(214, 163, 255, .18); }
+.p-import__why.is-warn { color: var(--warn); }
+/* With the balances and payments, the table scrolls sideways in a narrow form rather than squeezing its columns. */
+.p-import__table { max-height: 380px; }
+.p-import__table table { min-width: 660px; }
+.p-import__table td { white-space: normal; vertical-align: top; }
+.p-import__table th[scope="row"] { vertical-align: top; white-space: nowrap; }
+.p-import__start { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
+.p-import__start .p-import__why { flex: 1 1 260px; }
+.p-import__start b { color: var(--white); font-weight: 600; }
+.p-form select, .p-form input:not([type="file"]), .p-form textarea, .p-search input { width: 100%; font: inherit; font-size: .9rem; padding: 10px 13px; border-radius: 11px; border: 1px solid #2c2632; background: #0a080c; color: var(--white); }
+.p-form input:focus, .p-form select:focus, .p-form textarea:focus, .p-search input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(214, 163, 255, .18); }
 .p-form input:disabled { opacity: .55; }
 .p-form__row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .p-form input[type="date"] { color-scheme: dark; }
@@ -311,7 +325,7 @@ html { font-size: 15px; }
 .p-app .wallet__facts dt { font-size: .7rem; letter-spacing: .06em; text-transform: uppercase; }
 .p-app .wallet__facts dd { font-size: .92rem; }
 .p-app .wallet__pay { border-top-color: var(--line-soft); }
-.p-app .wallet__amount input, .p-form input, .p-form select, .p-form .c-select__btn, .p-search input { border-color: var(--line); background: rgba(0, 0, 0, .35); }
+.p-app .wallet__amount input, .p-form input, .p-form select, .p-form textarea, .p-form .c-select__btn, .p-search input { border-color: var(--line); background: rgba(0, 0, 0, .35); }
 .p-app .wallet__presets button { border-color: var(--line); font-size: .8rem; }
 .p-app .bill { border-radius: 16px; }
 .p-app .bill--today {
@@ -788,6 +802,16 @@ html { font-size: 15px; }
 /* Replaced Calls on a buyer's page (AdminUser.jsx): one date filter on the days of the calls, their Call Summaries,
    then the calls replaced on those days, by day. Buyers ask a day or two later, so the dates are the calls' days. */
 .p-app .is-warn { color: var(--warn); }
+/* The dates' calls, in four figures: Calls, Replaced, Billable, Charges. */
+.p-rc__totals { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin: 0 0 16px; }
+.p-rc__totals.is-skeleton { min-height: 62px; border-radius: 12px; }
+.p-rc__totals > span { display: flex; flex-direction: column; gap: 2px; min-width: 0; padding: 10px 14px; border-radius: 12px; border: 1px solid var(--line); background: rgba(255, 255, 255, .015); }
+.p-rc__totals small { font-size: .74rem; letter-spacing: .04em; text-transform: uppercase; color: var(--slate); }
+.p-rc__totals b { font-size: 1.15rem; font-weight: 600; color: var(--white); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.p-rc__totals b.is-warn { color: var(--warn); }
+.p-rc__unbilled { grid-column: 1 / -1; font-size: .8rem; }
+@media (max-width: 560px) { .p-rc__totals { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.p-rc__count { font-weight: 600; color: var(--white); }
 .p-rc__step { padding: 16px 0 18px; border-top: 1px solid var(--line-soft); }
 .p-rc__title { display: flex; align-items: center; gap: 10px; margin: 0 0 12px; font-size: .92rem; font-weight: 600; color: var(--white); }
 .p-rc__reports { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }

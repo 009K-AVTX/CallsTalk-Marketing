@@ -48,7 +48,12 @@ export const clearDay = (id, date, version) => authed(`${user(id)}/days/${date}$
 export const fetchReplacedCalls = async (id, { from, to }) => (await authed(`${user(id)}/replaced-calls${query({ from, to })}`)).results;
 export const replaceCalls = (id, report, calls, reason) => authed(`${user(id)}/replaced-calls`, json('POST', { report, calls, reason }));
 export const undoReplacedCall = (id, callId) => authed(`${user(id)}/replaced-calls/${encodeURIComponent(callId)}`, json('DELETE'));
+// Each day's calls on the days from `from` to `to`, billed or not: { results: [{ date, logged_calls, replaced_calls,
+// billed_calls, billed_replacements, price_per_call }], start_date }.
+export const fetchCallDays = (id, { from, to }) => authed(`${user(id)}/call-days${query({ from, to })}`);
 export const addPayment = (id, payment) => authed(`${user(id)}/payments`, json('POST', payment));
+// A billing report's Payment Received for a day: the server records what that day does not already have.
+export const saveReportPayment = (id, date, amount) => authed(`${user(id)}/report-payments`, json('POST', { date, amount }));
 export const removePayment = (id, paymentId) => authed(`${user(id)}/payments/${encodeURIComponent(paymentId)}`, json('DELETE'));
 
 // Where the person stands: waiting for their link, using the portal, or deactivated.

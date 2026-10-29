@@ -80,6 +80,7 @@ const ROUTES = [
     return s && { ...s, before: c ? pick(c, ['date', 'called_at', 'caller', 'duration', 'reason']) : null };
   }],
   ['POST', /^\/admin\/users\/(?<user>[^/]+)\/payments$/, 'payment.create', subject],
+  ['POST', /^\/admin\/users\/(?<user>[^/]+)\/report-payments$/, 'payment.report', subject],
   ['DELETE', /^\/admin\/users\/(?<user>[^/]+)\/payments\/(?<payment>[^/]+)$/, 'payment.delete', async (m) => {
     const s = await subject(m);
     const p = s && UUID.test(m.payment) ? await getPayment(s.id, m.payment) : null;
@@ -188,6 +189,8 @@ export async function auditTrail(req, res, next) {
         if (reply?.billing_days?.length) details.billing_days = reply.billing_days.map(dayChange);
       }
       else if (action === 'report.notify' && reply) Object.assign(details, { emailed: reply.emailed, telegram_sent: reply.telegram?.sent });
+      // The report's Payment Received (amount), and what was recorded from it: the part no other payment that day covers.
+      else if (action === 'payment.report' && reply?.report_payment) Object.assign(details, { recorded: reply.report_payment.amount, was: reply.report_payment.before });
       else if (action === 'calls.replace') {
         // Each call as one line ("2026-10-22 14:37:25 · 19736517174"), and its day when they share one.
         const calls = Array.isArray(body?.calls) ? body.calls : [];

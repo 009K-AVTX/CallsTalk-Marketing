@@ -19,7 +19,10 @@
 //                                                from a Call Summary taken off their days' bills, one replacement each
 //   GET    /api/admin/users/:id/replaced-calls?from=&to=  calls replaced on those days (default the last 7), latest first
 //   DELETE /api/admin/users/:id/replaced-calls/:callId   puts a replaced call back on its day's bill
+//   GET    /api/admin/users/:id/call-days?from=&to=  each day's calls in the Call Summaries and in billing (default the last 7)
 //   POST   /api/admin/users/:id/payments         a payment received (bank transfer, USDT...)
+//   POST   /api/admin/users/:id/report-payments  { date, amount }: a billing report's Payment Received for the day, recorded
+//                                                as what is not recorded yet that day (setReportPayment)
 //   DELETE /api/admin/users/:id/payments/:paymentId
 //   GET    /api/admin/audit...                   the audit trail (audit.js)
 //   GET    /api/admin/finance                    billed, collected and owed across customers (finance.js)
@@ -39,8 +42,8 @@ import { emailInvite } from './email.js';
 import { contactsOf } from './contacts.js';
 import {
   addPayment, countReplacedCalls, createInvite, createUser, deleteDay, deletePayment, deleteUser, deleteUserSessions, getDay, getReportInfo,
-  findUserByEmail, findUserByNickname, getAccount, getUser, listAudit, listDays, listPayments, listReplacedCalls, getUserRow, listUserOptions, listUsersPage,
-  replaceCalls, saveAccount, saveDay, syncAllCallDays, undoReplacedCall, updateUser, withAdminLock,
+  findUserByEmail, findUserByNickname, getAccount, getUser, listAudit, listCallDays, listDays, listPayments, listReplacedCalls, getUserRow, listUserOptions,
+  listUsersPage, replaceCalls, saveAccount, saveDay, setReportPayment, syncAllCallDays, undoReplacedCall, updateUser, withAdminLock,
 } from './portal-db.js';
 import { HttpError } from './routes.js';
 
@@ -157,7 +160,9 @@ async function billingView(user) {
   const result = statement({ user, account, days, payments, from });
   // Each shown day's version, sent back with a change to it (concurrency control).
   const dayVersions = Object.fromEntries(days.filter((d) => d.date >= from).map((d) => [d.date, d.version]));
-  return { account, statement: result, replaced_calls: replaced, contacts, telegram, day_versions: dayVersions };
+  // Each day's payment taken from a billing report, so a report uploaded again is set against the others that day.
+  const reportPayments = Object.fromEntries(payments.filter((p) => p.report_day).map((p) => [localDate(p.paid_at, account.timezone), p.amount]));
+  return { account, statement: result, replaced_calls: replaced, contacts, telegram, day_versions: dayVersions, report_payments: reportPayments };
 }
 
 const userView = ({ password_hash: _p, totp_secret: _t, totp_last_step: _s, session_id: _i, ...u }) => u;
@@ -170,8 +175,8 @@ const STAFF_ROUTES = [
   ['GET', `/users/${ID}`], ['PATCH', `/users/${ID}`], ['POST', `/users/${ID}/invite`],
   ['GET', `/users/${ID}/billing`], ['PUT', `/users/${ID}/billing`], ['GET', `/users/${ID}/activity`],
   ['PUT', `/users/${ID}/days/[^/]+`], ['DELETE', `/users/${ID}/days/[^/]+`],
-  ['POST', `/users/${ID}/payments`], ['DELETE', `/users/${ID}/payments/[^/]+`],
-  ['GET', `/users/${ID}/replaced-calls`], ['POST', `/users/${ID}/replaced-calls`], ['DELETE', `/users/${ID}/replaced-calls/[^/]+`],
+  ['POST', `/users/${ID}/payments`], ['POST', `/users/${ID}/report-payments`], ['DELETE', `/users/${ID}/payments/[^/]+`],
+  ['GET', `/users/${ID}/call-days`], ['GET', `/users/${ID}/replaced-calls`], ['POST', `/users/${ID}/replaced-calls`], ['DELETE', `/users/${ID}/replaced-calls/[^/]+`],
 ].map(([method, path]) => [method, new RegExp(`^${path}$`)]);
 
 async function staffOnCustomers(req, res, next) {
@@ -420,6 +425,37 @@ adminRouter.post('/users/:id/payments', async (req, res) => {
     });
   }
   res.status(201).json({ user: userView(user), ...await billingView(user) });
+});
+
+// A billing report's Payment Received for a day. Only what the day does not already have (typed in, or a deposit) is
+// recorded, so the same money is never counted twice, and uploading the report again changes nothing more.
+adminRouter.post('/users/:id/report-payments', async (req, res) => {
+  const user = await loadCustomer(req);
+  const account = await getAccount(user.id);
+  if (!account) throw new HttpError(400, 'Set this customer\'s billing terms first.');
+  const body = req.body || {};
+  const date = day(body.date);
+  if (date < account.start_date) throw new HttpError(400, 'That day is before this customer\'s billing start date.');
+  if (date > localDate(new Date(), account.timezone)) throw new HttpError(400, 'Payments can only be recorded for today or earlier.');
+  const total = Number(amount(body.amount, 'payment received', { min: 0 }));
+  const saved = await setReportPayment(user.id, { date, total, currency: account.currency, timezone: account.timezone, paid_at: onDay(date, account.timezone) });
+  if (saved.amount > saved.before) {
+    paymentReceived(user.id, {
+      amount: (saved.amount - saved.before).toFixed(2), method: `From the billing report, by ${req.user.name || req.user.email}`, buyerMethod: 'Recorded by our team', on: date,
+    });
+  }
+  res.json({ user: userView(user), ...await billingView(user), report_payment: { date, ...saved } });
+});
+
+// Each day's calls from `from` to `to` (default the last 7 days): in the Call Summaries, and in billing. Days not billed
+// (no billing terms yet, or before billing starts) are listed too, so their calls are never out of sight.
+adminRouter.get('/users/:id/call-days', async (req, res) => {
+  const user = await loadCustomer(req);
+  const account = await getAccount(user.id);
+  const to = DAY.test(req.query.to || '') ? req.query.to : localDate(new Date(), account?.timezone || DEFAULT_TZ);
+  const from = DAY.test(req.query.from || '') ? req.query.from : addDays(to, -6);
+  if (from > to) throw new HttpError(400, 'The start date is after the end date.');
+  res.json({ results: await listCallDays(user.id, from, to), start_date: account?.start_date ?? null });
 });
 
 adminRouter.delete('/users/:id/payments/:paymentId', async (req, res) => {

@@ -802,18 +802,47 @@ Customers log in at **https://portal.callstalk.com** (the website's Log In goes 
   - **Billing Report**: for the team only. The customer never sees it and is not told about it. It is where an admin
     can enter calls in the customer's billing (next point). Reports uploaded before this change count as billing
     reports, so customers no longer see them.
-- **Calls from a billing report:** a report itself never changes the balance. When the team uploads one in the **Excel
-  Template** format (a **Daily Bills** sheet, or any sheet with **Date** and **Total Calls** columns) or the team's
-  **Financial Overview** format (a box per day titled "Oct 22, 2026 · Financial Overview", on one sheet or several,
-  whose **Total No.** is read as the calls: "125 - 2" is 125 calls, 2 replaced; it has no price, so each day keeps
-  the one billing has; its balances and payments are not read), the upload
-  form lists its days (calls, replacements, price) beside what the customer's billing has now: **New**,
-  **Changes**, **Same**, or **Skipped** with the reason (before billing started, a future day, a row that is not a
-  date). Tick **Enter these calls in the customer's billing** to save the new and changed days once the report has
-  uploaded. Each is saved as if entered on the customer's page, so it is in the Audit Log, and a day someone
-  changed meanwhile is left alone and named in the result. Payments in the file are never read (deposits come in
-  on their own; record others as usual). An empty or 0 price keeps the day's price. The file's days also set the
-  report's period. Staff can do this too.
+- **Calls and payments from a billing report:** a report itself never changes the balance. The upload form reads the
+  team's report layouts whatever their columns are called (`portal/src/billing-read.js`; labels are matched loosely,
+  so "Opening Balanace" and "Cloing Balance" are read too):
+  - **tables** with a Date column and a row per day: the **Excel Template** (**Daily Bills**), **Daily Report**,
+    **VGK**-style sheets (Lead, Replacement, Final Lead, Total, Closing Balance, Received), **Balance Data**
+    (Advance, Total No., Payment Received, Closing Balance) and the one-row Date / Opening Balance / Total No. /
+    Payment Received / Balance table. A balance on its own above the first day ("Due- $2173", "$420") is that
+    day's opening balance;
+  - **boxes** of labels and values, one per day: **Financial Overview** ("Oct 22, 2026 · Financial Overview"), the
+    dated statement (Calls, Missed, Price, Final Calls count, Advance, Payment Received, Advance) and **Leads &
+    Transactions**. The day is the box's Date row, or the date in its title;
+  - the **Account Summary** sent as a message ("Date : 19-10-2026", "Old Due : $ 2,350 /-", "Total Number : 70-1",
+    "Payment Received", "Total Due"), with the label and its value in one line. Old Due and Total Due are owed, so
+    they are negative balances, and dates with dashes are day first (05-10-2026 is Oct 5). Staff paste it
+    under **Paste a Report Sent as Text** (or choose a .txt file): it is uploaded as an Excel file with a line a row
+    (`textBook`), so the report viewer shows it as it was sent.
+
+  From each day it takes the calls ("125 - 2" is 125 calls with 2 replaced; a Final figure gives the replacements),
+  the price (or Total ÷ billable calls), the opening balance, the **Payment Received** and the closing balance. The
+  portal works balances out itself: **balance = opening + payment received − (calls − replacements) × price**, so a
+  report's own balances are only checked against that. A red balance typed without its minus sign is read as owed
+  when only that adds up; a day whose balance does not add up, or whose opening differs from billing's, is flagged.
+  The form lists each day beside what billing has now (**New**, **Changes**, **Same**, or **Skipped** with the
+  reason), with two ticks:
+  - **Enter these calls in the customer's billing** saves the new and changed days as if entered on the customer's
+    page (Audit Log; a day someone changed meanwhile is left alone and named in the result). A day billed from its
+    Call Summaries keeps the call log's count, so only its replacements can come from the report, and calls replaced
+    one by one stay replaced. An empty or 0 price keeps the day's price.
+  - **Record the payments received** records each day's Payment Received as the part that day does not already
+    have (typed in, a USDT deposit, or this report uploaded before), so the same money is never counted twice and
+    uploading the report again changes nothing more. It is one payment a day, "From the billing report", shown as
+    recorded by our team (`POST /api/admin/users/:id/report-payments`, column `billing_payments.report_day`, Audit
+    Log "Payment from a Billing Report").
+
+  If the report's title or file name names another buyer's nickname, the form says so. For a buyer with no billing
+  terms it offers **Start Billing From the Report** (its first day, opening balance and price). The file's days also
+  set the report's period. Staff can do this too.
+- **Calls on a buyer's page:** **Replaced Calls** opens with the chosen dates' **Calls**, **Replaced**, **Billable**
+  and **Charges**, and each Call Summary shows its calls. Calls in Call Summaries on days before billing starts are
+  counted apart ("not billed: before billing starts"). A new buyer's billing starts the day the login is made, so set
+  an earlier **Start Date** under Billing Terms to bill calls from before it (`GET /api/admin/users/:id/call-days`).
 - **Lost phone or forgotten password:** open the login → **Account** → **Danger Zone** → **Reset and Send Link**. Their old password and
   code app stop working at once.
 - **Someone leaves:** **Account** → **Danger Zone** → **Deactivate** signs them out everywhere and blocks logging in.

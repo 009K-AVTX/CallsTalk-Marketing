@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { isAdmin, loadSession } from '../../../src/lib/portal.js';
 import {
-  addPayment, clearDay, fetchActivity, fetchBilling, fetchReplacedCalls, getUser, isConflict, removePayment, removeUser, replaceCalls, saveDay, saveTerms,
+  addPayment, clearDay, fetchActivity, fetchBilling, fetchCallDays, fetchReplacedCalls, getUser, isConflict, removePayment, removeUser, replaceCalls, saveDay, saveTerms,
   sendLink, signedIn, TIME_ZONES, undoReplacedCall, updateUser,
 } from '../admin.js';
 import SheetViewer from '../components/SheetViewer.jsx';
@@ -277,6 +277,46 @@ const longDay = (iso) => dateOf(iso).toLocaleDateString('en-US', { weekday: 'lon
 const shortDay = (iso) => dateOf(iso).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
 const SUMMARIES_SHOWN = 8;
 
+// The calls on the chosen dates, from their Call Summaries and billing (fetchCallDays): all of them, those replaced (not
+// charged), those billed, and what they come to. Days with calls in the logs but not in billing (before billing starts,
+// or no billing terms yet) are counted apart. `load`: useLoad of fetchCallDays.
+function CallTotals({ load, currency }) {
+  if (!load.data) return load.error ? <ErrorNote error={load.error} onRetry={load.reload} /> : <div className="p-rc__totals is-skeleton" />;
+  const t = load.data.results.reduce((sum, d) => {
+    if (d.billed_calls === null) return { ...sum, unbilled: sum.unbilled + d.logged_calls };
+    return {
+      ...sum,
+      calls: sum.calls + d.billed_calls,
+      replaced: sum.replaced + d.billed_replacements,
+      charges: sum.charges + Math.round((d.billed_calls - d.billed_replacements) * Number(d.price_per_call) * 100),
+    };
+  }, { calls: 0, replaced: 0, charges: 0, unbilled: 0 });
+  return (
+    <div className={`p-rc__totals${load.loading ? ' is-refreshing' : ''}`}>
+      <span><small>Calls</small><b>{t.calls.toLocaleString('en-US')}</b></span>
+      <span><small>Replaced</small><b className={t.replaced ? 'is-warn' : ''}>{t.replaced.toLocaleString('en-US')}</b></span>
+      <span><small>Billable</small><b>{(t.calls - t.replaced).toLocaleString('en-US')}</b></span>
+      <span><small>Charges</small><b>{money(t.charges / 100, currency)}</b></span>
+      {t.unbilled > 0 && <small className="p-rc__unbilled is-warn">{plural(t.unbilled, 'more call')} in the Call Summaries, not billed: {load.data.start_date ? 'before billing starts' : 'no billing terms yet'}.</small>}
+    </div>
+  );
+}
+
+// A buyer with no billing terms yet: their Call Summaries' calls are kept, and shown here until billing starts.
+function UnbilledCalls({ id, onSignedOut }) {
+  const [range, setRange] = useState(() => presetRange('Last 30 Days'));
+  const callDays = useLoad(signedIn(onSignedOut, () => fetchCallDays(id, range)), [id, range.from, range.to]);
+  return (
+    <section className="p-card p-rc">
+      <header className="p-card__head">
+        <div><h2>Calls</h2></div>
+        <DateRange value={range} onChange={setRange} label="Dates of the calls" />
+      </header>
+      <CallTotals load={callDays} currency="USD" />
+    </section>
+  );
+}
+
 // Calls the buyer asked (in the portal chat) to have replaced. They ask a day or two after the calls (up to 48 hours,
 // and Friday's calls on Monday or Tuesday), so one date filter, on the days the calls were made, scopes the card:
 // the Call Summaries of those days, where the calls are ticked (SheetViewer pick), and the calls replaced on them.
@@ -292,13 +332,13 @@ function ReplacedCalls({ id, account, days, onSaved, onBilling, onSignedOut }) {
   const [all, setAll] = useState(false); // every Call Summary of the dates, not just the latest few
   const [changes, setChanges] = useState(0); // each replacement or put-back loads the list again
   const history = useLoad(signedIn(onSignedOut, () => fetchReplacedCalls(id, range)), [id, range.from, range.to, changes]);
+  // Each day's calls in the dates, billed or not; loaded again when the billing or the Call Summaries change.
+  const callDays = useLoad(signedIn(onSignedOut, () => fetchCallDays(id, range)), [id, range.from, range.to, changes, days, reports.data]);
   const [open, setOpen] = useState(null); // the Call Summary being picked from
   const [reading, setReading] = useState(null);
   const [error, setError] = useState('');
   const card = useRef(null);
 
-  const billed = (date) => days.find((d) => d.date === date);
-  const oldestShown = days.reduce((min, d) => (d.date < min ? d.date : min), today());
   // The Call Summaries with a day in the dates, the latest day first.
   const summaries = (reports.data || []).filter((r) => r.period_from <= range.to && r.period_to >= range.from)
     .sort((a, b) => b.period_to.localeCompare(a.period_to) || b.uploaded_at.localeCompare(a.uploaded_at));
@@ -352,12 +392,19 @@ function ReplacedCalls({ id, account, days, onSaved, onBilling, onSignedOut }) {
   }));
   const groups = [...found.reduce((m, c) => m.set(c.date, [...(m.get(c.date) || []), c]), new Map())];
 
-  // A one-day Call Summary's day as billing has it.
+  // A Call Summary's days (those in the dates) as billing has them, or why their calls are not billed.
   const dayNote = (r) => {
-    if (r.period_from !== r.period_to) return null;
-    const b = billed(r.period_from);
-    if (b) return <small>{plural(b.calls, 'call')} in billing{b.replacements > 0 && <>, <span className="is-warn">{b.replacements} replaced</span></>}</small>;
-    return r.period_from >= oldestShown ? <small className="is-warn">No calls in billing</small> : null;
+    if (!callDays.data) return null;
+    const own = callDays.data.results.filter((d) => d.date >= r.period_from && d.date <= r.period_to);
+    const billed = own.filter((d) => d.billed_calls !== null);
+    if (billed.length) {
+      const calls = billed.reduce((t, d) => t + d.billed_calls, 0);
+      const replaced = billed.reduce((t, d) => t + d.billed_replacements, 0);
+      return <small>{plural(calls, 'call')} in billing{replaced > 0 && <>, <span className="is-warn">{replaced} replaced</span></>}</small>;
+    }
+    const logged = own.reduce((t, d) => t + d.logged_calls, 0);
+    if (logged) return <small className="is-warn">{plural(logged, 'call')} logged, not billed: before billing starts</small>;
+    return <small className="is-warn">No calls in billing</small>;
   };
 
   return (
@@ -367,6 +414,7 @@ function ReplacedCalls({ id, account, days, onSaved, onBilling, onSignedOut }) {
         <DateRange value={range} onChange={chooseRange} min={account.start_date} label="Dates of the calls" />
       </header>
       <ErrorNote error={error || reports.error} onRetry={reports.error ? reports.reload : null} />
+      <CallTotals load={callDays} currency={account.currency} />
 
       <div className="p-rc__step">
         <h3 className="p-rc__title">Call Summaries{reports.data && <span className="p-pill">{summaries.length}</span>}</h3>
@@ -382,7 +430,8 @@ function ReplacedCalls({ id, account, days, onSaved, onBilling, onSignedOut }) {
                 <span className="p-rc__what">
                   <span>{r.title}</span>
                   <small>
-                    {[r.calls === null ? null : plural(r.calls, 'call'), r.replaced.length > 0 && `${r.replaced.length} replaced`, `uploaded ${when(r.uploaded_at)}`].filter(Boolean).join(' · ')}
+                    {r.calls !== null && <><b className="p-rc__count">{plural(r.calls, 'call')}</b> · </>}
+                    {[r.replaced.length > 0 && `${r.replaced.length} replaced`, `uploaded ${when(r.uploaded_at)}`].filter(Boolean).join(' · ')}
                   </small>
                   {r.calls === null && <small className="is-warn">Not in billing yet</small>}
                 </span>
@@ -688,7 +737,7 @@ export default function AdminUser({ id, onSignedOut }) {
                 <Calls id={id} account={billing.account} picked={picked} versions={billing.day_versions} days={s.days} onSaved={setBilling} onConflict={latest} />
                 <Ledger statement={s} onPick={(d) => { setPicked(d); window.scrollTo({ top: document.querySelector('.p-admin__calls')?.offsetTop ?? 0, behavior: 'smooth' }); }} />
               </>
-            ) : noBilling)}
+            ) : <>{noBilling}<UnbilledCalls id={id} onSignedOut={onSignedOut} /></>)}
             {tab === 'billing' && billing && (
               <>
                 <div className="p-grid">

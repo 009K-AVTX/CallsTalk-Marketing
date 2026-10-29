@@ -202,6 +202,10 @@ const SCHEMA = `
   ALTER TABLE portal_reports ADD COLUMN IF NOT EXISTS calls integer;
   -- A day whose calls come from its Call Summaries rather than being typed in.
   ALTER TABLE billing_days ADD COLUMN IF NOT EXISTS from_calls boolean NOT NULL DEFAULT false;
+  -- A payment taken from a billing report's Payment Received (setReportPayment): at most one a day per customer,
+  -- updated when the report is uploaded again.
+  ALTER TABLE billing_payments ADD COLUMN IF NOT EXISTS report_day date;
+  CREATE UNIQUE INDEX IF NOT EXISTS billing_payments_report_day ON billing_payments (user_id, report_day) WHERE report_day IS NOT NULL;
 
   -- Audit trail (audit.js): who did what, and when. One row per signed-in change, plus sign-ins, failed
   -- sign-ins and deposits. The person's email and role, and the target's name, are copied in when the row is
@@ -511,6 +515,28 @@ export const listPaymentsOf = (userIds) =>
 
 export const deletePayment = (userId, id) => pool.query('DELETE FROM billing_payments WHERE user_id = $1 AND id = $2', [userId, id]);
 
+// A billing report's Payment Received for a day (`total`): the part of it not already recorded that day in the
+// customer's time zone (typed in, or a deposit) is kept as one completed payment, which a later upload of the report
+// updates, or removes when nothing is left over. -> { amount: the report's payment now (0: none), before: what it was
+// (0: none), others: the day's other completed payments }
+export const setReportPayment = (userId, { date, total, currency, timezone, paid_at }) => inTransaction(async (db) => {
+  await db.query('SELECT 1 FROM billing_accounts WHERE user_id = $1 FOR UPDATE', [userId]);
+  const others = Number((await db.query(`SELECT coalesce(sum(amount), 0) AS sum FROM billing_payments
+    WHERE user_id = $1 AND status = 'completed' AND report_day IS DISTINCT FROM $2::date AND (paid_at AT TIME ZONE $3)::date = $2::date`,
+  [userId, date, timezone])).rows[0].sum);
+  const before = (await db.query('SELECT id, amount FROM billing_payments WHERE user_id = $1 AND report_day = $2 FOR UPDATE', [userId, date])).rows[0];
+  const amount = Math.max(0, Math.round((total - others) * 100)) / 100;
+  if (!amount) {
+    if (before) await db.query('DELETE FROM billing_payments WHERE id = $1', [before.id]);
+  } else if (!before) {
+    await db.query(`INSERT INTO billing_payments (user_id, amount, currency, status, note, paid_at, report_day)
+      VALUES ($1, $2, $3, 'completed', 'From the billing report', $4, $5)`, [userId, amount, currency, paid_at, date]);
+  } else if (Number(before.amount) !== amount) {
+    await db.query('UPDATE billing_payments SET amount = $2 WHERE id = $1', [before.id, amount]);
+  }
+  return { amount, before: before ? Number(before.amount) : 0, others };
+});
+
 // ── call records (report_calls) and replaced calls ───────────────────────────
 
 // Bills these days from the buyer's call records, inside the caller's transaction (`db`). A day is billed from them
@@ -583,6 +609,22 @@ export const deleteReportAndSync = (id) => inTransaction(async (db) => {
   await db.query('DELETE FROM portal_reports WHERE id = $1', [id]);
   return syncCallDays(db, report.user_id, dates);
 });
+
+// Each day from `from` to `to` with calls in the buyer's Call Summaries or in billing, whether billed or not (no billing
+// terms yet, or before billing starts): logged_calls are the distinct calls (time and caller) in the logs and the
+// replaced calls, as syncCallDays counts them; billed_calls and billed_replacements are what billing has (null: none).
+export const listCallDays = (userId, from, to) => all(`
+  WITH logged AS (
+    SELECT date, count(*)::int AS calls FROM (
+      SELECT date, called_at, caller FROM report_calls WHERE user_id = $1 AND date BETWEEN $2 AND $3
+      UNION SELECT date, called_at, caller FROM replaced_calls WHERE user_id = $1 AND date BETWEEN $2 AND $3) c
+    GROUP BY date),
+  replaced AS (SELECT date, count(*)::int AS calls FROM replaced_calls WHERE user_id = $1 AND date BETWEEN $2 AND $3 GROUP BY date),
+  billed AS (SELECT date, calls, replacements, price_per_call FROM billing_days WHERE user_id = $1 AND date BETWEEN $2 AND $3)
+  SELECT coalesce(l.date, b.date)::text AS date, coalesce(l.calls, 0) AS logged_calls, coalesce(r.calls, 0) AS replaced_calls,
+    b.calls AS billed_calls, b.replacements AS billed_replacements, b.price_per_call
+  FROM logged l FULL JOIN billed b ON b.date = l.date LEFT JOIN replaced r ON r.date = coalesce(l.date, b.date)
+  ORDER BY 1`, [userId, from, to]);
 
 // ── replaced calls ───────────────────────────────────────────────────────────
 
