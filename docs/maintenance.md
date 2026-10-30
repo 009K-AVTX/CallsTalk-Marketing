@@ -825,7 +825,7 @@ Customers log in at **https://portal.callstalk.com** (the website's Log In goes 
   report's own balances are only checked against that. A red balance typed without its minus sign is read as owed
   when only that adds up; a day whose balance does not add up, or whose opening differs from billing's, is flagged.
   The form lists each day beside what billing has now (**New**, **Changes**, **Same**, or **Skipped** with the
-  reason), with two ticks:
+  reason), with two ticks, both ticked when there is something to enter (unless the report names another buyer):
   - **Enter these calls in the customer's billing** saves the new and changed days as if entered on the customer's
     page (Audit Log; a day someone changed meanwhile is left alone and named in the result). A day billed from its
     Call Summaries keeps the call log's count, so only its replacements can come from the report, and calls replaced
@@ -837,8 +837,16 @@ Customers log in at **https://portal.callstalk.com** (the website's Log In goes 
     Log "Payment from a Billing Report").
 
   If the report's title or file name names another buyer's nickname, the form says so. For a buyer with no billing
-  terms it offers **Start Billing From the Report** (its first day, opening balance and price). The file's days also
-  set the report's period. Staff can do this too.
+  terms it offers **Start Billing From the Report** (its first day, opening balance and price). When the report has
+  calls or payments on days before the buyer's billing starts (a new buyer's billing starts the day the login is
+  made), those days are skipped and the form offers **Start Billing on (day)**: the report's first day with calls or
+  a payment, at the report's opening balance, keeping the price (`earlierStart` in `billing-import.js`). The message
+  after the upload says what went into billing ("1 day of calls entered, $1,500.00 recorded as received"). The file's
+  days also set the report's period. Staff can do this too.
+- **Viewing uploaded reports:** in the admin and staff **Reports** list (`ReportManager` in `Upload.jsx`) each report,
+  of either kind, has **View** (or click its title), Download and Delete. View opens the file as a table in the same
+  viewer buyers use for their Call Summaries (`SheetViewer`, a tab per sheet); billing reports still never reach
+  buyers.
 - **Calls on a buyer's page:** **Replaced Calls** opens with the chosen dates' **Calls**, **Replaced**, **Billable**
   and **Charges**, and each Call Summary shows its calls. Calls in Call Summaries on days before billing starts are
   counted apart ("not billed: before billing starts"). A new buyer's billing starts the day the login is made, so set

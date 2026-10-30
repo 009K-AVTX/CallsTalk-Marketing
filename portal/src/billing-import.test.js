@@ -2,7 +2,7 @@
 // Run with `npm test`.
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { planBillingDays, termsFrom, toEnter, toPay } from './billing-import.js';
+import { earlierStart, planBillingDays, termsFrom, toEnter, toPay } from './billing-import.js';
 import { settle } from './billing-read.js';
 
 const NOW = new Date('2026-10-29T16:00:00Z');
@@ -69,6 +69,25 @@ test('days before billing or in the future are skipped', () => {
     reportDay({ date: '2026-10-30', calls: 3, payment: 100 }),
   ], billing(), NOW);
   assert.deepEqual(plan.map((d) => [d.action, d.pay.action]), [['skip', 'skip'], ['skip', 'skip']]);
+});
+
+test('a report from before billing starts: an earlier start is offered on its first day with activity (RNY)', () => {
+  // The Excel template as filled in: empty days, then Oct 28 opening at $143 with 10 calls and $1,500 received.
+  const empty = (date) => reportDay({ date, calls: 0, price: null, opening: 0, payment: 0, closing: 0 });
+  const days = [...['2026-10-23', '2026-10-24', '2026-10-25', '2026-10-26', '2026-10-27'].map(empty),
+    reportDay({ date: '2026-10-28', calls: 10, price: '50.00', opening: 143, payment: 1500, closing: 1143 })];
+  const account = { timezone: 'America/New_York', start_date: '2026-10-29', price_per_call: '50.00', opening_balance: '143.00' };
+  const [d] = planBillingDays(days.slice(-1), billing({ account, statement: { days: [] }, day_versions: {}, report_payments: {} }), NOW);
+  assert.deepEqual([d.action, d.pay.action, d.pay.reason], ['skip', 'skip', 'before billing started']);
+  assert.deepEqual(earlierStart(days, account), { start_date: '2026-10-28', opening_balance: '143.00' });
+  assert.equal(earlierStart(days, { ...account, start_date: '2026-10-28' }), null);
+  assert.equal(earlierStart(days.slice(0, 5), account), null); // nothing to enter before the start
+  // Billing from Oct 28 instead: the calls and the $1,500 are entered.
+  const from28 = { ...account, start_date: '2026-10-28' };
+  const shown = { days: [{ date: '2026-10-28', calls: 0, replacements: 0, price_per_call: '50.00', opening_balance: '143.00', payment_received: '0.00', from_call_log: false }] };
+  const [e] = planBillingDays(days.slice(-1), billing({ account: from28, statement: shown, day_versions: {}, report_payments: {} }), NOW);
+  assert.deepEqual([e.action, e.save, e.pay.action, e.pay.amount], ['new', { calls: 10, replacements: 0 }, 'new', 1500]);
+  assert.deepEqual(e.checks, []);
 });
 
 test('terms suggested from a report for a buyer without billing', () => {

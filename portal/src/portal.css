@@ -148,6 +148,10 @@
 .p-up__grid { display: grid; grid-template-columns: minmax(0, 420px) minmax(0, 1fr); gap: 20px; align-items: start; }
 .p-up__form { margin-bottom: 0; }
 .p-up__file { display: block; font-size: .78rem; color: var(--slate); }
+/* Uploaded: the title opens the report, as View does */
+.p-up__open.p-linkbtn { color: var(--white); text-decoration: none; text-align: left; overflow-wrap: anywhere; }
+.p-up__open.p-linkbtn:hover { color: var(--accent); text-decoration: underline; }
+.p-up__tools { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
 /* Upload: Call Summary or Billing Report */
 .p-up__kind { display: grid; gap: 6px; justify-items: start; }
 .p-up__label { font-size: .8rem; font-weight: 500; letter-spacing: .01em; }

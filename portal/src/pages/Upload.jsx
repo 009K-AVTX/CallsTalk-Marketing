@@ -3,11 +3,12 @@ import { LogoMark } from '../../../src/components/Logo.jsx';
 import { isAdmin } from '../../../src/lib/portal.js';
 import { fetchBilling, saveTerms } from '../admin.js';
 import { Avatar } from '../avatar.jsx';
-import { enterBillingDays, planBillingDays, readBillingDays, termsFrom, toEnter, toPay } from '../billing-import.js';
+import { earlierStart, enterBillingDays, planBillingDays, readBillingDays, termsFrom, toEnter, toPay } from '../billing-import.js';
 import { namedIn, textBook } from '../billing-read.js';
 import { callsIn, readCallSummary } from '../call-summary.js';
 import Icon from '../components/Icons.jsx';
 import { ErrorNote } from '../components/Shell.jsx';
+import SheetViewer, { downloadReport } from '../components/SheetViewer.jsx';
 import { addDays, buyerName, dayLabel, money, today } from '../format.js';
 import {
   canNotify, deleteReport, KINDS, listAll, listCustomers, localKeyHint, MAX_MB, notifyReports, staffSession, staffSignIn, staffSignOut, staffSignInKind, uploadReport,
@@ -101,10 +102,14 @@ const balances = ({ opening, payment, closing }) => [opening !== null && `Opens 
 const ACTION = { new: ['New', 'is-wait'], change: ['Changes', 'is-warn'], same: ['Same', ''], skip: ['Skipped', 'is-off'], check: ['On Save', 'is-wait'] };
 const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
 
+// The days a report has calls or payments on that cannot be entered (before billing starts, or ahead of today):
+// "Oct 28, 2026 (before billing started)".
+const leftOut = (days) => days.map((d) => `${dayLabel(d.date)} (${(d.pay?.action === 'skip' && d.pay.reason) || d.reason})`).join(', ');
+
 // Admins: the days read from the chosen report (calls, and the payments received), set against what the buyer's
-// billing has, and the choice to enter them (billing-import.js). Nothing is saved unless it is ticked, and only once
-// the report has uploaded. `named`: buyers the report names when the chosen one is not among them. `onStart`: sets
-// billing terms from the report, for a buyer who has none.
+// billing has, and the choice to enter them (billing-import.js). Saved only once the report has uploaded, and only
+// what is ticked. `named`: buyers the report names when the chosen one is not among them. `onStart`: sets billing
+// terms from the report, for a buyer who has none or whose billing starts after the report's first day.
 function CallsFromFile({ read, billing, plan, enter, onEnter, pay, onPay, named, buyer, onStart }) {
   const [starting, setStarting] = useState(false);
   const [startError, setStartError] = useState('');
@@ -112,27 +117,33 @@ function CallsFromFile({ read, billing, plan, enter, onEnter, pay, onPay, named,
   const paying = plan ? toPay(plan) : [];
   const changed = todo.filter((d) => d.action === 'change').length;
   const unread = read.skipped;
-  const noTerms = billing?.data && !billing.data.account;
+  const account = billing?.data?.account;
+  const noTerms = billing?.data && !account;
   const suggested = noTerms ? termsFrom(read.days) : null;
+  const earlier = account ? earlierStart(read.days, account) : null;
+  const skippedCalls = plan ? plan.filter((d) => d.action === 'skip' && d.calls) : [];
+  const skippedPay = plan ? plan.filter((d) => d.pay?.action === 'skip' && d.payment) : [];
   let note;
   if (billing?.error) note = `The customer's billing could not be loaded: ${billing.error}`;
   else if (noTerms) note = 'This customer has no billing terms yet. Set them on their page first.';
   else if (!plan) note = 'Checking the customer\'s billing…';
+  else if (!todo.length && skippedCalls.length) note = `Nothing can be entered: ${leftOut(skippedCalls)}.`;
   else if (!todo.length) note = 'Nothing to change: the billing already has these figures.';
   else note = `${plural(todo.length, 'day')} to enter${changed ? `, ${changed} of them changing what is there` : ''}. Saved after the report uploads; each one is in the Audit Log.`;
   let payNote;
   if (!plan) payNote = noTerms ? 'Payments are recorded once billing terms are set.' : 'Checking the customer\'s payments…';
   else if (!plan.some((d) => d.pay)) payNote = 'The report shows no payments received.';
+  else if (!paying.length && skippedPay.length) payNote = `Nothing can be recorded: ${leftOut(skippedPay)}.`;
   else if (!paying.length) payNote = 'Nothing to record: the payments in the report are already in billing.';
   else {
     const sum = paying.reduce((t, d) => t + Number(d.pay.amount || 0), 0);
     payNote = `${money(sum)} over ${plural(paying.length, 'day')}. Only what a day does not already have (typed in, or a deposit) is recorded, so nothing is counted twice.`;
   }
-  const start = async () => {
+  const start = async (terms) => {
     setStarting(true);
     setStartError('');
     try {
-      await onStart(suggested);
+      await onStart(terms);
     } catch (err) {
       setStartError(err.message);
     } finally {
@@ -150,7 +161,17 @@ function CallsFromFile({ read, billing, plan, enter, onEnter, pay, onPay, named,
           <small className="p-import__why">
             The report starts on <b>{dayLabel(suggested.start_date)}</b> with an opening balance of <b>{money(suggested.opening_balance)}</b> at <b>{money(suggested.price_per_call)}</b> a call.
           </small>
-          <button type="button" className="btn btn--quiet btn--sm" disabled={starting} onClick={start}>{starting ? 'Saving…' : 'Start Billing From the Report'}</button>
+          <button type="button" className="btn btn--quiet btn--sm" disabled={starting} onClick={() => start(suggested)}>{starting ? 'Saving…' : 'Start Billing From the Report'}</button>
+          {startError && <small className="p-import__why is-warn">{startError}</small>}
+        </div>
+      )}
+      {earlier && (
+        <div className="p-import__start">
+          <small className="p-import__why is-warn">
+            {buyer}'s billing starts on <b>{dayLabel(account.start_date)}</b>, so the report's days before it are left out.
+            Start billing on <b>{dayLabel(earlier.start_date)}</b> with the report's opening balance of <b>{money(earlier.opening_balance)}</b> (now {money(account.opening_balance)} on {dayLabel(account.start_date)}) to enter them.
+          </small>
+          <button type="button" className="btn btn--quiet btn--sm" disabled={starting} onClick={() => start(earlier)}>{starting ? 'Saving…' : `Start Billing on ${dayLabel(earlier.start_date)}`}</button>
           {startError && <small className="p-import__why is-warn">{startError}</small>}
         </div>
       )}
@@ -275,17 +296,18 @@ function UploadForm({ customers, onDone }) {
     return () => { gone = true; };
   }, [canEnterCalls, kind, chosen?.id, read, termsSet]);
   const plan = useMemo(() => (kind === 'billing' && read && billing?.data?.account ? planBillingDays(read.days, billing.data) : null), [kind, read, billing]);
-  // A new file or buyer: ticked again only after a look at the days.
-  useEffect(() => {
-    setEnterCalls(false);
-    setEnterPayments(false);
-  }, [plan]);
   // Buyers the report names ("VGK", "P30-Balance Data") when the chosen one is not among them.
   const named = useMemo(() => {
     if (!read || !chosen?.nickname) return [];
     const found = namedIn(read.titles, customers.map((c) => c.nickname).filter((n) => n && n.length > 1));
     return found.some((n) => n.toUpperCase() === chosen.nickname.toUpperCase()) ? [] : found;
   }, [read, chosen?.nickname, customers]);
+  // A new file or buyer: what can be entered is ticked, with the days shown above the Upload button; nothing is when
+  // the report names another buyer.
+  useEffect(() => {
+    setEnterCalls(Boolean(plan) && !named.length && toEnter(plan).length > 0);
+    setEnterPayments(Boolean(plan) && !named.length && toPay(plan).length > 0);
+  }, [plan, named]);
   const startBilling = async (terms) => {
     await saveTerms(chosen.id, terms);
     setTermsSet((n) => n + 1);
@@ -325,12 +347,14 @@ function UploadForm({ customers, onDone }) {
         uploaded.push(await uploadReport({ ...form, kind, title: single || '', file, calls }));
       }
       const who = chosen ? buyerName(chosen) : form.customer.trim().toLowerCase();
-      // Only what went wrong is added to the message.
+      // Added to the message: what went into billing, and what went wrong.
       let notes = '';
       const calls = enterCalls && plan && toEnter(plan).length > 0;
       const payments = enterPayments && plan && toPay(plan).length > 0;
       if (kind === 'billing' && (calls || payments)) {
-        const { failed } = await enterBillingDays(form.customer, plan, dayLabel, { calls, payments });
+        const { saved, paid, received, failed } = await enterBillingDays(form.customer, plan, dayLabel, { calls, payments });
+        const done = [saved && `${plural(saved, 'day')} of calls entered`, paid && `${money(received)} recorded as received`].filter(Boolean);
+        if (done.length) notes += ` In billing: ${done.join(', ')}.`;
         if (failed.length) notes += ` Not entered in billing: ${failed.join('; ')}.`;
       }
       const telegram = byTelegram && telegramReady;
@@ -448,13 +472,16 @@ function UploadForm({ customers, onDone }) {
   );
 }
 
-// Customer reports: upload, list and remove. Shown inside the admin and staff portal (Reports in the top bar),
-// and on the standalone /upload page (demo and local key sign-in). `onSignedOut` runs when the session ends.
+// Customer reports: upload, list, view and remove. Shown inside the admin and staff portal (Reports in the top bar),
+// and on the standalone /upload page (demo and local key sign-in). Either kind opens as a table in the viewer, as a
+// buyer sees their Call Summaries. `onSignedOut` runs when the session ends.
 export function ReportManager({ onSignedOut }) {
   const [reports, setReports] = useState(null);
   const [customers, setCustomers] = useState([]);
   const [error, setError] = useState('');
   const [filter, setFilter] = useState('');
+  const [open, setOpen] = useState(null);
+  const close = useCallback(() => setOpen(null), []);
 
   const load = useCallback(async () => {
     try {
@@ -497,7 +524,7 @@ export function ReportManager({ onSignedOut }) {
           </header>
           <div className="p-tablewrap">
             <table className="p-table">
-              <thead><tr><th scope="col">Customer</th><th scope="col">Report</th><th scope="col">Period</th><th scope="col">Added</th><th scope="col"><span className="sr-only">Delete</span></th></tr></thead>
+              <thead><tr><th scope="col">Customer</th><th scope="col">Report</th><th scope="col">Period</th><th scope="col">Added</th><th scope="col"><span className="sr-only">View, download or delete</span></th></tr></thead>
               <tbody>
                 {shown.map((r) => (
                   <tr key={r.id}>
@@ -507,10 +534,19 @@ export function ReportManager({ onSignedOut }) {
                         {r.customer_name || r.customer}
                       </span>
                     </th>
-                    <td>{r.title}<small className="p-up__file">{KINDS[r.kind] || KINDS.billing} · {r.filename} · {fileSize(r.size)}</small></td>
+                    <td>
+                      <button type="button" className="p-linkbtn p-up__open" onClick={() => setOpen(r)}>{r.title}</button>
+                      <small className="p-up__file">{KINDS[r.kind] || KINDS.billing} · {r.filename} · {fileSize(r.size)}</small>
+                    </td>
                     <td>{period(r)}</td>
                     <td>{new Date(r.uploaded_at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}</td>
-                    <td><button type="button" className="p-iconbtn" aria-label={`Delete ${r.title}`} onClick={() => remove(r)}><Icon name="close" /></button></td>
+                    <td>
+                      <span className="p-up__tools">
+                        <button type="button" className="btn btn--quiet btn--sm" onClick={() => setOpen(r)}>View</button>
+                        <button type="button" className="p-iconbtn" aria-label={`Download ${r.filename}`} onClick={() => downloadReport(r).catch((e) => setError(e.message))}><Icon name="download" /></button>
+                        <button type="button" className="p-iconbtn" aria-label={`Delete ${r.title}`} onClick={() => remove(r)}><Icon name="close" /></button>
+                      </span>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -519,6 +555,7 @@ export function ReportManager({ onSignedOut }) {
           </div>
         </section>
       </div>
+      {open && <SheetViewer report={open} onClose={close} />}
     </>
   );
 }

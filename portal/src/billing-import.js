@@ -101,19 +101,37 @@ export function planBillingDays(days, billing, now = new Date()) {
 export const toEnter = (plan) => plan.filter((d) => d.action === 'new' || d.action === 'change');
 export const toPay = (plan) => plan.filter((d) => ['new', 'change', 'check'].includes(d.pay?.action));
 
+// The report's first day with an opening balance (and a price, when `priced`), preferring one with calls or a payment:
+// the template's empty days before it ("0" all along) need no billing.
+function openingDay(days, priced) {
+  const set = days.filter((x) => x.opening !== null && (!priced || x.price || x.implied_price));
+  return set.find((x) => x.calls || x.payment) || set[0] || null;
+}
+
 // Billing terms suggested by a report for a buyer who has none: from its first day with an opening balance and a price.
 // -> { start_date, opening_balance, price_per_call } or null.
 export function termsFrom(days) {
-  const d = days.find((x) => x.opening !== null && (x.price || x.implied_price));
+  const d = openingDay(days, true);
   return d ? { start_date: d.date, opening_balance: d.opening.toFixed(2), price_per_call: Number(d.price || d.implied_price).toFixed(2) } : null;
 }
 
+// A report whose days start before the buyer's billing does (billing started the day their login was made, say): the
+// earlier start it suggests, on its first day with the report's opening balance, so its calls and payments can be
+// entered. -> { start_date, opening_balance } (the price stays the account's) or null.
+export function earlierStart(days, account) {
+  const before = account ? days.filter((x) => x.date < account.start_date) : [];
+  const d = before.some((x) => x.calls || x.payment) && openingDay(before, false);
+  return d ? { start_date: d.date, opening_balance: d.opening.toFixed(2) } : null;
+}
+
 // Saves the ticked parts of the plan: the new and changed days' calls first, then the days' payments, one at a time.
-// -> { saved, paid, failed: ["Oct 19, 2026: why", …] }. `label`: a day's date as shown. One day failing leaves the others.
+// -> { saved, paid, received, failed: ["Oct 19, 2026: why", …] }: days saved, payments saved and what they came to
+// (only what each day did not have already). `label`: a day's date as shown. One day failing leaves the others.
 export async function enterBillingDays(customerId, plan, label, { calls = true, payments = false } = {}) {
   const { isConflict, saveDay, saveReportPayment } = await import('./admin.js');
   let saved = 0;
   let paid = 0;
+  let received = 0;
   const failed = [];
   for (const d of calls ? toEnter(plan) : []) {
     try {
@@ -125,11 +143,12 @@ export async function enterBillingDays(customerId, plan, label, { calls = true, 
   }
   for (const d of payments ? toPay(plan) : []) {
     try {
-      await saveReportPayment(customerId, d.date, d.payment);
+      const { report_payment: saved = {} } = await saveReportPayment(customerId, d.date, d.payment);
       paid++;
+      received += Math.max(0, Number(saved.amount ?? d.pay.amount ?? 0) - Number(saved.before ?? d.pay.was ?? 0));
     } catch (err) {
       failed.push(`${label(d.date)} payment: ${err.message}`);
     }
   }
-  return { saved, paid, failed };
+  return { saved, paid, received, failed };
 }
