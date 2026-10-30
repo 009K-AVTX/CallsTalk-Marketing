@@ -15,8 +15,9 @@
 // A report is one of two kinds. A billing report ('billing') is for the team: an admin can enter its calls in the
 // buyer's billing with the upload (portal/src/billing-import.js), and the buyer never sees it. A Call Summary ('calls'),
 // the day's call log, is what the buyer views and downloads, and what they are told about. Its calls come with it
-// ([{ date, called_at, caller, duration }], read as its viewer shows them: call-summary.js callOf) and bill their
-// days: each day's calls are counted from the buyer's logs (portal-db.js syncCallDays). Replies that change billing
+// ([{ date, called_at, caller, duration, call_time, number_called }], read as its viewer shows them: call-summary.js
+// callOf) and bill their days: each day's calls are counted from all the buyer's logs, for every toll-free number
+// (portal-db.js syncCallDays). Replies that change billing
 // say how, in `billing_days`: [{ date, before, after }].
 
 import { Router } from 'express';
@@ -45,13 +46,18 @@ const KINDS = ['billing', 'calls'];
 const MAX_CALLS = 5000;
 
 const text = (v, max) => (typeof v === 'string' ? v.trim().slice(0, max) : '');
+const CALL_TIME = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/;
 const dayText = (iso) => new Date(`${iso}T12:00:00Z`).toLocaleDateString('en-US', { timeZone: 'UTC', month: 'short', day: 'numeric', year: 'numeric' });
 
-// A Call Summary's calls as sent, checked: each on a day the report covers.
+// A Call Summary's calls as sent, checked: each on a day the report covers. A portal from before calls kept their
+// time to the second and number called sends neither.
 function callsOf(list, from, to) {
   if (list.length > MAX_CALLS) throw new HttpError(400, `A Call Summary can list up to ${MAX_CALLS.toLocaleString('en-US')} calls.`);
   return list.map((c) => {
-    const call = { date: c?.date, called_at: text(c?.called_at, 40), caller: text(c?.caller, 40), duration: text(c?.duration, 20) };
+    const call = {
+      date: c?.date, called_at: text(c?.called_at, 40), caller: text(c?.caller, 40), duration: text(c?.duration, 20),
+      call_time: CALL_TIME.test(c?.call_time) ? c.call_time : '', number_called: /^\d{11}$/.test(c?.number_called) ? c.number_called : '',
+    };
     if (!DAY.test(call.date || '') || !call.called_at) throw new HttpError(400, 'The calls in this file could not be read. Choose the file again.');
     if (call.date < from || call.date > to) {
       throw new HttpError(400, `The file has calls on ${dayText(call.date)}, outside the days chosen (${dayText(from)}${to === from ? '' : ` to ${dayText(to)}`}).`);
@@ -59,6 +65,9 @@ function callsOf(list, from, to) {
     return call;
   });
 }
+
+// Whether calls were read with their time to the second and number called (each has the fields, '' when the log lacks one).
+const readExactly = (list) => list.every((c) => typeof c?.call_time === 'string' && typeof c?.number_called === 'string');
 
 export const portalRouter = Router();
 
@@ -74,7 +83,8 @@ portalRouter.get('/billing/statement', requireUser('customer'), async (req, res)
     ...statement({ user: req.user, account, days, payments, from }),
     // The calls our team replaced at their request on these days, without who did it.
     replaced_calls: replaced.map((c) => ({
-      date: c.date, called_at: c.called_at, caller: c.caller, duration: c.duration, reason: c.reason, replaced_at: c.created_at,
+      date: c.date, called_at: c.called_at, caller: c.caller, duration: c.duration, call_time: c.call_time, number_called: c.number_called,
+      reason: c.reason, replaced_at: c.created_at,
     })),
   });
 });
@@ -147,7 +157,7 @@ staff.post('/reports', async (req, res) => {
   const report = await addReport({
     userId: customer.id, kind: body.kind, title, note, periodFrom: body.period_from, periodTo: body.period_to, filename, contentType: TYPES[ext], content,
   });
-  const billingDays = calls ? await setReportCalls(report, calls) : [];
+  const billingDays = calls ? await setReportCalls(report, calls, readExactly(body.calls)) : [];
   res.status(201).json({ ...report, calls: calls ? calls.length : report.calls, billing_days: billingDays });
 });
 
@@ -156,8 +166,8 @@ staff.put('/reports/:id/calls', async (req, res) => {
   const report = UUID.test(req.params.id) && await getReportInfo(req.params.id);
   if (!report) throw new HttpError(404, 'That report no longer exists.');
   if (report.kind !== 'calls') throw new HttpError(400, 'Only a Call Summary\'s calls are read into billing.');
-  const calls = callsOf(Array.isArray(req.body?.calls) ? req.body.calls : [], report.period_from, report.period_to);
-  const billingDays = await setReportCalls(report, calls);
+  const sent = Array.isArray(req.body?.calls) ? req.body.calls : [];
+  const billingDays = await setReportCalls(report, callsOf(sent, report.period_from, report.period_to), readExactly(sent));
   res.json({ ...await getReportInfo(report.id), billing_days: billingDays });
 });
 

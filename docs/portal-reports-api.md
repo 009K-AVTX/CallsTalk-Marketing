@@ -19,8 +19,8 @@ Sign-in, billing and payments use the endpoints in [customer-billing-api.md](cus
 {
   "id": "7c1d…", "customer": "bills@q32.com", "kind": "calls", "title": "Call Summary, 72 calls",
   "note": "", "period_from": "2026-10-26", "period_to": "2026-10-26",
-  "filename": "C4V - 72.xlsx", "size": 11516, "uploaded_at": "2026-10-27T14:48:00Z", "calls": 72,
-  "replaced": [{ "called_at": "2026-10-26 15:22:51", "caller": "5743447831" }]
+  "filename": "C4V - 72.xlsx", "size": 11516, "uploaded_at": "2026-10-27T14:48:00Z", "calls": 72, "calls_exact": true,
+  "replaced": [{ "called_at": "10/26/26 15:22", "caller": "5743447831", "call_time": "2026-10-26 15:22:51", "number_called": "18779642010" }]
 }
 ```
 
@@ -47,7 +47,7 @@ The upload page signs in with `POST /accounts/login` (staff account) and sends t
 | `PUT /staff/reports/{id}/calls` | `{ calls }` → the report and `billing_days`: a Call Summary's calls read now (one uploaded before calls were read) |
 | `DELETE /staff/reports/{id}` | `{ "ok": true, "billing_days": […] }`; the customer stops seeing it, and its calls come off their billing |
 
-A Call Summary's `calls` (`[{ date, called_at, caller, duration }]`, up to 5,000, each on a day from `period_from` to `period_to`) are read in the browser exactly as the report viewer reads the file (`portal/src/call-summary.js` `callsIn`). They bill their days: a day's calls become every distinct call (time and caller) in the buyer's Call Summaries for that day, with their replaced calls, so a second or corrected log never counts a call twice. Such a day cannot be typed over on the customer's page; a corrected log, or deleting the wrong one, changes it. `billing_days`: `[{ date, before, after }]` for each day whose calls changed (`null`: none). The Audit Log keeps the same.
+A Call Summary's `calls` (`[{ date, called_at, caller, duration, call_time, number_called }]`, up to 5,000, each on a day from `period_from` to `period_to`) are read in the browser exactly as the report viewer reads the file (`portal/src/call-summary.js` `callsIn`). `called_at` is the time as the viewer shows it (to the minute for Excel logs); `call_time` is the same time to the second (`YYYY-MM-DD HH:MM:SS`, from the cell as stored) and `number_called` the toll-free number the call came in on (11 digits); either is `''` when the log lacks it. They bill their days: a day's calls become every distinct call (time to the second, caller and number called) in all the buyer's Call Summaries for that day, whichever toll-free number each log is for, with their replaced calls, so logs for several numbers add up, a caller who called twice in one minute counts twice, and a second or corrected log never counts a call twice. Calls read before seconds and numbers were kept (`call_time` `''`) are their minute and caller, and are left out of a day where a call read since has that minute and caller; `calls_exact` is false for such a Call Summary, and **Read Again** on the buyer's page reads it again. Such a day cannot be typed over on the customer's page; a corrected log, or deleting the wrong one, changes it. `billing_days`: `[{ date, before, after }]` for each day whose calls changed (`null`: none). The Audit Log keeps the same.
 
 For `POST`:
 - `customer` is the buyer `id` from `/staff/customers`.

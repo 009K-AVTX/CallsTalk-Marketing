@@ -26,7 +26,10 @@ export const callsLabel = (day) => (day.replacements
   : day.calls.toLocaleString('en-US'));
 
 // A call's time as its log gives it, without the day when the log writes that too ("2026-10-26 11:17:24" -> "11:17:24").
-export const callTime = (call) => (call.called_at.startsWith(`${call.date} `) ? call.called_at.slice(call.date.length + 1) : call.called_at);
+export const callTime = (call) => {
+  const at = call.call_time || call.called_at; // to the second when the log was read with it
+  return at.startsWith(`${call.date} `) ? at.slice(call.date.length + 1) : at;
+};
 
 // The day's bill: the Telegram picture's four lines, plus the price and what the calls came to.
 export function Statement({ day, currency }) {
@@ -296,8 +299,8 @@ export function BillingSections({ data, onPaid }) {
           </div>
           <ul>
             {data.replaced_calls.map((c) => (
-              <li key={`${c.date} ${c.called_at} ${c.caller}`}>
-                <span>{dayLabel(c.date)} · {callTime(c)}<small>{[c.caller, c.duration, c.reason].filter(Boolean).join(' · ')}</small></span>
+              <li key={`${c.date} ${c.called_at} ${c.caller} ${c.call_time} ${c.number_called}`}>
+                <span>{dayLabel(c.date)} · {callTime(c)}<small>{[c.caller, c.number_called && `to ${c.number_called}`, c.duration, c.reason].filter(Boolean).join(' · ')}</small></span>
                 <span className="billing__status is-completed">Replaced</span>
                 <b>Not charged</b>
               </li>

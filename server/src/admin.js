@@ -15,11 +15,13 @@
 //   PUT    /api/admin/users/:id/days/:date       a day's calls and replacements (not charged); price defaults to the current one.
 //                                                A day billed from its Call Summaries keeps their calls (portal.js)
 //   DELETE /api/admin/users/:id/days/:date
-//   POST   /api/admin/users/:id/replaced-calls   { report, calls: [{ date, called_at, caller, duration }], reason }: calls
+//   POST   /api/admin/users/:id/replaced-calls   { report, calls: [{ date, called_at, caller, duration, call_time,
+//                                                number_called }], reason }: calls
 //                                                from a Call Summary taken off their days' bills, one replacement each
 //   GET    /api/admin/users/:id/replaced-calls?from=&to=  calls replaced on those days (default the last 7), latest first
 //   DELETE /api/admin/users/:id/replaced-calls/:callId   puts a replaced call back on its day's bill
-//   GET    /api/admin/users/:id/call-days?from=&to=  each day's calls in the Call Summaries and in billing (default the last 7)
+//   GET    /api/admin/users/:id/call-days?from=&to=  each day's calls in the Call Summaries and in billing (default the last 7),
+//                                                and by toll-free number called
 //   POST   /api/admin/users/:id/payments         a payment received (bank transfer, USDT...)
 //   POST   /api/admin/users/:id/report-payments  { date, amount }: a billing report's Payment Received for the day, recorded
 //                                                as what is not recorded yet that day (setReportPayment)
@@ -43,7 +45,7 @@ import { contactsOf } from './contacts.js';
 import {
   addPayment, countReplacedCalls, createInvite, createUser, deleteDay, deletePayment, deleteUser, deleteUserSessions, getDay, getReportInfo,
   findUserByEmail, findUserByNickname, getAccount, getUser, listAudit, listCallDays, listDays, listPayments, listReplacedCalls, getUserRow, listUserOptions,
-  listUsersPage, replaceCalls, saveAccount, saveDay, setReportPayment, syncAllCallDays, undoReplacedCall, updateUser, withAdminLock,
+  listCallNumbers, listUsersPage, replaceCalls, saveAccount, saveDay, setReportPayment, syncAllCallDays, undoReplacedCall, updateUser, withAdminLock,
 } from './portal-db.js';
 import { HttpError } from './routes.js';
 
@@ -56,6 +58,9 @@ const CURRENCIES = ['USD'];
 const DEFAULT_TZ = 'America/New_York';
 
 const str = (v, max) => (typeof v === 'string' ? v.trim().slice(0, max) : '');
+// A call's time to the second ("2026-10-26 15:22:51") and toll-free number called, as the portal read them ('' when not).
+const CALL_TIME = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/;
+const exactOf = (c) => ({ call_time: CALL_TIME.test(c?.call_time) ? c.call_time : '', number_called: /^\d{11}$/.test(c?.number_called) ? c.number_called : '' });
 const dayText = (iso) => new Date(`${iso}T12:00:00Z`).toLocaleDateString('en-US', { timeZone: 'UTC', month: 'short', day: 'numeric', year: 'numeric' });
 
 // Concurrency control: a change carries the `version` it was made from (portal-db.js). Left out, the change
@@ -378,7 +383,7 @@ adminRouter.post('/users/:id/replaced-calls', async (req, res) => {
   if (list.length > 500) throw new HttpError(400, 'Replace up to 500 calls at a time.');
   const today = localDate(new Date(), account.timezone);
   const calls = list.map((c) => {
-    const call = { date: day(c?.date, 'call day'), called_at: str(c?.called_at, 40), caller: str(c?.caller, 40), duration: str(c?.duration, 20) };
+    const call = { date: day(c?.date, 'call day'), called_at: str(c?.called_at, 40), caller: str(c?.caller, 40), duration: str(c?.duration, 20), ...exactOf(c) };
     if (!call.called_at) throw new HttpError(400, 'Each call needs its time, as the Call Summary shows it.');
     if (call.date < report.period_from || call.date > report.period_to) throw new HttpError(400, `A call on ${dayText(call.date)} is outside the days this Call Summary covers.`);
     if (call.date < account.start_date || call.date > today) throw new HttpError(400, `Calls on ${dayText(call.date)} are not billed.`);
@@ -448,14 +453,16 @@ adminRouter.post('/users/:id/report-payments', async (req, res) => {
 });
 
 // Each day's calls from `from` to `to` (default the last 7 days): in the Call Summaries, and in billing. Days not billed
-// (no billing terms yet, or before billing starts) are listed too, so their calls are never out of sight.
+// (no billing terms yet, or before billing starts) are listed too, so their calls are never out of sight. `numbers`:
+// the same calls by day and toll-free number called, for a buyer with several.
 adminRouter.get('/users/:id/call-days', async (req, res) => {
   const user = await loadCustomer(req);
   const account = await getAccount(user.id);
   const to = DAY.test(req.query.to || '') ? req.query.to : localDate(new Date(), account?.timezone || DEFAULT_TZ);
   const from = DAY.test(req.query.from || '') ? req.query.from : addDays(to, -6);
   if (from > to) throw new HttpError(400, 'The start date is after the end date.');
-  res.json({ results: await listCallDays(user.id, from, to), start_date: account?.start_date ?? null });
+  const [results, numbers] = await Promise.all([listCallDays(user.id, from, to), listCallNumbers(user.id, from, to)]);
+  res.json({ results, numbers, start_date: account?.start_date ?? null });
 });
 
 adminRouter.delete('/users/:id/payments/:paymentId', async (req, res) => {

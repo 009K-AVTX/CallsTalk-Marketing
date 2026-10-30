@@ -6,7 +6,7 @@ import {
 } from '../admin.js';
 import SheetViewer from '../components/SheetViewer.jsx';
 import DateRange, { presetRange } from '../components/DateRange.jsx';
-import { callsIn } from '../call-summary.js';
+import { callsIn, numberLabel } from '../call-summary.js';
 import { fetchFile, listCallSummariesOf, setReportCalls } from '../reports.js';
 import { actor, describe, failed, groupOf, outcome, stamp } from '../audit-text.js';
 import Icon from '../components/Icons.jsx';
@@ -279,7 +279,9 @@ const SUMMARIES_SHOWN = 8;
 
 // The calls on the chosen dates, from their Call Summaries and billing (fetchCallDays): all of them, those replaced (not
 // charged), those billed, and what they come to. Days with calls in the logs but not in billing (before billing starts,
-// or no billing terms yet) are counted apart. `load`: useLoad of fetchCallDays.
+// or no billing terms yet) are counted apart. Below them, the same calls by toll-free number called: each number's
+// calls in the Call Summaries, those replaced, and what the billed days charge for them at their day's price; the
+// numbers add up to the day's calls, as each call is counted once. `load`: useLoad of fetchCallDays.
 function CallTotals({ load, currency }) {
   if (!load.data) return load.error ? <ErrorNote error={load.error} onRetry={load.reload} /> : <div className="p-rc__totals is-skeleton" />;
   const t = load.data.results.reduce((sum, d) => {
@@ -291,14 +293,42 @@ function CallTotals({ load, currency }) {
       charges: sum.charges + Math.round((d.billed_calls - d.billed_replacements) * Number(d.price_per_call) * 100),
     };
   }, { calls: 0, replaced: 0, charges: 0, unbilled: 0 });
+  const price = new Map(load.data.results.filter((d) => d.billed_calls !== null).map((d) => [d.date, Number(d.price_per_call)]));
+  const numbers = [...(load.data.numbers || []).reduce((m, r) => {
+    const n = m.get(r.number_called) || { calls: 0, replaced: 0, charges: 0 };
+    const charges = price.has(r.date) ? Math.round((r.calls - r.replaced) * price.get(r.date) * 100) : 0;
+    return m.set(r.number_called, { calls: n.calls + r.calls, replaced: n.replaced + r.replaced, charges: n.charges + charges });
+  }, new Map())].sort(([a], [b]) => (a === '') - (b === '') || a.localeCompare(b)); // calls read before numbers were kept last
   return (
-    <div className={`p-rc__totals${load.loading ? ' is-refreshing' : ''}`}>
-      <span><small>Calls</small><b>{t.calls.toLocaleString('en-US')}</b></span>
-      <span><small>Replaced</small><b className={t.replaced ? 'is-warn' : ''}>{t.replaced.toLocaleString('en-US')}</b></span>
-      <span><small>Billable</small><b>{(t.calls - t.replaced).toLocaleString('en-US')}</b></span>
-      <span><small>Charges</small><b>{money(t.charges / 100, currency)}</b></span>
-      {t.unbilled > 0 && <small className="p-rc__unbilled is-warn">{plural(t.unbilled, 'more call')} in the Call Summaries, not billed: {load.data.start_date ? 'before billing starts' : 'no billing terms yet'}.</small>}
-    </div>
+    <>
+      <div className={`p-rc__totals${load.loading ? ' is-refreshing' : ''}`}>
+        <span><small>Calls</small><b>{t.calls.toLocaleString('en-US')}</b></span>
+        <span><small>Replaced</small><b className={t.replaced ? 'is-warn' : ''}>{t.replaced.toLocaleString('en-US')}</b></span>
+        <span><small>Billable</small><b>{(t.calls - t.replaced).toLocaleString('en-US')}</b></span>
+        <span><small>Charges</small><b>{money(t.charges / 100, currency)}</b></span>
+        {t.unbilled > 0 && <small className="p-rc__unbilled is-warn">{plural(t.unbilled, 'more call')} in the Call Summaries, not billed: {load.data.start_date ? 'before billing starts' : 'no billing terms yet'}.</small>}
+      </div>
+      {numbers.some(([n]) => n) && (
+        <div className={`p-tablewrap p-rc__numbers${load.loading ? ' is-refreshing' : ''}`}>
+          <table className="p-table">
+            <thead>
+              <tr><th scope="col">Number Called</th><th scope="col">Calls</th><th scope="col">Replaced</th><th scope="col">Billable</th><th scope="col">Charges</th></tr>
+            </thead>
+            <tbody>
+              {numbers.map(([number, n]) => (
+                <tr key={number}>
+                  <th scope="row">{number ? numberLabel(number) : <span className="is-warn">Not read yet (Read Again)</span>}</th>
+                  <td>{n.calls.toLocaleString('en-US')}</td>
+                  <td className={n.replaced ? 'is-warn' : ''}>{n.replaced.toLocaleString('en-US')}</td>
+                  <td>{(n.calls - n.replaced).toLocaleString('en-US')}</td>
+                  <td>{money(n.charges / 100, currency)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </>
   );
 }
 
@@ -322,8 +352,9 @@ function UnbilledCalls({ id, onSignedOut }) {
 // the Call Summaries of those days, where the calls are ticked (SheetViewer pick), and the calls replaced on them.
 // Each replaced call comes off its day's bill: the day reads "125 − 2", and that day's balance and every one after it
 // move by the call's price. The buyer sees them on their Billing page, and marked in their Call Summary; Put Back
-// charges one again. A Call Summary uploaded before calls were read into billing has "Read Calls": its file is read
-// here and its days counted from it, as a new upload's are. `days`: the statement's days. `onBilling`: loads the
+// charges one again. A Call Summary uploaded before calls were read into billing has "Read Calls", and one read before
+// calls kept their seconds and number called "Read Again": its file is read here and its days counted from it, as a
+// new upload's are. `days`: the statement's days. `onBilling`: loads the
 // billing again.
 function ReplacedCalls({ id, account, days, onSaved, onBilling, onSignedOut }) {
   const reports = useLoad(signedIn(onSignedOut, () => listCallSummariesOf(id)), [id]);
@@ -349,17 +380,26 @@ function ReplacedCalls({ id, account, days, onSaved, onBilling, onSignedOut }) {
     setAll(false);
   };
 
-  const readCalls = async (r) => {
+  // Call Summaries whose calls are not read, or were read before calls kept their seconds and number called: read
+  // again, a day with logs for several numbers counts each call once even when one caller called twice in a minute.
+  const unread = summaries.filter((r) => r.calls === null || r.calls_exact === false);
+  const readCalls = async (list) => {
     setError('');
-    setReading(r.id);
+    let read = 0;
     try {
-      await setReportCalls(r.id, await callsIn(await fetchFile(r)));
-      reports.reload();
-      onBilling();
+      for (const r of list) {
+        setReading(r.id);
+        await setReportCalls(r.id, await callsIn(await fetchFile(r)));
+        read++;
+      }
     } catch (err) {
       setError(err.message);
     } finally {
       setReading(null);
+      if (read) {
+        reports.reload();
+        onBilling();
+      }
     }
   };
   const close = useCallback(() => setOpen(null), []);
@@ -386,7 +426,7 @@ function ReplacedCalls({ id, account, days, onSaved, onBilling, onSignedOut }) {
   // The replaced calls on those days that match the search, by day, latest first.
   const needle = find.trim().toLowerCase();
   const digits = needle.replace(/\D/g, '');
-  const found = (history.data || []).filter((c) => !needle || [c.called_at, c.caller, c.reason, c.duration].some((v) => {
+  const found = (history.data || []).filter((c) => !needle || [c.called_at, c.call_time, c.caller, c.number_called, c.reason, c.duration].some((v) => {
     const s = String(v || '').toLowerCase();
     return s.includes(needle) || (digits.length >= 3 && s.replace(/\D/g, '').includes(digits));
   }));
@@ -417,7 +457,12 @@ function ReplacedCalls({ id, account, days, onSaved, onBilling, onSignedOut }) {
       <CallTotals load={callDays} currency={account.currency} />
 
       <div className="p-rc__step">
-        <h3 className="p-rc__title">Call Summaries{reports.data && <span className="p-pill">{summaries.length}</span>}</h3>
+        <h3 className="p-rc__title">
+          Call Summaries{reports.data && <span className="p-pill">{summaries.length}</span>}
+          {unread.length > 1 && (
+            <button type="button" className="btn btn--quiet btn--sm p-rc__readall" disabled={reading !== null} onClick={() => readCalls(unread)}>{reading ? 'Reading…' : `Read ${unread.length} Again`}</button>
+          )}
+        </h3>
         {!reports.data && !reports.error && <div className="p-rows is-skeleton p-rc__loading" />}
         {listed.length > 0 && (
           <ul className="p-rc__reports">
@@ -434,9 +479,12 @@ function ReplacedCalls({ id, account, days, onSaved, onBilling, onSignedOut }) {
                     {[r.replaced.length > 0 && `${r.replaced.length} replaced`, `uploaded ${when(r.uploaded_at)}`].filter(Boolean).join(' · ')}
                   </small>
                   {r.calls === null && <small className="is-warn">Not in billing yet</small>}
+                  {r.calls !== null && r.calls_exact === false && <small className="is-warn">Read before calls kept their seconds and number called</small>}
                 </span>
                 <span className="p-rc__go">
-                  {r.calls === null && <button type="button" className="btn btn--quiet btn--sm" disabled={reading === r.id} onClick={() => readCalls(r)}>{reading === r.id ? 'Reading…' : 'Read Calls'}</button>}
+                  {(r.calls === null || r.calls_exact === false) && (
+                    <button type="button" className="btn btn--quiet btn--sm" disabled={reading !== null} onClick={() => readCalls([r])}>{reading === r.id ? 'Reading…' : r.calls === null ? 'Read Calls' : 'Read Again'}</button>
+                  )}
                   <button type="button" className="btn btn--light btn--sm" onClick={() => setOpen(r.id)}><Icon name="check" />Choose Calls</button>
                 </span>
               </li>
@@ -483,7 +531,7 @@ function ReplacedCalls({ id, account, days, onSaved, onBilling, onSignedOut }) {
                       <span className="p-rc__time">{callTime(c)}</span>
                       <span className="p-rc__call">
                         <b>{c.caller || 'Unknown caller'}</b>
-                        <small>{[c.duration, c.reason].filter(Boolean).join(' · ')}</small>
+                        <small>{[c.number_called && `to ${numberLabel(c.number_called)}`, c.duration, c.reason].filter(Boolean).join(' · ')}</small>
                       </span>
                       <small className="p-rc__by">{c.replaced_by_email || 'Our team'}<br />{when(c.created_at)}</small>
                       <button type="button" className="btn btn--quiet btn--sm p-rc__undo" onClick={() => undo(c)}>Put Back</button>

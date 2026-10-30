@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { callKey, callOf, withCallHeader } from '../call-summary.js';
+import { callKey, callSheets, isReplaced as replacedIn } from '../call-summary.js';
 import { fetchFile } from '../reports.js';
 import { dayLabel } from '../format.js';
 import { callTime } from '../../../src/components/BillingPage.jsx';
@@ -46,11 +46,12 @@ export default function SheetViewer({ report, onClose, pick }) {
     (async () => {
       try {
         const [XLSX, data] = await Promise.all([import('xlsx'), fetchFile(report)]); // SheetJS loads only when a report is opened
-        const wb = XLSX.read(data, { type: 'array', cellDates: true });
-        const sheets = wb.SheetNames.map((name) => {
-          const rows = XLSX.utils.sheet_to_json(wb.Sheets[name], { header: 1, raw: false, blankrows: false, defval: '' });
-          return { name, rows: report.kind === 'calls' ? withCallHeader(rows) : rows }; // a call log has no header row
-        });
+        let sheets;
+        if (report.kind === 'calls') sheets = callSheets(XLSX, data); // a call log has no header row, and each row is a call
+        else {
+          const wb = XLSX.read(data, { type: 'array', cellDates: true });
+          sheets = wb.SheetNames.map((name) => ({ name, rows: XLSX.utils.sheet_to_json(wb.Sheets[name], { header: 1, raw: false, blankrows: false, defval: '' }) }));
+        }
         if (live) setBook(sheets);
       } catch (err) {
         if (live) setError(err.message || 'This file could not be opened.');
@@ -66,14 +67,14 @@ export default function SheetViewer({ report, onClose, pick }) {
   const width = Math.max(0, ...rows.slice(0, MAX_ROWS).map((r) => r.length));
   const [head, ...body] = rows;
   // The calls on this sheet, row by row (null for a row that is not a call), and a column to mark them in.
-  const calls = useMemo(() => (report.kind === 'calls' ? body.map(callOf) : []), [report.kind, rows]); // eslint-disable-line react-hooks/exhaustive-deps
-  const done = calls.filter((c) => c && replaced.has(callKey(c))).length;
+  const calls = book?.[sheet]?.calls || [];
+  const done = calls.filter((c) => c && replacedIn(replaced, c)).length;
   const marks = report.kind === 'calls' && (Boolean(pick) || done > 0);
 
   // What the team is shown while picking: the calls that match the search. Everyone else sees every row.
   const needle = pick ? find.trim().toLowerCase() : '';
   const shown = useMemo(() => body.map((r, i) => i).filter((i) => !needle || (calls[i] && matches(body[i], needle))), [rows, calls, needle]); // eslint-disable-line react-hooks/exhaustive-deps
-  const open = shown.map((i) => calls[i]).filter((c) => c && !replaced.has(callKey(c))); // can still be chosen
+  const open = shown.map((i) => calls[i]).filter((c) => c && !replacedIn(replaced, c)); // can still be chosen
   const allOn = open.length > 0 && open.every((c) => chosen.has(callKey(c)));
 
   const toggle = (call) => setChosen((m) => {
@@ -159,7 +160,7 @@ export default function SheetViewer({ report, onClose, pick }) {
                     const r = body[i];
                     const call = calls[i];
                     const key = call && callKey(call);
-                    const isReplaced = key && replaced.has(key);
+                    const isReplaced = Boolean(call) && replacedIn(replaced, call);
                     const choosable = pick && call && !isReplaced;
                     return (
                       <tr key={i} className={isReplaced ? 'is-replaced' : choosable && chosen.has(key) ? 'is-picked' : ''} onClick={choosable ? () => toggle(call) : undefined}>

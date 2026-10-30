@@ -167,9 +167,9 @@ const SCHEMA = `
   ALTER TABLE portal_reports ADD COLUMN IF NOT EXISTS kind text NOT NULL DEFAULT 'billing';
 
   -- Replaced calls: calls a buyer asked (in the portal chat) to have replaced, picked by an admin in a Call Summary.
-  -- Each is taken off its day's bill, and the day's billing_days.replacements counts it. A call is the time and
-  -- caller as the log shows them, so the same call in a corrected log is not replaced twice, and the record stays
-  -- readable after its Call Summary is deleted.
+  -- Each is taken off its day's bill, and the day's billing_days.replacements counts it. A call is the time, caller
+  -- and number called as the log shows them, so the same call in a corrected log is not replaced twice, and the
+  -- record stays readable after its Call Summary is deleted.
   CREATE TABLE IF NOT EXISTS replaced_calls (
     id                 uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id            uuid NOT NULL REFERENCES portal_users (id) ON DELETE CASCADE,
@@ -183,11 +183,11 @@ const SCHEMA = `
     replaced_by_email  text NOT NULL DEFAULT '',
     created_at         timestamptz NOT NULL DEFAULT now()
   );
-  CREATE UNIQUE INDEX IF NOT EXISTS replaced_calls_call ON replaced_calls (user_id, date, called_at, caller);
 
   -- The calls each Call Summary lists, read in the browser as its viewer shows them (call-summary.js callOf). A day
   -- with any is billed from them (syncCallDays): its calls are every distinct call in the buyer's logs for that day,
-  -- replaced ones included, so a corrected or second log of the same day never counts a call twice.
+  -- whichever toll-free number they came in on, replaced ones included, so a corrected or second log of the same day
+  -- never counts a call twice.
   -- portal_reports.calls: how many it lists; null for a report whose calls were never read (uploaded before this).
   CREATE TABLE IF NOT EXISTS report_calls (
     report_id  uuid NOT NULL REFERENCES portal_reports (id) ON DELETE CASCADE,
@@ -200,6 +200,16 @@ const SCHEMA = `
   CREATE INDEX IF NOT EXISTS report_calls_day ON report_calls (user_id, date);
   CREATE INDEX IF NOT EXISTS report_calls_report ON report_calls (report_id);
   ALTER TABLE portal_reports ADD COLUMN IF NOT EXISTS calls integer;
+  -- A call to the second and the toll-free number called (call-summary.js callOf): a buyer's logs for several numbers
+  -- on one day count each call once, even two from one caller in the same minute. '' in calls read before these were
+  -- kept: such a call is its minute and caller (portal-db.js CALLS). calls_exact: the report's calls were read with them.
+  ALTER TABLE report_calls ADD COLUMN IF NOT EXISTS call_time text NOT NULL DEFAULT '';
+  ALTER TABLE report_calls ADD COLUMN IF NOT EXISTS number_called text NOT NULL DEFAULT '';
+  ALTER TABLE replaced_calls ADD COLUMN IF NOT EXISTS call_time text NOT NULL DEFAULT '';
+  ALTER TABLE replaced_calls ADD COLUMN IF NOT EXISTS number_called text NOT NULL DEFAULT '';
+  ALTER TABLE portal_reports ADD COLUMN IF NOT EXISTS calls_exact boolean NOT NULL DEFAULT false;
+  DROP INDEX IF EXISTS replaced_calls_call;
+  CREATE UNIQUE INDEX IF NOT EXISTS replaced_calls_exact ON replaced_calls (user_id, date, called_at, caller, call_time, number_called);
   -- A day whose calls come from its Call Summaries rather than being typed in.
   ALTER TABLE billing_days ADD COLUMN IF NOT EXISTS from_calls boolean NOT NULL DEFAULT false;
   -- A payment taken from a billing report's Payment Received (setReportPayment): at most one a day per customer,
@@ -539,9 +549,19 @@ export const setReportPayment = (userId, { date, total, currency, timezone, paid
 
 // ── call records (report_calls) and replaced calls ───────────────────────────
 
+// The buyer's distinct calls (`calls`, a WITH query; $1 is the buyer) on the days `range` picks (SQL on `date`): each
+// call in their Call Summaries, for every toll-free number, and each replaced call, once. A call is its time to the
+// second, caller and number called; one read before those were kept (call_time '') is its minute and caller, and is
+// left out when a call read since has that minute and caller (it is the same call, or one of them).
+const CALLS = (range) => `
+  c AS (SELECT date, called_at, caller, call_time, number_called FROM report_calls WHERE user_id = $1 AND ${range}
+    UNION SELECT date, called_at, caller, call_time, number_called FROM replaced_calls WHERE user_id = $1 AND ${range}),
+  calls AS (SELECT * FROM c WHERE call_time <> '' OR NOT EXISTS (SELECT 1 FROM c x
+    WHERE x.call_time <> '' AND x.date = c.date AND x.called_at = c.called_at AND x.caller = c.caller))`;
+
 // Bills these days from the buyer's call records, inside the caller's transaction (`db`). A day is billed from them
-// once any Call Summary lists calls on it, and stays so: its calls are the distinct calls (time and caller) in their
-// logs and their replaced calls; with none left, the day is removed. Days typed in and never in a log are left
+// once any Call Summary lists calls on it, and stays so: its calls are the distinct calls (CALLS) in their logs and
+// their replaced calls; with none left, the day is removed. Days typed in and never in a log are left
 // alone, as are days before billing starts. -> [{ date, before, after }] for each day that changed (null: none).
 export async function syncCallDays(db, userId, dates) {
   const account = (await db.query('SELECT start_date::text AS start_date, price_per_call FROM billing_accounts WHERE user_id = $1', [userId])).rows[0];
@@ -550,9 +570,8 @@ export async function syncCallDays(db, userId, dates) {
   for (const date of [...new Set(dates)].sort()) {
     if (date < account.start_date) continue;
     const day = (await db.query('SELECT calls, from_calls FROM billing_days WHERE user_id = $1 AND date = $2 FOR UPDATE', [userId, date])).rows[0];
-    const { logged, calls } = (await db.query(`SELECT EXISTS (SELECT 1 FROM report_calls WHERE user_id = $1 AND date = $2) AS logged,
-      (SELECT count(*)::int FROM (SELECT called_at, caller FROM report_calls WHERE user_id = $1 AND date = $2
-        UNION SELECT called_at, caller FROM replaced_calls WHERE user_id = $1 AND date = $2) c) AS calls`, [userId, date])).rows[0];
+    const { logged, calls } = (await db.query(`WITH ${CALLS('date = $2')}
+      SELECT EXISTS (SELECT 1 FROM report_calls WHERE user_id = $1 AND date = $2) AS logged, (SELECT count(*)::int FROM calls) AS calls`, [userId, date])).rows[0];
     if (!logged && !day?.from_calls) continue;
     if (calls > 0) {
       if (day?.from_calls && day.calls === calls) continue;
@@ -583,14 +602,16 @@ async function inTransaction(fn) {
   }
 }
 
-// A Call Summary's calls ([{ date, called_at, caller, duration }]), replacing any it had, and its days billed from
-// them. -> the days that changed, as syncCallDays.
-export const setReportCalls = (report, calls) => inTransaction(async (db) => {
+// A Call Summary's calls ([{ date, called_at, caller, duration, call_time, number_called }]), replacing any it had, and
+// its days billed from them. `exact`: they were read with their time to the second and number called (an up-to-date
+// portal). -> the days that changed, as syncCallDays.
+export const setReportCalls = (report, calls, exact = true) => inTransaction(async (db) => {
   const before = (await db.query('DELETE FROM report_calls WHERE report_id = $1 RETURNING date::text AS date', [report.id])).rows.map((r) => r.date);
-  await db.query(`INSERT INTO report_calls (report_id, user_id, date, called_at, caller, duration)
-    SELECT $1::uuid, $2::uuid, * FROM unnest($3::date[], $4::text[], $5::text[], $6::text[])`,
-  [report.id, report.user_id, calls.map((c) => c.date), calls.map((c) => c.called_at), calls.map((c) => c.caller), calls.map((c) => c.duration)]);
-  await db.query('UPDATE portal_reports SET calls = $2 WHERE id = $1', [report.id, calls.length]);
+  const col = (k) => calls.map((c) => c[k] || '');
+  await db.query(`INSERT INTO report_calls (report_id, user_id, date, called_at, caller, duration, call_time, number_called)
+    SELECT $1::uuid, $2::uuid, * FROM unnest($3::date[], $4::text[], $5::text[], $6::text[], $7::text[], $8::text[])`,
+  [report.id, report.user_id, col('date'), col('called_at'), col('caller'), col('duration'), col('call_time'), col('number_called')]);
+  await db.query('UPDATE portal_reports SET calls = $2, calls_exact = $3 WHERE id = $1', [report.id, calls.length, exact]);
   return syncCallDays(db, report.user_id, [...before, ...calls.map((c) => c.date)]);
 });
 
@@ -611,14 +632,11 @@ export const deleteReportAndSync = (id) => inTransaction(async (db) => {
 });
 
 // Each day from `from` to `to` with calls in the buyer's Call Summaries or in billing, whether billed or not (no billing
-// terms yet, or before billing starts): logged_calls are the distinct calls (time and caller) in the logs and the
-// replaced calls, as syncCallDays counts them; billed_calls and billed_replacements are what billing has (null: none).
+// terms yet, or before billing starts): logged_calls are the distinct calls (CALLS) in the logs and the replaced
+// calls, as syncCallDays counts them; billed_calls and billed_replacements are what billing has (null: none).
 export const listCallDays = (userId, from, to) => all(`
-  WITH logged AS (
-    SELECT date, count(*)::int AS calls FROM (
-      SELECT date, called_at, caller FROM report_calls WHERE user_id = $1 AND date BETWEEN $2 AND $3
-      UNION SELECT date, called_at, caller FROM replaced_calls WHERE user_id = $1 AND date BETWEEN $2 AND $3) c
-    GROUP BY date),
+  WITH ${CALLS('date BETWEEN $2 AND $3')},
+  logged AS (SELECT date, count(*)::int AS calls FROM calls GROUP BY date),
   replaced AS (SELECT date, count(*)::int AS calls FROM replaced_calls WHERE user_id = $1 AND date BETWEEN $2 AND $3 GROUP BY date),
   billed AS (SELECT date, calls, replacements, price_per_call FROM billing_days WHERE user_id = $1 AND date BETWEEN $2 AND $3)
   SELECT coalesce(l.date, b.date)::text AS date, coalesce(l.calls, 0) AS logged_calls, coalesce(r.calls, 0) AS replaced_calls,
@@ -626,9 +644,20 @@ export const listCallDays = (userId, from, to) => all(`
   FROM logged l FULL JOIN billed b ON b.date = l.date LEFT JOIN replaced r ON r.date = coalesce(l.date, b.date)
   ORDER BY 1`, [userId, from, to]);
 
+// The same calls (CALLS) by day and toll-free number called: [{ date, number_called, calls, replaced }]. number_called
+// is '' for calls read before numbers were kept.
+export const listCallNumbers = (userId, from, to) => all(`
+  WITH ${CALLS('date BETWEEN $2 AND $3')},
+  logged AS (SELECT date, number_called, count(*)::int AS calls FROM calls GROUP BY 1, 2),
+  replaced AS (SELECT date, number_called, count(*)::int AS calls FROM replaced_calls WHERE user_id = $1 AND date BETWEEN $2 AND $3 GROUP BY 1, 2)
+  SELECT coalesce(l.date, r.date)::text AS date, coalesce(l.number_called, r.number_called) AS number_called,
+    coalesce(l.calls, 0) AS calls, coalesce(r.calls, 0) AS replaced
+  FROM logged l FULL JOIN replaced r ON r.date = l.date AND r.number_called = l.number_called
+  ORDER BY 1, 2`, [userId, from, to]);
+
 // ── replaced calls ───────────────────────────────────────────────────────────
 
-const REPLACED_FIELDS = `id, report_id, date::text AS date, called_at, caller, duration, reason, replaced_by_email, created_at`;
+const REPLACED_FIELDS = `id, report_id, date::text AS date, called_at, caller, duration, call_time, number_called, reason, replaced_by_email, created_at`;
 
 // From `from` on (to `to`, when given), the latest day first.
 export const listReplacedCalls = (userId, from, to = null) => all(`SELECT ${REPLACED_FIELDS} FROM replaced_calls
@@ -638,7 +667,8 @@ export const countReplacedCalls = async (userId, date) =>
   Number((await one('SELECT count(*) FROM replaced_calls WHERE user_id = $1 AND date = $2', [userId, date])).count);
 
 // Takes calls off their days' bills, all or none: each day's replacements go up by its newly replaced calls.
-// Calls already replaced are left as they are. -> { replaced } (how many were new), or { refused: { date, calls,
+// Calls already replaced are left as they are, as is a call replaced before calls kept their seconds and number
+// called that has the same minute and caller (or the other way round). -> { replaced } (how many were new), or { refused: { date, calls,
 // replacements, adding } } when a day has no calls entered (calls null) or too few for them, and nothing is saved.
 // A refusal stops the transaction without saving anything.
 class Refused extends Error {
@@ -652,9 +682,11 @@ export const replaceCalls = (userId, calls, { reportId, reason, by }) => inTrans
   const perDay = new Map();
   for (const c of calls) {
     const { rows } = await db.query(`
-      INSERT INTO replaced_calls (user_id, report_id, date, called_at, caller, duration, reason, replaced_by, replaced_by_email)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) ON CONFLICT (user_id, date, called_at, caller) DO NOTHING RETURNING date::text AS date`,
-    [userId, reportId, c.date, c.called_at, c.caller, c.duration, reason, by.id, by.email]);
+      INSERT INTO replaced_calls (user_id, report_id, date, called_at, caller, duration, reason, replaced_by, replaced_by_email, call_time, number_called)
+      SELECT $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11 WHERE NOT EXISTS (SELECT 1 FROM replaced_calls
+        WHERE user_id = $1 AND date = $3 AND called_at = $4 AND caller = $5 AND (call_time = '' OR $10 = ''))
+      ON CONFLICT DO NOTHING RETURNING date::text AS date`,
+    [userId, reportId, c.date, c.called_at, c.caller, c.duration, reason, by.id, by.email, c.call_time || '', c.number_called || '']);
     if (rows[0]) perDay.set(rows[0].date, (perDay.get(rows[0].date) || 0) + 1);
   }
   // A replaced call missing from the day's logs still counts as one of its calls.
@@ -705,12 +737,13 @@ export const findWalletOwners = async (addresses) => new Map(
 
 // ── reports ──────────────────────────────────────────────────────────────────
 
-// `replaced`: for a Call Summary, the calls replaced on the days it covers ({ called_at, caller }), so its viewer can
-// mark them.
+// `replaced`: for a Call Summary, the calls replaced on the days it covers ({ called_at, caller, call_time,
+// number_called }), so its viewer can mark them.
 // `calls`: for a Call Summary, how many calls it lists (null: never read, uploaded before calls were read).
+// `calls_exact`: its calls were read with their time to the second and number called (false: read before; Read Again).
 const REPORT_FIELDS = `r.id, u.email AS customer, coalesce(nullif(u.nickname, ''), nullif(u.name, ''), u.email) AS customer_name, r.user_id, r.kind, r.title, r.note, r.period_from::text AS period_from,
-  r.period_to::text AS period_to, r.filename, r.size, r.uploaded_at, r.calls,
-  (SELECT coalesce(json_agg(json_build_object('called_at', c.called_at, 'caller', c.caller)), '[]') FROM replaced_calls c
+  r.period_to::text AS period_to, r.filename, r.size, r.uploaded_at, r.calls, r.calls_exact,
+  (SELECT coalesce(json_agg(json_build_object('called_at', c.called_at, 'caller', c.caller, 'call_time', c.call_time, 'number_called', c.number_called)), '[]') FROM replaced_calls c
     WHERE r.kind = 'calls' AND c.user_id = r.user_id AND c.date BETWEEN r.period_from AND r.period_to) AS replaced`;
 
 // `kind`: 'billing' or 'calls' only, or null for both.

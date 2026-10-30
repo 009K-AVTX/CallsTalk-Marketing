@@ -815,6 +815,11 @@ html { font-size: 15px; }
 .p-rc__totals b.is-warn { color: var(--warn); }
 .p-rc__unbilled { grid-column: 1 / -1; font-size: .8rem; }
 @media (max-width: 560px) { .p-rc__totals { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+/* The same calls by toll-free number called. */
+.p-card:not(.p-card--flush) .p-tablewrap.p-rc__numbers { margin: -4px 0 16px; border: 1px solid var(--line); border-radius: 12px; }
+.p-rc__numbers .p-table th, .p-rc__numbers .p-table td { padding: 9px 14px; }
+.p-rc__numbers .p-table td.is-warn { color: var(--warn); }
+.p-rc__readall { margin-left: auto; }
 .p-rc__count { font-weight: 600; color: var(--white); }
 .p-rc__step { padding: 16px 0 18px; border-top: 1px solid var(--line-soft); }
 .p-rc__title { display: flex; align-items: center; gap: 10px; margin: 0 0 12px; font-size: .92rem; font-weight: 600; color: var(--white); }

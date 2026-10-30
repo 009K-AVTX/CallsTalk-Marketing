@@ -848,7 +848,12 @@ Customers log in at **https://portal.callstalk.com** (the website's Log In goes 
   viewer buyers use for their Call Summaries (`SheetViewer`, a tab per sheet); billing reports still never reach
   buyers.
 - **Calls on a buyer's page:** **Replaced Calls** opens with the chosen dates' **Calls**, **Replaced**, **Billable**
-  and **Charges**, and each Call Summary shows its calls. Calls in Call Summaries on days before billing starts are
+  and **Charges**, then the same by **Number Called** (each toll-free number's calls, replaced calls and charges at
+  the day's price), and each Call Summary shows its calls. A buyer with several toll-free numbers gets one Call
+  Summary per number per day; the day is billed for all of them together, each call once: a call is its time to the
+  second, caller and number called, so the same log uploaded twice adds nothing and a caller who called twice in a
+  minute counts twice. Call Summaries read before calls kept their seconds and number show **Read Again** (or
+  **Read N Again** for all of them); until then their calls show as "Not read yet" in the table. Calls in Call Summaries on days before billing starts are
   counted apart ("not billed: before billing starts"). A new buyer's billing starts the day the login is made, so set
   an earlier **Start Date** under Billing Terms to bill calls from before it (`GET /api/admin/users/:id/call-days`).
 - **Lost phone or forgotten password:** open the login → **Account** → **Danger Zone** → **Reset and Send Link**. Their old password and
