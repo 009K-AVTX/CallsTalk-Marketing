@@ -16,32 +16,64 @@ import Select from '../../../src/components/Select.jsx';
 
 const ACCEPT = '.xlsx,.xls,.csv';
 
-// A blank billing report in the format customers know from the old Telegram bill. The sums are formulas:
-// Call Charges = (Total Calls - Replacements) x Price, Balance = Opening - Charges + Payment, and each day
-// opens on the last balance. Replaced calls are not charged ("125 - 2" bills 123).
-async function downloadTemplate() {
-  const XLSX = await import('xlsx');
-  const head = ['Date', 'Opening Balance ($)', 'Total Calls', 'Replacements', 'Price per Call ($)', 'Call Charges ($)', 'Payment Received ($)', 'Balance ($)'];
-  const rows = [head];
-  for (let i = 7; i >= 1; i--) rows.push([addDays(today(), -i), null, null, null, null, null, null, null]);
-  const ws = XLSX.utils.aoa_to_sheet(rows);
-  for (let r = 2; r <= 8; r++) {
-    ws[`B${r}`] = r === 2 ? { t: 'n', v: 0 } : { t: 'n', f: `H${r - 1}` };
-    ws[`C${r}`] = { t: 'n', v: 0 };
-    ws[`D${r}`] = { t: 'n', v: 0 };
-    ws[`E${r}`] = { t: 'n', v: 0 };
-    ws[`F${r}`] = { t: 'n', f: `(C${r}-D${r})*E${r}` };
-    ws[`G${r}`] = { t: 'n', v: 0 };
-    ws[`H${r}`] = { t: 'n', f: `B${r}-F${r}+G${r}` };
-    for (const c of 'BEFGH') ws[`${c}${r}`].z = '$#,##0.00;[Red]-$#,##0.00';
+// The template's colors: the portal's, as the PDF reports print them (exports.js). Plum heads, white and lilac rows.
+const XL = { plum: 'FF2C1C3E', accent: 'FFD6A3FF', row: 'FFF8F6FB', rule: 'FFE2DEE8', ink: 'FF18141E', muted: 'FF70687A' };
+const MONEY_FORMAT = '$#,##0.00;[Red]-$#,##0.00';
+
+// A sheet with the portal's look: a plum head row that stays in view, then `rows` blank or filled lines in
+// alternating white and lilac. `widths`: each column's width in characters.
+function styledSheet(wb, name, head, widths, rows) {
+  const ws = wb.addWorksheet(name, { views: [{ state: 'frozen', ySplit: 1, showGridLines: false }], properties: { tabColor: { argb: XL.accent } } });
+  ws.columns = widths.map((width) => ({ width }));
+  const top = ws.addRow(head);
+  top.height = 24;
+  top.eachCell((c) => {
+    c.font = { name: 'Arial', size: 10, bold: true, color: { argb: 'FFFFFFFF' } };
+    c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: XL.plum } };
+    c.alignment = { vertical: 'middle' };
+    c.border = { bottom: { style: 'medium', color: { argb: XL.accent } } };
+  });
+  for (let i = 0; i < rows; i++) {
+    const row = ws.addRow([]);
+    row.height = 20;
+    for (let k = 1; k <= head.length; k++) {
+      const c = row.getCell(k);
+      c.font = { name: 'Arial', size: 10, color: { argb: XL.ink } };
+      c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: i % 2 ? XL.row : 'FFFFFFFF' } };
+      c.alignment = { vertical: 'middle' };
+      c.border = { bottom: { style: 'thin', color: { argb: XL.rule } } };
+    }
   }
-  ws['!cols'] = [{ wch: 12 }, { wch: 20 }, { wch: 12 }, { wch: 14 }, { wch: 17 }, { wch: 17 }, { wch: 20 }, { wch: 15 }];
-  const pay = XLSX.utils.aoa_to_sheet([['Payment Date', 'Amount ($)', 'Method', 'Reference']]);
-  pay['!cols'] = [{ wch: 14 }, { wch: 12 }, { wch: 18 }, { wch: 20 }];
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'Daily Bills');
-  XLSX.utils.book_append_sheet(wb, pay, 'Payments');
-  XLSX.writeFile(wb, 'CallsTalk-billing-report-template.xlsx');
+  return ws;
+}
+
+// A blank billing report in the format customers know from the old Telegram bill, in the portal's colors. The sums
+// are formulas: Call Charges = (Total Calls - Replacements) x Price, Balance = Opening - Charges + Payment, and each
+// day opens on the last balance. Replaced calls are not charged ("125 - 2" bills 123). Calls, replacements, price and
+// payment start empty, not 0: a day left empty is skipped on upload instead of setting the customer's calls to 0.
+async function downloadTemplate() {
+  const { default: ExcelJS } = await import('exceljs'); // loads only when the template is asked for
+  const wb = new ExcelJS.Workbook();
+  wb.creator = 'CallsTalk';
+  const head = ['Date', 'Opening Balance ($)', 'Total Calls', 'Replacements', 'Price per Call ($)', 'Call Charges ($)', 'Payment Received ($)', 'Balance ($)'];
+  const ws = styledSheet(wb, 'Daily Bills', head, [12, 20, 12, 14, 17, 17, 20, 15], 7);
+  for (let r = 2; r <= 8; r++) {
+    const row = ws.getRow(r);
+    row.getCell(1).value = addDays(today(), r - 9);
+    row.getCell(2).value = r === 2 ? 0 : { formula: `H${r - 1}` };
+    row.getCell(6).value = { formula: `(C${r}-D${r})*E${r}` };
+    row.getCell(8).value = { formula: `B${r}-F${r}+G${r}` };
+    for (const k of [2, 5, 6, 7, 8]) row.getCell(k).numFmt = MONEY_FORMAT;
+    for (const k of [2, 6, 8]) row.getCell(k).font = { name: 'Arial', size: 10, color: { argb: XL.muted } }; // worked out, not typed
+    row.getCell(8).font = { name: 'Arial', size: 10, bold: true, color: { argb: XL.plum } };
+  }
+  const pay = styledSheet(wb, 'Payments', ['Payment Date', 'Amount ($)', 'Method', 'Reference'], [14, 12, 18, 20], 7);
+  for (let r = 2; r <= 8; r++) pay.getRow(r).getCell(2).numFmt = MONEY_FORMAT;
+
+  const blob = new Blob([await wb.xlsx.writeBuffer()], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  const url = URL.createObjectURL(blob);
+  Object.assign(document.createElement('a'), { href: url, download: 'CallsTalk-billing-report-template.xlsx' }).click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 function Gate({ onIn }) {
