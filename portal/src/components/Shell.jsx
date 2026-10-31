@@ -23,6 +23,9 @@ export const ADMIN_NAV = [
   { to: '/settings', label: 'Settings', icon: 'settings' },
 ];
 
+// The Owner: the Owner Panel (every client's records by month) first, then everything admins have.
+export const OWNER_NAV = [{ to: '/admin/owner', label: 'Owner Panel', icon: 'finance' }, ...ADMIN_NAV];
+
 // Staff: customer reports, customers (each with their login, billing, calls and payments), and adding customers.
 export const STAFF_NAV = [
   { to: '/upload', label: 'Reports', icon: 'reports' },
@@ -32,8 +35,9 @@ export const STAFF_NAV = [
 ];
 
 const TEAM = {
+  owner: { home: '/admin/owner', label: 'Owner', menu: 'CallsTalk Owner' },
   admin: { home: '/admin', label: 'Admin', menu: 'CallsTalk Admin' },
-  staff: { home: '/upload', label: 'Staff', menu: 'CallsTalk Staff' },
+  staff: { home: '/upload', label: 'Billing', menu: 'CallsTalk Billing' },
 };
 
 // Billing page, payment form in view and the amount ready to type.
@@ -88,10 +92,10 @@ export default function Shell({ path, statement, children, nav = NAV, team, badg
     <div className="p-app">
       <header className={`p-top${crew ? ' p-top--team' : ''}`}>
         <div className="p-top__inner">
-          <Link to={home} className="p-brand" aria-label="CallsTalk Portal home">
+          <Link to={home} className="p-brand" aria-label={`CallsTalk ${crew ? crew.label : 'Client'} home`}>
             <LogoMark className="p-brand__mark" />
             <span>Calls<b>Talk</b></span>
-            <em>{crew ? crew.label : 'Portal'}</em>
+            <em>{crew ? crew.label : 'Client'}</em>
           </Link>
           <nav id="portal-nav" className={`p-nav${navOpen ? ' is-open' : ''}`} aria-label="Portal">
             {nav.map(({ to, href, label, icon }) => (href ? (

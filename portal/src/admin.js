@@ -91,3 +91,7 @@ export const fetchFinance = ({ from, to, customer, payments_offset, payments_lim
 export const fetchNotices = () => authed('/admin/notifications');
 export const saveNotices = (settings) => authed('/admin/notifications', json('PUT', settings));
 export const sendSummaryNow = () => authed('/admin/notifications/test', json('POST'));
+
+// ── the Owner Panel (server/src/owner.js, the Owner only) ────────────────────
+// -> { from, to, as_of, months: [{ month: 'YYYY-MM', totals, clients: [...] }] }, newest month first.
+export const fetchOwnerMonths = ({ from, to } = {}) => authed(`/admin/owner/months${query({ from, to })}`);

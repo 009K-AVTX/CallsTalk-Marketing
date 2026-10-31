@@ -29,7 +29,7 @@ const localDate = (timeZone, now = new Date()) => {
 
 // A day's calls -> { now, version, action, reason, save: { calls, replacements } }: `now` is what billing has
 // ({ calls, replacements, price }, or null when nothing is entered), `action` is new | change | same | skip.
-function callsPlan(d, s, { version, picked, today, start }) {
+function callsPlan(d, s, { version, picked, today, start, rates }) {
   if (d.calls === null) return { now: null, action: 'skip', reason: 'no calls in the report' };
   if (d.date < start) return { now: null, action: 'skip', reason: 'before billing started' };
   if (d.date > today) return { now: null, action: 'skip', reason: 'a future day' };
@@ -53,7 +53,9 @@ function callsPlan(d, s, { version, picked, today, start }) {
     return { now: null, version: 0, action: empty ? 'same' : 'new', reason: empty ? 'no calls' : why.join('; '), save };
   }
   const now = { calls: s.calls, replacements: s.replacements, price: s.price_per_call };
-  const same = now.calls === calls && now.replacements === replacements && (d.price === null || Number(d.price) === Number(now.price));
+  // Only the Owner sets rates: for anyone else the report's price is shown but never entered.
+  if (!rates && d.price !== null && Number(d.price) !== Number(now.price)) why.push(`the report's rate of ${usd(Number(d.price))} is not entered: only the Owner sets rates`);
+  const same = now.calls === calls && now.replacements === replacements && (!rates || d.price === null || Number(d.price) === Number(now.price));
   return { now, version, action: same ? 'same' : 'change', reason: why.join('; '), save };
 }
 
@@ -74,9 +76,10 @@ function paymentPlan(d, s, { own, today, start }) {
 }
 
 // What entering `days` would do to the buyer's billing. `billing`: fetchBilling (admin.js) for that buyer.
+// `rates`: whether the report's prices are entered too (the Owner only; the server refuses anyone else's).
 // -> each day as read, with the calls' { now, version, action, reason, save }, `pay` (paymentPlan) and `checks`: what
 // does not match (the report's balance, or its opening balance against the portal's).
-export function planBillingDays(days, billing, now = new Date()) {
+export function planBillingDays(days, billing, now = new Date(), { rates = true } = {}) {
   const { account, statement, day_versions: versions = {}, replaced_calls: replaced = [], report_payments: reported = {} } = billing;
   const today = localDate(account.timezone, now);
   const shown = new Map(statement.days.map((d) => [d.date, d])); // the last 31 days, as on the customer page
@@ -91,7 +94,8 @@ export function planBillingDays(days, billing, now = new Date()) {
     if (s && day.opening !== null && cents(day.opening) !== cents(s.opening_balance)) checks.push(`billing opens at ${usd(Number(s.opening_balance))}`);
     return {
       ...day,
-      ...callsPlan(day, s, { version: versions[d.date], picked: picked.get(d.date) || 0, today, start: account.start_date }),
+      rates,
+      ...callsPlan(day, s, { version: versions[d.date], picked: picked.get(d.date) || 0, today, start: account.start_date, rates }),
       pay: paymentPlan(day, s, { own: reported[d.date], today, start: account.start_date }),
       checks,
     };
@@ -135,7 +139,7 @@ export async function enterBillingDays(customerId, plan, label, { calls = true, 
   const failed = [];
   for (const d of calls ? toEnter(plan) : []) {
     try {
-      await saveDay(customerId, d.date, d.save.calls, d.price, d.save.replacements, d.version);
+      await saveDay(customerId, d.date, d.save.calls, d.rates === false ? undefined : d.price, d.save.replacements, d.version);
       saved++;
     } catch (err) {
       failed.push(`${label(d.date)}: ${isConflict(err) ? 'someone changed it meanwhile, so it was left as it is' : err.message}`);

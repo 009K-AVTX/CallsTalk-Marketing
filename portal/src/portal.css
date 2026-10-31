@@ -962,3 +962,22 @@ html { font-size: 15px; }
   .p-rc .p-card__head .p-range { width: 100%; }
   .p-rc__go { width: 100%; margin-left: 0; }
 }
+
+/* Rates are the Owner's: where someone else would type one, they see it instead. */
+.p-rate-note { display: grid; gap: 3px; align-content: start; padding: 10px 14px; border-radius: 12px; border: 1px dashed var(--line); background: rgba(255, 255, 255, .015); }
+.p-rate-note span { font-size: .86rem; font-weight: 500; color: var(--on-dark-soft); }
+.p-rate-note b { color: var(--white); }
+.p-rate-note small { color: var(--slate); font-size: .8rem; }
+
+/* Owner Panel: a card per month, its totals in the header, the clients' table when opened. */
+.p-owner__month { margin-bottom: 16px; }
+.p-owner__month .p-card__head { align-items: center; }
+.p-owner__toggle { display: inline-flex; align-items: center; gap: 10px; padding: 0; border: 0; background: none; color: inherit; font: inherit; cursor: pointer; }
+.p-owner__chevron { width: 16px; height: 16px; transform: rotate(-90deg); transition: transform .2s; color: var(--slate); }
+.p-owner__chevron.is-open { transform: rotate(90deg); }
+.p-owner__totals { display: flex; flex-wrap: wrap; gap: 8px 22px; margin: 0; }
+.p-owner__totals dt { font-size: .72rem; letter-spacing: .06em; text-transform: uppercase; color: var(--slate); }
+.p-owner__totals dd { margin: 2px 0 0; font-weight: 600; color: var(--white); font-variant-numeric: tabular-nums; }
+.p-owner__totals dd small { color: var(--slate); font-weight: 500; }
+.p-owner__totals .is-neg { color: var(--neg); }
+.p-owner__totals .is-pos { color: var(--pos); }

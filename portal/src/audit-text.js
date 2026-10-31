@@ -50,7 +50,7 @@ export const ACTIONS = {
 };
 export const actionName = (action) => ACTIONS[action] || action;
 
-const ROLE = { customer: 'Customer', staff: 'Staff', admin: 'Admin' };
+const ROLE = { customer: 'Customer', staff: 'Billing', admin: 'Admin', owner: 'Owner' };
 export const roleName = (role) => ROLE[role] || '';
 
 export const failed = (row) => row.status_code >= 400 || row.action.endsWith('_failed');

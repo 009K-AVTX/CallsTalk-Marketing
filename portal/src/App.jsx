@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useStatement } from '../../src/components/BillingPage.jsx';
 import { loadSession } from '../../src/lib/portal.js';
-import Shell, { ADMIN_NAV, NAV, PageHead, STAFF_NAV } from './components/Shell.jsx';
+import Shell, { ADMIN_NAV, NAV, OWNER_NAV, PageHead, STAFF_NAV } from './components/Shell.jsx';
+import OwnerPanel from './pages/OwnerPanel.jsx';
 import { navigate, usePath } from './router.jsx';
 import Login from './pages/Login.jsx';
 import Setup from './pages/Setup.jsx';
@@ -36,7 +37,7 @@ function Portal({ path }) {
   const title = NAV.find((n) => n.to === path)?.label || 'Billing';
 
   useEffect(() => {
-    document.title = `${title} | CallsTalk Portal`;
+    document.title = `${title} | CallsTalk Client`;
     if (!PAGES[path]) navigate('/', { replace: true });
   }, [path, title]);
 
@@ -62,24 +63,28 @@ const ADMIN_PAGES = {
   '/admin/reports': { title: 'Reports', Page: ReportManager },
 };
 
-function Admin({ path }) {
+// The Owner gets every admin page, plus the Owner Panel (`owner`).
+const OWNER_PAGES = { ...ADMIN_PAGES, '/admin/owner': { title: 'Owner Panel', Page: OwnerPanel } };
+
+function Admin({ path, owner = false }) {
+  const pages = owner ? OWNER_PAGES : ADMIN_PAGES;
   const userId = /^\/admin\/users\/([0-9a-f-]{36})$/.exec(path)?.[1];
-  const known = ADMIN_PAGES[path] || path === '/settings' || userId;
-  const title = path === '/settings' ? 'Settings' : ADMIN_PAGES[path]?.title || 'Logins';
-  const Page = ADMIN_PAGES[path]?.Page || AdminUsers;
+  const known = pages[path] || path === '/settings' || userId;
+  const title = path === '/settings' ? 'Settings' : pages[path]?.title || 'Logins';
+  const Page = pages[path]?.Page || AdminUsers;
 
   useEffect(() => {
-    document.title = `${title} | CallsTalk Admin`;
+    document.title = `${title} | CallsTalk ${owner ? 'Owner' : 'Admin'}`;
     // Older links to the standalone upload page open Reports inside the admin portal.
     if (path === '/upload') navigate('/admin/reports', { replace: true });
-    else if (!known) navigate('/admin', { replace: true });
-  }, [known, title, path]);
+    else if (!known) navigate(owner ? '/admin/owner' : '/admin', { replace: true });
+  }, [known, title, path, owner]);
 
   if (path === '/upload') return null;
 
   return (
-    <Shell path={userId ? '/admin' : path} nav={ADMIN_NAV} team="admin">
-      {path === '/settings' ? <Settings team="admin" /> : userId ? <AdminUser id={userId} onSignedOut={toLogin} /> : <Page key={path} onSignedOut={toLogin} />}
+    <Shell path={userId ? '/admin' : path} nav={owner ? OWNER_NAV : ADMIN_NAV} team={owner ? 'owner' : 'admin'}>
+      {path === '/settings' ? <Settings team={owner ? 'owner' : 'admin'} /> : userId ? <AdminUser id={userId} onSignedOut={toLogin} /> : <Page key={path} onSignedOut={toLogin} />}
     </Shell>
   );
 }
@@ -93,7 +98,7 @@ function Staff({ path }) {
   const customerId = /^\/customers\/([0-9a-f-]{36})$/.exec(path)?.[1];
   const title = customerId ? 'Customer' : STAFF_TITLES[path];
   useEffect(() => {
-    if (title) document.title = `${title} | CallsTalk Staff`;
+    if (title) document.title = `${title} | CallsTalk Billing`;
     else navigate('/upload', { replace: true });
   }, [path, title]);
 
@@ -120,12 +125,13 @@ export default function App() {
   }, [signedIn, path]);
 
   // Signed-in admins and staff get reports inside their portal; the standalone page is for the demo and local key.
-  const team = signedIn && staffSignInKind === 'login' && ['admin', 'staff'].includes(session.role);
+  const team = signedIn && staffSignInKind === 'login' && ['owner', 'admin', 'staff'].includes(session.role);
   if (path === '/upload' && !team) return <Upload />;
   if (path === '/setup') return <Setup />;
   if (path === '/reset') return <Reset />;
   if (path === '/login') return <Login />;
   if (!signedIn) return null;
+  if (session.role === 'owner') return <Admin path={path} owner />;
   if (session.role === 'admin') return <Admin path={path} />;
   if (session.role === 'staff') return <Staff path={path} />;
   // Customers on any other address (an /admin link, say) are sent to Billing by Portal.

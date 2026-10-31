@@ -86,7 +86,7 @@ export function BalanceCard({ data }) {
             : 'Your balance is clear. Nothing to pay right now.'}
       </p>
       <dl className="acct__facts">
-        <div><dt>Price</dt><dd>{money(data.price_per_call, data.currency)} / call</dd></div>
+        <div><dt>Price</dt><dd>{Number(data.price_per_call) ? `${money(data.price_per_call, data.currency)} / call` : 'Not set yet'}</dd></div>
         <div><dt>Calls today</dt><dd>{today ? callsLabel(today) : '0'}</dd></div>
         <div><dt>Time zone</dt><dd>{zoneName(data.timezone)}</dd></div>
       </dl>

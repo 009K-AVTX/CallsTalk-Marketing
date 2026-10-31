@@ -80,17 +80,22 @@ async function signIn(res, user) {
   return { email: user.email, name: user.name, role: user.role };
 }
 
-// Puts the signed-in user on req.user. With roles given, only those roles get through.
+// The Owner is an admin who also sets clients' rates and has the Owner Panel: wherever admins are let in, so is
+// the Owner. Rates are changed by the Owner alone (admin.js).
+export const isAdminRole = (role) => role === 'admin' || role === 'owner';
+const allows = (roles, role) => !roles.length || roles.includes(role) || (role === 'owner' && roles.includes('admin'));
+
+// Puts the signed-in user on req.user. With roles given, only those roles get through (the Owner wherever 'admin' is).
 // Already done for this request (an upload checked before its body was read): only the role is checked again.
 export const requireUser = (...roles) => async (req, res, next) => {
   if (req.user) {
-    if (roles.length && !roles.includes(req.user.role)) throw new HttpError(403, 'You do not have permission to access this page.');
+    if (!allows(roles, req.user.role)) throw new HttpError(403, 'You do not have permission to access this page.');
     return next();
   }
   const { token, viaCookie } = sessionToken(req);
   const user = token && await findSessionUser(hashToken(token));
   if (!user) throw new HttpError(401, 'Your session has expired. Please log in again.');
-  if (roles.length && !roles.includes(user.role)) throw new HttpError(403, 'You do not have permission to access this page.');
+  if (!allows(roles, user.role)) throw new HttpError(403, 'You do not have permission to access this page.');
   checkCsrf(req, viaCookie);
   req.user = user;
   res.setHeader('Cache-Control', 'no-store');
@@ -306,7 +311,7 @@ accountsRouter.delete('/avatar', requireUser(), async (req, res) => {
 accountsRouter.get('/avatar/:userId', requireUser(), async (req, res) => {
   const { userId } = req.params;
   const self = userId === req.user.id;
-  let allowed = self || req.user.role === 'admin';
+  let allowed = self || isAdminRole(req.user.role);
   if (!allowed && req.user.role === 'staff' && UUID.test(userId)) allowed = (await getUser(userId))?.role === 'customer';
   const avatar = allowed && UUID.test(userId) && await getAvatar(userId);
   if (!avatar) throw new HttpError(404, 'No photo.');

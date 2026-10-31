@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { isAdmin, loadSession } from '../../../src/lib/portal.js';
+import { isAdmin, isOwner, loadSession } from '../../../src/lib/portal.js';
 import {
   addPayment, clearDay, fetchActivity, fetchBilling, fetchCallDays, fetchReplacedCalls, getUser, isConflict, removePayment, removeUser, replaceCalls, saveDay, saveTerms,
   sendLink, signedIn, TIME_ZONES, undoReplacedCall, updateUser,
@@ -16,7 +16,7 @@ import { buyerName, dayLabel, money, today } from '../format.js';
 import { callsLabel, callTime } from '../../../src/components/BillingPage.jsx';
 import { Link, navigate } from '../router.jsx';
 import useLoad from '../useLoad.js';
-import { LinkResult, ROLE_LABEL, StatePill, when } from './AdminUsers.jsx';
+import { LinkResult, rateLabel, ROLE_LABEL, StatePill, when } from './AdminUsers.jsx';
 import { Avatar } from '../avatar.jsx';
 import Select from '../../../src/components/Select.jsx';
 
@@ -54,6 +54,8 @@ function Profile({ user, onSaved, onConflict }) {
   const self = user.email === loadSession()?.email;
   const customer = user.role === 'customer';
   const admin = isAdmin();
+  // An Owner login is changed by the Owner alone (the server refuses anyone else).
+  const locked = user.role === 'owner' && !isOwner();
   // Only customers have a nickname; it is sent only while they are one.
   const { role, ...details } = f.form;
   const change = { ...(customer ? details : { name: details.name, company: details.company }), ...(admin && { role }) };
@@ -67,13 +69,15 @@ function Profile({ user, onSaved, onConflict }) {
         <label>Role
           <Select value={f.form.role} onChange={f.set('role')} disabled={self}>
             <option value="customer">Customer</option>
-            <option value="staff">Staff (reports, and customers' logins and billing)</option>
+            <option value="staff">Billing (reports, and customers' logins and billing)</option>
             <option value="admin">Admin</option>
+            {(isOwner() || user.role === 'owner') && <option value="owner">Owner (Admin, plus clients' rates and the Owner Panel)</option>}
           </Select>
         </label>
       )}
+      {locked && <p className="p-admin__note">This is the Owner's login. Only the Owner can change it.</p>}
       <Note f={f} />
-      <button type="submit" className="btn btn--light btn--sm" disabled={f.status === 'sending'}>{f.status === 'sending' ? 'Saving…' : 'Save Details'}</button>
+      <button type="submit" className="btn btn--light btn--sm" disabled={f.status === 'sending' || locked}>{f.status === 'sending' ? 'Saving…' : 'Save Details'}</button>
     </form>
   );
 }
@@ -96,6 +100,11 @@ function AccessCard({ user }) {
 // What locks a person out or removes them, kept apart at the foot of the page in red (as Vercel's Danger Zone):
 // resetting the login, deactivating it, and (admins) deleting it. Each asks to be confirmed.
 function DangerZone({ user, onSaved, onConflict }) {
+  if (user.role === 'owner' && !isOwner()) return null; // the Owner's login is the Owner's to reset or deactivate
+  return <DangerZoneCard user={user} onSaved={onSaved} onConflict={onConflict} />;
+}
+
+function DangerZoneCard({ user, onSaved, onConflict }) {
   const f = useForm({}, onConflict);
   const [link, setLink] = useState(null);
   const self = user.email === loadSession()?.email;
@@ -201,16 +210,25 @@ function ContactsCard({ contacts = {}, telegram }) {
   );
 }
 
+// The rate (price per call) is the Owner's alone: everyone else sees it, and their saves leave it as it is.
 function Terms({ id, account, onSaved, onConflict }) {
+  const owner = isOwner();
   const f = useForm({
     price_per_call: account?.price_per_call ?? '', opening_balance: account?.opening_balance ?? '0',
     start_date: account?.start_date ?? today(), timezone: account?.timezone ?? TIME_ZONES[0],
   }, onConflict);
   return (
-    <form className="p-card p-form" onSubmit={(e) => f.run(e, async () => onSaved(await saveTerms(id, { ...f.form, version: account?.version ?? 0 })), 'Billing terms saved.')}>
+    <form className="p-card p-form" onSubmit={(e) => f.run(e, async () => {
+      const { price_per_call: _rate, ...rest } = f.form;
+      onSaved(await saveTerms(id, { ...(owner ? f.form : rest), version: account?.version ?? 0 }));
+    }, 'Billing terms saved.')}>
       <header className="p-card__head"><div><h2>Billing Terms</h2></div></header>
       <div className="p-form__row">
-        <label>Price per Call ($)<input required type="number" min="0" step="0.01" value={f.form.price_per_call} onChange={f.set('price_per_call')} /></label>
+        {owner ? (
+          <label>Price per Call ($)<input required type="number" min="0.01" step="0.01" value={f.form.price_per_call} onChange={f.set('price_per_call')} /></label>
+        ) : (
+          <div className="p-rate-note"><span>Price per Call</span><b>{rateLabel(account?.price_per_call)}</b><small>{Number(account?.price_per_call) ? 'Only the Owner can change the rate.' : 'Waiting for the Owner to set the rate. Calls entered meanwhile are charged at it once set.'}</small></div>
+        )}
         <label>Opening Balance ($)<input required type="number" step="0.01" value={f.form.opening_balance} onChange={f.set('opening_balance')} /></label>
       </div>
       <div className="p-form__row">
@@ -258,10 +276,12 @@ function Calls({ id, account, picked, versions, days, onSaved, onConflict }) {
           {replaced > calls && <span className="is-neg"> (fewer calls than the {replaced} replaced)</span>}
         </p>
       )}
-      <label><span>Price per Call ($) <i className="p-optional">default {money(account.price_per_call)}</i></span><input type="number" min="0" step="0.01" value={f.form.price} onChange={f.set('price')} /></label>
+      {isOwner()
+        ? <label><span>Price per Call ($) <i className="p-optional">default {rateLabel(account.price_per_call)}</i></span><input type="number" min="0" step="0.01" value={f.form.price} onChange={f.set('price')} /></label>
+        : <p className="p-admin__note">Charged at <b>{rateLabel(shown?.price_per_call ?? account.price_per_call)}</b> a call. Only the Owner can change the rate.</p>}
       <Note f={f} />
       <div className="p-admin__actions">
-        <button type="submit" className="btn btn--light btn--sm" disabled={f.status === 'sending'}>{f.status === 'sending' ? 'Saving…' : logged ? 'Save Price' : 'Save Calls'}</button>
+        <button type="submit" className="btn btn--light btn--sm" disabled={f.status === 'sending' || (logged && !isOwner())}>{f.status === 'sending' ? 'Saving…' : logged ? 'Save Price' : 'Save Calls'}</button>
         <button type="button" className="btn btn--quiet btn--sm" disabled={f.status === 'sending' || logged} onClick={(e) => f.run(e, async () => onSaved(await clearDay(id, f.form.date, versionOf(f.form.date))), `Calls cleared for ${dayLabel(f.form.date)}.`)}>Clear This Day</button>
       </div>
     </form>

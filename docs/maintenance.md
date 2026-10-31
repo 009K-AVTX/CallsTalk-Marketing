@@ -766,7 +766,24 @@ Customers log in at **https://portal.callstalk.com** (the website's Log In goes 
   **Customers** (`/customers/<id>`) to work it as an admin does: their login (details, setup link, deactivate),
   billing terms, calls, replaced calls, payments and recent activity. Staff cannot change a role, delete a login,
   or open staff and admin logins, Finance or the Audit Log (the server refuses: `STAFF_ROUTES` in
-  `server/src/admin.js`). **Admin** can do everything.
+  `server/src/admin.js`). **Admin** can do everything except change rates. **Owner** is an admin who also sets
+  every client's rate and has the **Owner Panel**. The portal shows the role beside the logo: **CLIENT**,
+  **BILLING** (the Staff role), **ADMIN** or **OWNER**.
+- **Rates (price per call) are the Owner's alone.** Admins and Billing see a client's rate but cannot set or change
+  it anywhere: not when adding a client, in Billing Terms, as a day's price, or from a billing report (the report's
+  rate is shown and left out). The server refuses it (`ONLY_OWNER_RATE` in `server/src/admin.js`). A client added by
+  an admin or Billing has **Rate: Not set** until the Owner sets it; their calls can be entered meanwhile, and when
+  the Owner sets the first rate those days are billed at it (`priceUnsetDays`). A later rate change applies from then
+  on; earlier days keep their price.
+- **The Owner login:** made on the server, once: `npm run portal:admin -- owner@callstalk.com "Full Name" --owner`.
+  After that the Owner can make other logins Owner under Logins. Only the Owner can add, change, reset, deactivate or
+  delete an Owner login; admins cannot make anyone Owner.
+- **Owner Panel** (`/admin/owner`, the Owner only; `GET /api/admin/owner/months?from=YYYY-MM&to=YYYY-MM`,
+  `server/src/owner.js`): every client's records month by month (3, 6 or 12 months, or this year), each month with its
+  totals (clients, calls, billed, collected, owed and credit at month end) and, opened, a row per client: rate (a
+  range when it changed during the month, **Not set** while there is none), calls, replaced, charged calls, opening
+  balance, billed, collected and closing balance. **Download CSV** gives every row. The figures follow each client's
+  own bill, as Finance does.
 - **Billing:** open a customer → enter each day's **billable calls** and **payments** received. Customers see
   their balance and the last five days.
 - **Calls from the call logs:** uploading a Call Summary sets the customer's calls in billing for its days: each
@@ -985,6 +1002,7 @@ Check: `pm2 logs callstalk-chat --lines 50 --nostream | grep -E "billing|connect
 
 With no other admin to reset them, run `npm run portal:admin -- their@email.com` in `server/`. It resets that
 login and prints a new setup link.
+An Owner locked out with no other Owner: `npm run portal:admin -- their@email.com --owner` (it keeps them Owner).
 
 ### 16.5 Once, when deploying the cookie sessions and limits
 

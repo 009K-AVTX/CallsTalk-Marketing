@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { LogoMark } from '../../../src/components/Logo.jsx';
-import { isAdmin } from '../../../src/lib/portal.js';
+import { isAdmin, isOwner } from '../../../src/lib/portal.js';
 import { fetchBilling, saveTerms } from '../admin.js';
 import { Avatar } from '../avatar.jsx';
 import { earlierStart, enterBillingDays, planBillingDays, readBillingDays, termsFrom, toEnter, toPay } from '../billing-import.js';
@@ -160,6 +160,7 @@ function CallsFromFile({ read, billing, plan, enter, onEnter, pay, onPay, named,
         <div className="p-import__start">
           <small className="p-import__why">
             The report starts on <b>{dayLabel(suggested.start_date)}</b> with an opening balance of <b>{money(suggested.opening_balance)}</b> at <b>{money(suggested.price_per_call)}</b> a call.
+            {!isOwner() && ' The rate is not entered: the Owner sets it, and these calls are charged at it once set.'}
           </small>
           <button type="button" className="btn btn--quiet btn--sm" disabled={starting} onClick={() => start(suggested)}>{starting ? 'Saving…' : 'Start Billing From the Report'}</button>
           {startError && <small className="p-import__why is-warn">{startError}</small>}
@@ -295,7 +296,7 @@ function UploadForm({ customers, onDone }) {
     }
     return () => { gone = true; };
   }, [canEnterCalls, kind, chosen?.id, read, termsSet]);
-  const plan = useMemo(() => (kind === 'billing' && read && billing?.data?.account ? planBillingDays(read.days, billing.data) : null), [kind, read, billing]);
+  const plan = useMemo(() => (kind === 'billing' && read && billing?.data?.account ? planBillingDays(read.days, billing.data, new Date(), { rates: isOwner() }) : null), [kind, read, billing]);
   // Buyers the report names ("VGK", "P30-Balance Data") when the chosen one is not among them.
   const named = useMemo(() => {
     if (!read || !chosen?.nickname) return [];
@@ -308,8 +309,9 @@ function UploadForm({ customers, onDone }) {
     setEnterCalls(Boolean(plan) && !named.length && toEnter(plan).length > 0);
     setEnterPayments(Boolean(plan) && !named.length && toPay(plan).length > 0);
   }, [plan, named]);
-  const startBilling = async (terms) => {
-    await saveTerms(chosen.id, terms);
+  // Only the Owner gives a client their rate: anyone else starts billing without it, and the Owner sets it.
+  const startBilling = async ({ price_per_call: rate, ...terms }) => {
+    await saveTerms(chosen.id, isOwner() && rate !== undefined ? { ...terms, price_per_call: rate } : terms);
     setTermsSet((n) => n + 1);
   };
 

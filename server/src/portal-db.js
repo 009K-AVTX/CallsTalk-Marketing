@@ -257,7 +257,7 @@ export const findUserByEmail = (email) => one('SELECT * FROM portal_users WHERE 
 export const findUserByNickname = (nickname, exceptId = null) =>
   one('SELECT id, email, name, company FROM portal_users WHERE lower(nickname) = lower($1) AND ($2::uuid IS NULL OR id <> $2)', [nickname, exceptId]);
 export const getUser = (id) => one('SELECT * FROM portal_users WHERE id = $1', [id]);
-export const countAdmins = async () => Number((await one("SELECT count(*) FROM portal_users WHERE role = 'admin' AND status <> 'disabled'")).count);
+export const countAdmins = async () => Number((await one("SELECT count(*) FROM portal_users WHERE role IN ('admin', 'owner') AND status <> 'disabled'")).count);
 
 export const createUser = ({ email, name, company, nickname = '', role }) => one(
   `INSERT INTO portal_users (email, name, company, nickname, role) VALUES ($1, $2, $3, $4, $5) RETURNING ${USER_FIELDS}`,
@@ -279,7 +279,8 @@ export async function withAdminLock(userId, fn) {
   try {
     await client.query('BEGIN');
     await client.query('SELECT pg_advisory_xact_lock(731400)');
-    const admins = Number((await client.query("SELECT count(*) FROM portal_users WHERE role = 'admin' AND status <> 'disabled'")).rows[0].count);
+    // Owners are admins too: "keep at least one admin" counts them.
+    const admins = Number((await client.query("SELECT count(*) FROM portal_users WHERE role IN ('admin', 'owner') AND status <> 'disabled'")).rows[0].count);
     const row = (await client.query('SELECT * FROM portal_users WHERE id = $1 FOR UPDATE', [userId])).rows[0];
     const result = await fn(client, admins, row);
     await client.query('COMMIT');
@@ -303,7 +304,7 @@ const USER_ROW = `
     (SELECT max(i.expires_at) FROM portal_invites i WHERE i.user_id = u.id AND i.used_at IS NULL AND i.expires_at > now()) AS invite_expires_at,
     a.price_per_call, a.currency, a.start_date::text AS start_date, ${AVATAR_VERSION}
   FROM portal_users u LEFT JOIN billing_accounts a ON a.user_id = u.id`;
-const USER_ORDER = "ORDER BY u.role = 'admin' DESC, u.role = 'staff' DESC, lower(coalesce(nullif(u.nickname, ''), nullif(u.name, ''), u.email)), u.id";
+const USER_ORDER = "ORDER BY u.role = 'owner' DESC, u.role = 'admin' DESC, u.role = 'staff' DESC, lower(coalesce(nullif(u.nickname, ''), nullif(u.name, ''), u.email)), u.id";
 
 // Everyone (the server's own uses: staff's customer list).
 export const listUsers = () => all(`${USER_ROW} ${USER_ORDER}`);
@@ -486,6 +487,10 @@ export const saveAccount = (userId, { currency, price_per_call, opening_balance,
   RETURNING ${ACCOUNT_FIELDS}`, [userId, currency, price_per_call, opening_balance, start_date, timezone, expected]);
 
 const DAY_FIELDS = 'date::text AS date, calls, replacements, price_per_call, from_calls, version';
+
+// The Owner set a client's first rate: days entered while it was not set ($0.00) take it, so none stays unbilled.
+export const priceUnsetDays = (userId, price) => pool.query(
+  'UPDATE billing_days SET price_per_call = $2, updated_at = now(), version = version + 1 WHERE user_id = $1 AND price_per_call = 0', [userId, price]);
 
 export const listDays = (userId, upTo) =>
   all(`SELECT ${DAY_FIELDS} FROM billing_days WHERE user_id = $1 AND date <= $2 ORDER BY date`, [userId, upTo]);

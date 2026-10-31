@@ -33,11 +33,12 @@
 import { Router } from 'express';
 import { auditRouter } from './audit.js';
 import { financeRouter } from './finance.js';
+import { ownerRouter } from './owner.js';
 import { billingNoticesRouter, paymentReceived } from './billing-notices.js';
 import { telegramOf } from './telegram-link.js';
 import { config } from './config.js';
 import { hashToken, newToken, newTotpSecret } from './auth-crypto.js';
-import { requireUser } from './accounts.js';
+import { isAdminRole, requireUser } from './accounts.js';
 import { addDays, localDate, statement, validTimeZone } from './billing.js';
 import { UUID } from './db.js';
 import { emailInvite } from './email.js';
@@ -45,7 +46,7 @@ import { contactsOf } from './contacts.js';
 import {
   addPayment, countReplacedCalls, createInvite, createUser, deleteDay, deletePayment, deleteUser, deleteUserSessions, getDay, getReportInfo,
   findUserByEmail, findUserByNickname, getAccount, getUser, listAudit, listCallDays, listDays, listPayments, listReplacedCalls, getUserRow, listUserOptions,
-  listCallNumbers, listUsersPage, replaceCalls, saveAccount, saveDay, setReportPayment, syncAllCallDays, undoReplacedCall, updateUser, withAdminLock,
+  listCallNumbers, listUsersPage, priceUnsetDays, replaceCalls, saveAccount, saveDay, setReportPayment, syncAllCallDays, undoReplacedCall, updateUser, withAdminLock,
 } from './portal-db.js';
 import { HttpError } from './routes.js';
 
@@ -53,7 +54,15 @@ const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 // customer: billing and reports · staff: customer reports, and customers' logins and billing (no roles or deleting)
 // · admin: everything
-const ROLES = ['customer', 'staff', 'admin'];
+// customer: billing and Call Summaries · staff (shown as Billing): reports and customers' pages · admin: everything
+// but rates · owner: everything, the clients' rates (price per call) and the Owner Panel (owner.js).
+const ROLES = ['customer', 'staff', 'admin', 'owner'];
+const isOwner = (user) => user?.role === 'owner';
+// Rates are the Owner's alone. A rate of $0.00 means "not set yet": a new client created by an admin or Billing
+// waits for the Owner, and the days entered meanwhile take the Owner's rate when it is set (priceUnsetDays).
+const ONLY_OWNER_RATE = 'Only the Owner can set or change a client\'s rate (price per call).';
+const ONLY_OWNER_LOGIN = 'Only the Owner can change an Owner login.';
+const cents = (v) => Math.round(Number(v || 0) * 100);
 const CURRENCIES = ['USD'];
 const DEFAULT_TZ = 'America/New_York';
 
@@ -185,7 +194,7 @@ const STAFF_ROUTES = [
 ].map(([method, path]) => [method, new RegExp(`^${path}$`)]);
 
 async function staffOnCustomers(req, res, next) {
-  if (req.user.role === 'admin' || (req.method === 'POST' && req.path === '/users') || /^\/users\/[^/]+\/nickname$/.test(req.path)) return next();
+  if (isAdminRole(req.user.role) || (req.method === 'POST' && req.path === '/users') || /^\/users\/[^/]+\/nickname$/.test(req.path)) return next();
   if (!STAFF_ROUTES.some(([method, re]) => method === req.method && re.test(req.path))) throw new HttpError(403, 'You do not have permission to access this page.');
   const user = await getUser(req.path.split('/')[2]);
   if (user && user.role !== 'customer') throw new HttpError(403, 'Staff can only open customer logins.');
@@ -207,6 +216,8 @@ adminRouter.patch('/users/:id/nickname', requireUser('staff', 'admin'), async (r
 adminRouter.use('/audit', auditRouter);
 adminRouter.use('/finance', financeRouter);
 adminRouter.use('/notifications', billingNoticesRouter);
+// The Owner Panel (owner.js): requireUser('owner') there, so no admin or Billing login reaches it.
+adminRouter.use('/owner', ownerRouter);
 
 // A page of logins: ?q= (name, email or company), ?role=, ?limit= (50, at most 200), ?offset=.
 // -> { results, total, counts: { customer, staff, admin }, waiting, limit, offset }
@@ -236,12 +247,15 @@ async function createLogin(req, res) {
   const name = str(body.name, 100);
   const company = str(body.company, 120);
   const role = ROLES.includes(body.role) ? body.role : 'customer';
-  if (req.user.role !== 'admin' && role !== 'customer') throw new HttpError(403, 'Staff can only add customer logins.');
+  if (!isAdminRole(req.user.role) && role !== 'customer') throw new HttpError(403, 'Billing logins can only add customers.');
+  if (role === 'owner' && !isOwner(req.user)) throw new HttpError(403, 'Only the Owner can add another Owner login.');
+  // Anyone may add a client, but only the Owner gives them a rate; without one the client waits for the Owner.
+  if (role === 'customer' && !isOwner(req.user) && cents(body.price_per_call)) throw new HttpError(403, ONLY_OWNER_RATE);
   if (!EMAIL.test(email)) throw new HttpError(400, 'Please enter a valid email address.');
   if (!name) throw new HttpError(400, 'Please enter the person\'s name.');
   if (role === 'customer' && !company) throw new HttpError(400, 'Please enter the customer\'s company.');
   if (await findUserByEmail(email)) throw new HttpError(409, 'A login with this email already exists.');
-  const billing = role === 'customer' ? terms(body) : null;
+  const billing = role === 'customer' ? terms(isOwner(req.user) ? body : { ...body, price_per_call: 0 }) : null;
   const nick = role === 'customer' ? await nickname(body.nickname) : '';
 
   const user = await createUser({ email, name, company, nickname: nick, role }).catch(nicknameTaken);
@@ -253,12 +267,13 @@ adminRouter.patch('/users/:id', async (req, res) => {
   const user = await loadUser(req);
   const body = req.body || {};
   const self = user.id === req.user.id;
+  if ((user.role === 'owner' || body.role === 'owner') && !isOwner(req.user)) throw new HttpError(403, ONLY_OWNER_LOGIN);
   const change = {};
   if (body.name !== undefined) change.name = str(body.name, 100) || user.name;
   if (body.company !== undefined) change.company = str(body.company, 120);
   if (body.nickname !== undefined) change.nickname = await nickname(body.nickname, user.id);
   if (body.role !== undefined && body.role !== user.role) {
-    if (req.user.role !== 'admin') throw new HttpError(403, 'Only admins can change a login\'s role.');
+    if (!isAdminRole(req.user.role)) throw new HttpError(403, 'Only admins can change a login\'s role.');
     if (!ROLES.includes(body.role)) throw new HttpError(400, 'Unknown role.');
     if (self) throw new HttpError(400, 'You cannot change your own role.');
     change.role = body.role;
@@ -272,7 +287,7 @@ adminRouter.patch('/users/:id', async (req, res) => {
   // Checked against the login as it is inside the lock, not as it was read above.
   const updated = await withAdminLock(user.id, async (db, admins, now) => {
     if (!now) throw new HttpError(404, 'That login no longer exists.');
-    const removesAdmin = now.role === 'admin' && now.status !== 'disabled' && ((change.role && change.role !== 'admin') || change.status === 'disabled');
+    const removesAdmin = isAdminRole(now.role) && now.status !== 'disabled' && ((change.role && !isAdminRole(change.role)) || change.status === 'disabled');
     if (removesAdmin && admins <= 1) throw new HttpError(400, 'Keep at least one admin login.');
     const row = await updateUser(user.id, change, versionOf(body), db).catch(nicknameTaken);
     if (!row) throw outOfDate();
@@ -285,6 +300,7 @@ adminRouter.patch('/users/:id', async (req, res) => {
 adminRouter.post('/users/:id/invite', async (req, res) => {
   const user = await loadUser(req);
   if (user.id === req.user.id) throw new HttpError(400, 'Ask another admin to reset your own login.');
+  if (user.role === 'owner' && !isOwner(req.user)) throw new HttpError(403, ONLY_OWNER_LOGIN);
   if (user.status === 'disabled') throw new HttpError(400, 'Reactivate this login first.');
   const reset = Boolean(user.password_hash);
   res.json({ reset, ...await sendInvite(user, { createdBy: req.user.id, reset }) });
@@ -293,8 +309,9 @@ adminRouter.post('/users/:id/invite', async (req, res) => {
 adminRouter.delete('/users/:id', async (req, res) => {
   const user = await loadUser(req);
   if (user.id === req.user.id) throw new HttpError(400, 'You cannot delete your own login.');
+  if (user.role === 'owner' && !isOwner(req.user)) throw new HttpError(403, ONLY_OWNER_LOGIN);
   await withAdminLock(user.id, async (db, admins, now) => {
-    if (now?.role === 'admin' && now.status !== 'disabled' && admins <= 1) throw new HttpError(400, 'Keep at least one admin login.');
+    if (isAdminRole(now?.role) && now.status !== 'disabled' && admins <= 1) throw new HttpError(400, 'Keep at least one admin login.');
     if (now) await deleteUser(user.id, db);
   });
   res.json({ ok: true });
@@ -316,8 +333,17 @@ adminRouter.get('/users/:id/activity', async (req, res) => {
 
 adminRouter.put('/users/:id/billing', async (req, res) => {
   const user = await loadCustomer(req);
-  const saved = await saveAccount(user.id, terms(req.body || {}, await getAccount(user.id) || {}), versionOf(req.body));
+  const current = await getAccount(user.id) || {};
+  const next = terms(req.body || {}, current);
+  // The rate is the Owner's: anyone else's save keeps it as it is, and is refused if it tries to change it.
+  if (cents(next.price_per_call) !== cents(current.price_per_call) && !isOwner(req.user)) {
+    if (current.price_per_call === undefined && !cents(next.price_per_call)) next.price_per_call = '0.00';
+    else throw new HttpError(403, ONLY_OWNER_RATE);
+  }
+  const saved = await saveAccount(user.id, next, versionOf(req.body));
   if (!saved) throw outOfDate();
+  // The client's first rate: the days entered while it was not set are billed at it.
+  if (!cents(current.price_per_call) && cents(next.price_per_call)) await priceUnsetDays(user.id, next.price_per_call);
   await syncAllCallDays(user.id); // Call Summaries uploaded before the terms were set, or before a new start date
   res.json({ user: userView(user), ...await billingView(user) });
 });
@@ -340,7 +366,9 @@ adminRouter.put('/users/:id/days/:date', async (req, res) => {
   // Calls replaced one by one stay counted until they are put back.
   const picked = await countReplacedCalls(user.id, date);
   if (replacements < picked) throw new HttpError(400, `${picked} call${picked === 1 ? ' was' : 's were'} replaced on ${dayText(date)}, so the day needs at least ${picked} replacement${picked === 1 ? '' : 's'}. Undo them under Replaced Calls first.`);
-  const price = amount(req.body?.price_per_call, 'price per call', { min: 0, required: false }) ?? existing?.price_per_call ?? account.price_per_call;
+  const kept = existing?.price_per_call ?? account.price_per_call;
+  const price = amount(req.body?.price_per_call, 'price per call', { min: 0, required: false }) ?? kept;
+  if (cents(price) !== cents(kept) && !isOwner(req.user)) throw new HttpError(403, ONLY_OWNER_RATE);
   if (!await saveDay(user.id, { date, calls, replacements, price_per_call: price }, versionOf(req.body))) throw outOfDate();
   res.json({ user: userView(user), ...await billingView(user) });
 });
