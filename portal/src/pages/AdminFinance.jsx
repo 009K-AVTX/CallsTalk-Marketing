@@ -5,7 +5,7 @@ import { DownloadMenu, period, Period } from '../components/Filters.jsx';
 import Icon from '../components/Icons.jsx';
 import { ErrorNote, PageHead } from '../components/Shell.jsx';
 import { downloadCsv, downloadPdf } from '../exports.js';
-import { dayLabel, money } from '../format.js';
+import { buyerName, byBuyerName, dayLabel, money } from '../format.js';
 import { Link } from '../router.jsx';
 import useLoad from '../useLoad.js';
 import Select from '../../../src/components/Select.jsx';
@@ -120,9 +120,9 @@ export default function AdminFinance({ onSignedOut }) {
     : fetchFinance({ from: range.from, to: range.to, customer, payments_offset: paid, payments_limit: PAYMENTS }))), [range.from, range.to, range.invalid, customer, paid]);
 
   const r = report.data;
-  const customers = (people.data || []).filter((u) => u.role === 'customer');
+  const customers = (people.data || []).filter((u) => u.role === 'customer').sort(byBuyerName);
   const one = customers.find((c) => c.id === customer);
-  const name = one ? one.company || one.name || one.email : '';
+  const name = one ? buyerName(one) : '';
   const days = r?.days || [];
   const labels = days.map((d) => d.date);
   const span = r ? `${dayLabel(r.from)} to ${dayLabel(r.to)}` : '';
@@ -215,7 +215,7 @@ export default function AdminFinance({ onSignedOut }) {
           <span className="sr-only">Customer</span>
           <Select value={customer} onChange={(e) => setCustomer(e.target.value)}>
             <option value="">All Customers</option>
-            {customers.map((c) => <option key={c.id} value={c.id}>{c.company || c.name || c.email}</option>)}
+            {customers.map((c) => <option key={c.id} value={c.id}>{buyerName(c)}</option>)}
           </Select>
         </label>
       </div>

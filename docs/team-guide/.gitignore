@@ -1,0 +1,3 @@
+# Made by seed.mjs and demo-server.mjs --build each time
+.demo/
+.portal-build/

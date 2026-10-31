@@ -1,25 +1,33 @@
 // What the portal shows a signed-in customer, and the team's report uploads.
 // Same calls as docs/customer-billing-api.md and docs/portal-reports-api.md, served from our own database.
 //
-//   GET    /api/billing/statement?from=YYYY-MM-DD  (customer)  balance and the last five days' bills
+//   GET    /api/billing/statement?from=YYYY-MM-DD  (customer)  balance, the last five days' bills and their replaced calls
 //   POST   /api/billing/statement/pay              (customer)  their USDT (TRC-20) payment address (payments.js)
 //   GET    /api/portal/reports                     (customer)  their Call Summary reports, newest first
 //   GET    /api/portal/reports/:id/file            (customer for their Call Summaries, or staff/admin for any report)
 //   GET    /api/staff/customers                    (staff, admin)  customers who have a login
-//   GET    /api/staff/reports                      (staff, admin)  every report, of both kinds
+//   GET    /api/staff/reports?customer=&kind=      (staff, admin)  every report, of both kinds, or one customer's / kind's
 //   POST   /api/staff/reports                      (staff, admin)  upload a report for a customer
+//   PUT    /api/staff/reports/:id/calls            (staff, admin)  { calls }: a Call Summary's calls, read in the browser
 //   POST   /api/staff/reports/notify               (staff, admin)  { customer, reports: [ids], email, telegram }: tell the customer
 //   DELETE /api/staff/reports/:id                  (staff, admin)
 //
 // A report is one of two kinds. A billing report ('billing') is for the team: an admin can enter its calls in the
 // buyer's billing with the upload (portal/src/billing-import.js), and the buyer never sees it. A Call Summary ('calls'),
-// the day's call log, is what the buyer views and downloads, and what they are told about.
+// the day's call log, is what the buyer views and downloads, and what they are told about. Its calls come with it
+// ([{ date, called_at, caller, duration, call_time, number_called }], read as its viewer shows them: call-summary.js
+// callOf) and bill their days: each day's calls are counted from all the buyer's logs, for every toll-free number
+// (portal-db.js syncCallDays). Replies that change billing
+// say how, in `billing_days`: [{ date, before, after }].
 
 import { Router } from 'express';
 import { requireUser } from './accounts.js';
 import { addDays, HISTORY_DAYS, localDate, statement } from './billing.js';
 import { UUID } from './db.js';
-import { addReport, deleteReport, getAccount, getReportFile, getUser, listDays, listPayments, listReports, listUsers, telegramLinked } from './portal-db.js';
+import {
+  addReport, deleteReportAndSync, getAccount, getReportFile, getReportInfo, getUser, listDays, listPayments, listReplacedCalls, listReports,
+  listUsers, setReportCalls, telegramLinked,
+} from './portal-db.js';
 import { HttpError } from './routes.js';
 import { paymentDetails, paymentsEnabled } from './payments.js';
 import { config } from './config.js';
@@ -35,6 +43,31 @@ const TYPES = {
 };
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 const KINDS = ['billing', 'calls'];
+const MAX_CALLS = 5000;
+
+const text = (v, max) => (typeof v === 'string' ? v.trim().slice(0, max) : '');
+const CALL_TIME = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/;
+const dayText = (iso) => new Date(`${iso}T12:00:00Z`).toLocaleDateString('en-US', { timeZone: 'UTC', month: 'short', day: 'numeric', year: 'numeric' });
+
+// A Call Summary's calls as sent, checked: each on a day the report covers. A portal from before calls kept their
+// time to the second and number called sends neither.
+function callsOf(list, from, to) {
+  if (list.length > MAX_CALLS) throw new HttpError(400, `A Call Summary can list up to ${MAX_CALLS.toLocaleString('en-US')} calls.`);
+  return list.map((c) => {
+    const call = {
+      date: c?.date, called_at: text(c?.called_at, 40), caller: text(c?.caller, 40), duration: text(c?.duration, 20),
+      call_time: CALL_TIME.test(c?.call_time) ? c.call_time : '', number_called: /^\d{11}$/.test(c?.number_called) ? c.number_called : '',
+    };
+    if (!DAY.test(call.date || '') || !call.called_at) throw new HttpError(400, 'The calls in this file could not be read. Choose the file again.');
+    if (call.date < from || call.date > to) {
+      throw new HttpError(400, `The file has calls on ${dayText(call.date)}, outside the days chosen (${dayText(from)}${to === from ? '' : ` to ${dayText(to)}`}).`);
+    }
+    return call;
+  });
+}
+
+// Whether calls were read with their time to the second and number called (each has the fields, '' when the log lacks one).
+const readExactly = (list) => list.every((c) => typeof c?.call_time === 'string' && typeof c?.number_called === 'string');
 
 export const portalRouter = Router();
 
@@ -45,9 +78,15 @@ portalRouter.get('/billing/statement', requireUser('customer'), async (req, res)
   // Customers get the last five days at most; older bills reach them as reports.
   const asked = DAY.test(req.query.from) ? req.query.from : today;
   const from = [asked, addDays(today, -(HISTORY_DAYS - 1)), account.start_date].sort().pop();
-  res.json(statement({
-    user: req.user, account, days: await listDays(req.user.id, today), payments: await listPayments(req.user.id), from,
-  }));
+  const [days, payments, replaced] = await Promise.all([listDays(req.user.id, today), listPayments(req.user.id), listReplacedCalls(req.user.id, from)]);
+  res.json({
+    ...statement({ user: req.user, account, days, payments, from }),
+    // The calls our team replaced at their request on these days, without who did it.
+    replaced_calls: replaced.map((c) => ({
+      date: c.date, called_at: c.called_at, caller: c.caller, duration: c.duration, call_time: c.call_time, number_called: c.number_called,
+      reason: c.reason, replaced_at: c.created_at,
+    })),
+  });
 });
 
 // Where to send the payment: the customer's own USDT (TRC-20) address. It counts once confirmed on the blockchain.
@@ -65,7 +104,8 @@ portalRouter.post('/billing/statement/pay', requireUser('customer'), async (req,
 });
 
 portalRouter.get('/portal/reports', requireUser('customer'), async (req, res) => {
-  res.json({ results: await listReports(req.user.id, 'calls') });
+  // Without their nickname: that is the team's name for them.
+  res.json({ results: (await listReports(req.user.id, 'calls')).map(({ customer_name, ...r }) => r) });
 });
 
 portalRouter.get('/portal/reports/:id/file', requireUser('customer', 'staff', 'admin'), async (req, res) => {
@@ -87,12 +127,14 @@ staff.get('/customers', async (req, res) => {
   // `telegram`: they connected Telegram in their Settings, so a new report can be announced there too.
   const linked = await telegramLinked(customers.map((u) => u.id));
   res.json({ results: customers.map((u) => ({
-    id: u.id, name: u.company || u.name || u.email, login: u.email, avatar_version: u.avatar_version, telegram: linked.has(u.id),
+    id: u.id, name: u.name || u.email, company: u.company, login: u.email, nickname: u.nickname, version: u.version,
+    avatar_version: u.avatar_version, telegram: linked.has(u.id),
   })) });
 });
 
 staff.get('/reports', async (req, res) => {
-  res.json({ results: await listReports() });
+  const customer = UUID.test(req.query.customer) ? req.query.customer : null;
+  res.json({ results: await listReports(customer, KINDS.includes(req.query.kind) ? req.query.kind : null) });
 });
 
 staff.post('/reports', async (req, res) => {
@@ -111,9 +153,22 @@ staff.post('/reports', async (req, res) => {
 
   const title = (typeof body.title === 'string' ? body.title.trim().slice(0, 120) : '') || filename.replace(/\.[^.]+$/, '');
   const note = typeof body.note === 'string' ? body.note.trim().slice(0, 300) : '';
-  res.status(201).json(await addReport({
+  const calls = body.kind === 'calls' && Array.isArray(body.calls) ? callsOf(body.calls, body.period_from, body.period_to) : null;
+  const report = await addReport({
     userId: customer.id, kind: body.kind, title, note, periodFrom: body.period_from, periodTo: body.period_to, filename, contentType: TYPES[ext], content,
-  }));
+  });
+  const billingDays = calls ? await setReportCalls(report, calls, readExactly(body.calls)) : [];
+  res.status(201).json({ ...report, calls: calls ? calls.length : report.calls, billing_days: billingDays });
+});
+
+// A Call Summary's calls, for one uploaded before calls were read (or read again): its days are billed from them.
+staff.put('/reports/:id/calls', async (req, res) => {
+  const report = UUID.test(req.params.id) && await getReportInfo(req.params.id);
+  if (!report) throw new HttpError(404, 'That report no longer exists.');
+  if (report.kind !== 'calls') throw new HttpError(400, 'Only a Call Summary\'s calls are read into billing.');
+  const sent = Array.isArray(req.body?.calls) ? req.body.calls : [];
+  const billingDays = await setReportCalls(report, callsOf(sent, report.period_from, report.period_to), readExactly(sent));
+  res.json({ ...await getReportInfo(report.id), billing_days: billingDays });
 });
 
 // After an upload (one file or several): tell the customer about the new Call Summaries, once for the whole upload.
@@ -155,8 +210,7 @@ staff.post('/reports/notify', rateLimit({ windowMs: 10 * 60_000, max: 30 }), asy
 });
 
 staff.delete('/reports/:id', async (req, res) => {
-  if (UUID.test(req.params.id)) await deleteReport(req.params.id);
-  res.json({ ok: true });
+  res.json({ ok: true, billing_days: UUID.test(req.params.id) ? await deleteReportAndSync(req.params.id) : [] });
 });
 
 portalRouter.use('/staff', staff);

@@ -1,8 +1,8 @@
-// Customers' other contact methods (Telegram, Element X, Zangi, Signal, another email), set in portal Settings.
-// When a customer changes them, the team is emailed what changed.
+// Customers' other contact methods (Telegram, WhatsApp, Element X, Zangi, Signal, another email), set in portal
+// Settings and shown on the customer's admin page. When a customer changes them, the team is emailed what changed.
 //
 //   GET /api/accounts/contacts   (customer)  -> { contacts }
-//   PUT /api/accounts/contacts   (customer)  { telegram, element, zangi, signal, email } -> { contacts, changed, notified }
+//   PUT /api/accounts/contacts   (customer)  { telegram, whatsapp, element, zangi, signal, email } -> { contacts, changed, notified }
 
 import { Router } from 'express';
 import { requireUser } from './accounts.js';
@@ -23,6 +23,15 @@ export const CONTACT_METHODS = {
       if (/^[a-zA-Z][a-zA-Z0-9_]{4,31}$/.test(handle)) return `@${handle}`;
       if (PHONE.test(v)) return tidy(v);
       throw new HttpError(400, 'Please enter a valid Telegram @username or phone number.');
+    },
+  },
+  whatsapp: {
+    label: 'WhatsApp',
+    check(v) {
+      const number = v.replace(/^(https?:\/\/)?(wa\.me|api\.whatsapp\.com\/send\?phone=)\/?/i, '');
+      // With the country code, so the team's wa.me link reaches them: 7 to 15 digits.
+      if (PHONE.test(number) && /^\d{7,15}$/.test(number.replace(/\D/g, ''))) return tidy(number);
+      throw new HttpError(400, 'Please enter a valid WhatsApp number with the country code, for example +1 555 123 4567.');
     },
   },
   element: {

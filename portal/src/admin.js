@@ -29,17 +29,31 @@ export const sendLink = (id) => authed(`${user(id)}/invite`, json('POST'));
 export const removeUser = (id) => authed(user(id), json('DELETE'));
 
 export const fetchBilling = (id) => authed(`${user(id)}/billing`);
+// The latest audit entries by or about a login: { rows }. Staff get these for customers too.
+export const fetchActivity = (id, limit = 8) => authed(`${user(id)}/activity?limit=${limit}`);
 export const saveTerms = (id, terms) => authed(`${user(id)}/billing`, json('PUT', terms));
-// `replacements`: calls from that day that are not charged (shown as "125 - 2").
+// `replacements`: calls from that day that are not charged (shown as "125 - 2"); undefined keeps what the day has.
 // `version`: the day's version as shown (0: no calls entered yet; undefined: not known, the save wins).
 export const saveDay = (id, date, calls, price, replacements, version) => authed(`${user(id)}/days/${date}`, json('PUT', {
   calls: Number(calls),
-  replacements: Number(replacements || 0),
+  ...(replacements !== undefined && { replacements: Number(replacements || 0) }),
   ...(price !== '' && price != null && { price_per_call: price }),
   ...(Number.isInteger(version) && { version }),
 }));
 export const clearDay = (id, date, version) => authed(`${user(id)}/days/${date}${Number.isInteger(version) ? `?version=${version}` : ''}`, json('DELETE'));
+// Calls the buyer asked (in the portal chat) to have replaced, picked in one of their Call Summaries: each is taken off
+// its day's bill. `calls`: [{ date, called_at, caller, duration }] as the log shows them (call-summary.js callOf).
+// -> the billing, with `replaced`: how many were newly replaced.
+// The calls replaced on the days from `from` to `to`, latest day first.
+export const fetchReplacedCalls = async (id, { from, to }) => (await authed(`${user(id)}/replaced-calls${query({ from, to })}`)).results;
+export const replaceCalls = (id, report, calls, reason) => authed(`${user(id)}/replaced-calls`, json('POST', { report, calls, reason }));
+export const undoReplacedCall = (id, callId) => authed(`${user(id)}/replaced-calls/${encodeURIComponent(callId)}`, json('DELETE'));
+// Each day's calls on the days from `from` to `to`, billed or not: { results: [{ date, logged_calls, replaced_calls,
+// billed_calls, billed_replacements, price_per_call }], start_date }.
+export const fetchCallDays = (id, { from, to }) => authed(`${user(id)}/call-days${query({ from, to })}`);
 export const addPayment = (id, payment) => authed(`${user(id)}/payments`, json('POST', payment));
+// A billing report's Payment Received for a day: the server records what that day does not already have.
+export const saveReportPayment = (id, date, amount) => authed(`${user(id)}/report-payments`, json('POST', { date, amount }));
 export const removePayment = (id, paymentId) => authed(`${user(id)}/payments/${encodeURIComponent(paymentId)}`, json('DELETE'));
 
 // Where the person stands: waiting for their link, using the portal, or deactivated.
@@ -77,3 +91,7 @@ export const fetchFinance = ({ from, to, customer, payments_offset, payments_lim
 export const fetchNotices = () => authed('/admin/notifications');
 export const saveNotices = (settings) => authed('/admin/notifications', json('PUT', settings));
 export const sendSummaryNow = () => authed('/admin/notifications/test', json('POST'));
+
+// ── the Owner Panel (server/src/owner.js, the Owner only) ────────────────────
+// -> { from, to, as_of, months: [{ month: 'YYYY-MM', totals, clients: [...] }] }, newest month first.
+export const fetchOwnerMonths = ({ from, to } = {}) => authed(`/admin/owner/months${query({ from, to })}`);

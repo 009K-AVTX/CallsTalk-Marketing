@@ -1,0 +1,293 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>CallsTalk Portal Staff Quick Guide</title>
+<style>
+  @page {
+    size: A4; margin: 15mm 16mm 17mm;
+    @bottom-left { content: "CallsTalk Portal \00B7  Staff Quick Guide"; font: 7.5pt "Segoe UI", sans-serif; color: #8a8594; }
+    @bottom-right { content: "Page " counter(page) " of " counter(pages); font: 7.5pt "Segoe UI", sans-serif; color: #8a8594; }
+  }
+  :root { --ink: #1d1a22; --soft: #5c5866; --line: #e3dfe9; --accent: #7b3fb8; --tint: #f6f1fb; --warn: #9a5b00; --warn-tint: #fff6e6; }
+  * { box-sizing: border-box; }
+  html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body { margin: 0; font: 10pt/1.5 "Segoe UI", system-ui, sans-serif; color: var(--ink); background: #fff; }
+  h1, h2, h3 { font-weight: 600; line-height: 1.25; }
+  h1 { font-size: 19pt; margin: 0 0 3mm; }
+  h1 .n { color: var(--accent); margin-right: 3mm; }
+  h2 { font-size: 12.5pt; margin: 6mm 0 2mm; break-after: avoid; }
+  p { margin: 0 0 2.5mm; }
+  .lead { font-size: 10.8pt; color: var(--soft); margin-bottom: 4mm; }
+  .page { break-before: page; }
+  b, strong { font-weight: 600; }
+  .ui { font-weight: 600; }
+  ul, ol { margin: 0 0 3mm; padding-left: 6mm; }
+  li { margin-bottom: 1.2mm; }
+  ol.steps { list-style: none; padding: 0; counter-reset: s; }
+  ol.steps > li { counter-increment: s; position: relative; padding-left: 8mm; margin-bottom: 2mm; }
+  ol.steps > li::before { content: counter(s); position: absolute; left: 0; top: .2mm; width: 5.2mm; height: 5.2mm; border-radius: 50%; background: var(--accent); color: #fff; font-size: 8.5pt; font-weight: 600; text-align: center; line-height: 5.2mm; }
+
+  figure { margin: 3mm 0 4mm; break-inside: avoid; }
+  figure img { display: block; width: 100%; border-radius: 2mm; border: 1px solid #2a2530; }
+  figcaption { font-size: 8.6pt; color: var(--soft); margin-top: 1.5mm; }
+  .side { display: flex; gap: 6mm; align-items: flex-start; break-inside: avoid; }
+  .side > div { flex: 1; min-width: 0; }
+  .side > figure { flex: 0 0 auto; margin-top: 0; }
+  .w50 { width: 50mm; } .w55 { width: 55mm; } .w58 { width: 58mm; } .w62 { width: 62mm; } .w70 { width: 70mm; } .w80 { width: 80mm; }
+  .center { margin-left: auto; margin-right: auto; }
+  .h60 img { max-height: 60mm; width: auto; max-width: 100%; margin: 0 auto; }
+
+  table { width: 100%; border-collapse: collapse; margin: 2mm 0 4mm; font-size: 9.3pt; break-inside: avoid; }
+  th, td { text-align: left; vertical-align: top; padding: 1.7mm 2.4mm; border-bottom: 1px solid var(--line); }
+  thead th { font-size: 7.8pt; letter-spacing: .06em; text-transform: uppercase; color: var(--accent); border-bottom: 1.5px solid var(--accent); }
+
+  .box { border: 1px solid var(--line); background: var(--tint); border-radius: 2.5mm; padding: 3mm 4mm; margin: 3mm 0 4mm; break-inside: avoid; }
+  .box > .t { display: block; font-size: 7.8pt; letter-spacing: .08em; text-transform: uppercase; font-weight: 700; color: var(--accent); margin-bottom: 1mm; }
+  .box p:last-child, .box ul:last-child { margin-bottom: 0; }
+  .box.warn { background: var(--warn-tint); border-color: #f1d9a8; } .box.warn > .t { color: var(--warn); }
+
+  .title { border-bottom: 2px solid var(--accent); padding-bottom: 4mm; margin-bottom: 5mm; }
+  .title .brand { font-size: 10pt; font-weight: 600; color: var(--accent); letter-spacing: .04em; }
+  .title h1 { font-size: 24pt; margin: 1.5mm 0 1.5mm; }
+  .title p { color: var(--soft); margin: 0; }
+
+  .qa { break-inside: avoid; margin-bottom: 3mm; }
+  .qa .q { font-weight: 600; margin-bottom: .8mm; }
+  .qa .q::before { content: "Q"; color: var(--accent); margin-right: 2mm; }
+</style>
+</head>
+<body>
+
+<!-- ───────────────────────── 1 Getting started ───────────────────────── -->
+<section>
+  <div class="title">
+    <div class="brand">CallsTalk Portal</div>
+    <h1>Staff Quick Guide</h1>
+    <p>How to upload reports, add buyers, replace calls and record payments. portal.callstalk.com &middot; October 2026</p>
+  </div>
+
+  <h2>What Staff Can Do</h2>
+  <p>Your top bar has <span class="ui">Reports</span>, <span class="ui">Customers</span>, <span class="ui">New Customer</span> and <span class="ui">Settings</span>. You can:</p>
+  <ul>
+    <li>upload and delete buyers' reports, and tell buyers about new Call Summaries by email or Telegram;</li>
+    <li>add buyers and give them nicknames;</li>
+    <li>work a buyer's page: replace calls, enter calls, set billing terms, record payments, reset or deactivate their login.</li>
+  </ul>
+  <p>Changing roles, deleting logins, Finance and the Audit Log are for admins.</p>
+
+  <h2>First-Time Setup</h2>
+  <div class="side">
+    <div>
+      <ol class="steps">
+        <li>Install an authenticator app on your phone (Google Authenticator, Microsoft Authenticator or Authy).</li>
+        <li>Open the setup link from your email. It works once, for 7 days.</li>
+        <li>Scan the QR code with the app (or type the setup key shown beside it).</li>
+        <li>Choose a password of at least 8 characters, type the app's 6-digit code, and press <span class="ui">Activate Account</span>.</li>
+      </ol>
+    </div>
+    <figure class="w50"><img src="shots/setup.jpg" alt=""><figcaption>The setup page.</figcaption></figure>
+  </div>
+
+  <h2>Logging In</h2>
+  <div class="side">
+    <div>
+      <ol class="steps">
+        <li>Go to <b>portal.callstalk.com</b>.</li>
+        <li>Enter your email and password, then press <span class="ui">Log In</span>.</li>
+        <li>Enter the 6-digit code from your app. You land on Reports.</li>
+      </ol>
+      <p>Forgot your password? Use <span class="ui">Forgot password?</span> on the login page. Lost your phone? Ask an admin to reset your login.</p>
+    </div>
+    <figure class="w50"><img src="shots/login.jpg" alt=""><figcaption>The login page.</figcaption></figure>
+  </div>
+</section>
+
+<!-- ───────────────────────── 2 Reports ───────────────────────── -->
+<section class="page">
+  <h1><span class="n">1</span>Uploading Reports</h1>
+  <p class="lead">There are two kinds. A <b>Call Summary</b> is the day's call log: the buyer sees it, and its calls set their billing for those days. A <b>Billing Report</b> is for the team only.</p>
+
+  <h2>Upload a Call Summary</h2>
+  <div class="side">
+    <div>
+      <ol class="steps">
+        <li>Open <span class="ui">Reports</span>. Keep <span class="ui">Call Summary</span> selected.</li>
+        <li>Choose the buyer under <span class="ui">Customer</span> (listed by nickname, e.g. HHP).</li>
+        <li>Drop the Excel or CSV file on the box. Several files at once are fine, up to 3 MB each.</li>
+        <li>Check the calls and dates the portal read from the file.</li>
+        <li>Leave <span class="ui">Email the customer</span> ticked to tell them. Tick <span class="ui">Send on Telegram</span> too if they connected it.</li>
+        <li>Press <span class="ui">Upload Call Summary</span>.</li>
+      </ol>
+      <p>Their calls and balance update at once. A later export of the same day can be uploaded as it is: only its new calls are added.</p>
+    </div>
+    <figure class="w58"><img src="shots/upload-calls.jpg" alt=""><figcaption>A Call Summary ready to upload.</figcaption></figure>
+  </div>
+
+  <div class="box warn">
+    <span class="t">Uploaded the Wrong File?</span>
+    <p>Delete the wrong report first (&times; on its row under <span class="ui">Uploaded</span>), then upload the right one. Untick <span class="ui">Email the customer</span> if they shouldn't be told twice.</p>
+  </div>
+
+  <h2>Upload a Billing Report</h2>
+  <p>Choose <span class="ui">Billing Report</span> under Report Type; the rest is the same. The buyer never sees it. To enter its figures in their billing, tick <span class="ui">Enter these calls in the customer's billing</span> and check the rows before uploading. <span class="ui">Excel Template</span> gives a blank sheet in the right layout.</p>
+
+  <h2>The Uploaded List</h2>
+  <p>Below the form, every report is listed newest first. Type in <span class="ui">Filter by customer or title</span> to find one, and press &times; on its row to delete it.</p>
+</section>
+
+<!-- ───────────────────────── 3 Customers ───────────────────────── -->
+<section class="page">
+  <h1><span class="n">2</span>Customers</h1>
+  <p class="lead">Your list of buyers. Click a name to open their page.</p>
+  <figure><img src="shots/customers.jpg" alt=""><figcaption>Customers. Type a nickname and press Save; each buyer's nickname must be unique.</figcaption></figure>
+
+  <h2>Add a New Customer</h2>
+  <div class="side">
+    <div>
+      <ol class="steps">
+        <li>Press <span class="ui">New Customer</span> in the top bar.</li>
+        <li>Fill in their name, email (their Login ID), company and, optionally, a nickname.</li>
+        <li>Set <span class="ui">Price per Call</span>, <span class="ui">Opening Balance</span> (negative if they owe us, 0 for a fresh start), <span class="ui">Billing Starts</span> and their time zone.</li>
+        <li>Press <span class="ui">Create Login and Send Link</span>. They're emailed a setup link that works for 7 days.</li>
+      </ol>
+      <p>If the result says <span class="ui">Not emailed</span>, press <span class="ui">Copy Link</span> and send it to them yourself.</p>
+    </div>
+    <figure class="w70"><img src="shots/new-customer.jpg" alt=""><figcaption>The New Customer form.</figcaption></figure>
+  </div>
+</section>
+
+<!-- ───────────────────────── 4 Buyer's page ───────────────────────── -->
+<section class="page">
+  <h1><span class="n">3</span>A Buyer's Page</h1>
+  <p class="lead">Open a buyer from Customers. Their balance is at the top right. The page has three tabs.</p>
+  <figure><img src="shots/buyer-tabs.jpg" alt=""><figcaption>The page opens on Calls &amp; Replacements.</figcaption></figure>
+  <table>
+    <thead><tr><th style="width:28%">Tab</th><th>What's on It</th></tr></thead>
+    <tbody>
+      <tr><td><b>Calls &amp; Replacements</b></td><td>Replaced Calls (with the date filter), the Calls form, and the daily table.</td></tr>
+      <tr><td><b>Billing &amp; Payments</b></td><td>Billing Terms, Record a Payment, and the payments list.</td></tr>
+      <tr><td><b>Account</b></td><td>Details, Access, Contact Methods, Recent Activity and the Danger Zone.</td></tr>
+    </tbody>
+  </table>
+
+  <h2>The Date Filter</h2>
+  <div class="side">
+    <div>
+      <p>Replaced Calls shows the <b>last 7 days</b> to start with. Press the date button at its top right to change it:</p>
+      <ul>
+        <li><b>Preset:</b> open the menu at the top and pick Today, Yesterday, Last 7 Days, Last 30 Days, Last 90 Days, This Month or Last Month.</li>
+        <li><b>Range:</b> click the first day, then the last day.</li>
+        <li><b>One day:</b> click the same day twice.</li>
+      </ul>
+      <p>Press <span class="ui">Apply</span>. The Call Summaries and the replaced calls below both follow the dates.</p>
+    </div>
+    <figure class="w62"><img src="shots/date-range.jpg" alt=""><figcaption>Last 7 Days selected.</figcaption></figure>
+  </div>
+</section>
+
+<!-- ───────────────────────── 5 Replacing calls ───────────────────────── -->
+<section class="page">
+  <h1><span class="n">4</span>Replacing Calls</h1>
+  <p class="lead">Buyers ask in the portal chat, giving the call's time and caller number. They usually ask 24 to 48 hours later; Friday's calls are often done on Monday or Tuesday. Always go by the day the call was made.</p>
+  <ol class="steps">
+    <li>Open the buyer. On <span class="ui">Calls &amp; Replacements</span>, set the date filter to cover the day of the call. The default 7 days covers most requests.</li>
+    <li>Under <span class="ui">Call Summaries</span>, press <span class="ui">Choose Calls</span> beside that day.</li>
+    <li>In the log, type the caller number or time in <span class="ui">Search caller or time</span>, e.g. 5743447831 or 15:22. Tick the call. Repeat for each call they asked about.</li>
+    <li>Check the ticked calls listed above the button (&times; unticks one). Add a reason if you like. <b>The buyer sees it.</b></li>
+    <li>Press <span class="ui">Replace 2 Calls</span>, then close the log. Reply to the buyer in the chat.</li>
+  </ol>
+  <figure><img src="shots/replace-pick.jpg" alt=""><figcaption>Two calls ticked, with a reason.</figcaption></figure>
+  <p>Each replaced call comes off its day's bill at once: 23 calls with 2 replaced reads <b>23 &minus; 2</b>, and that day's balance and every later one move with it. The buyer sees the calls on their Billing page and marked in their Call Summary.</p>
+</section>
+
+<!-- ───────────────────────── 6 Replaced record, calls, payments ───────────────────────── -->
+<section class="page">
+  <h2 style="margin-top:0">Checking and Undoing Replacements</h2>
+  <figure><img src="shots/replaced-card.jpg" alt=""><figcaption>Replaced Calls: the Call Summaries of the dates, then the calls replaced on those days.</figcaption></figure>
+  <ul>
+    <li><b>Replaced on These Days</b> lists the replaced calls by day, with who replaced them. Use <span class="ui">Search</span> to find one, or <span class="ui">Only This Day</span> to narrow the card to a day.</li>
+    <li><b>Put Back</b> charges a call again (it asks you to confirm). Use it only for a call replaced by mistake.</li>
+    <li>A Call Summary marked <span class="ui">Not in billing yet</span> needs <span class="ui">Read Calls</span> pressed once before its calls can be replaced.</li>
+    <li>If a day shows <span class="ui">No calls in billing</span>, its calls must be entered first (below).</li>
+  </ul>
+
+  <h2>Days Without a Call Log</h2>
+  <div class="side">
+    <div>
+      <p>Most days are counted from the Call Summary. For a day with no log, use the <span class="ui">Calls</span> card on the same tab:</p>
+      <ol class="steps">
+        <li>Pick the day, or click it in the daily table below.</li>
+        <li>Enter <span class="ui">Total Calls</span>, and a price if it differs from the usual one.</li>
+        <li>Press <span class="ui">Save Calls</span>.</li>
+      </ol>
+      <p>A day counted from a call log is locked; to change it, upload the corrected log.</p>
+    </div>
+    <figure class="w70"><img src="shots/calls-logged.jpg" alt=""><figcaption>A day counted from its call log.</figcaption></figure>
+  </div>
+</section>
+
+<!-- ───────────────────────── 7 Billing, account ───────────────────────── -->
+<section class="page">
+  <h1><span class="n">5</span>Billing, Payments and Account</h1>
+
+  <h2>Billing &amp; Payments</h2>
+  <figure><img src="shots/terms-payment.jpg" alt=""><figcaption>Billing Terms (left) and Record a Payment (right).</figcaption></figure>
+  <ul>
+    <li><b>Billing Terms:</b> price per call, opening balance, start date and time zone. A new price applies from now on; past days keep theirs.</li>
+    <li><b>Record a Payment:</b> amount, the day it arrived and its status. <span class="ui">Shown to Customer</span> is the note they see, e.g. "Bank transfer". USDT deposits arrive by themselves; record only the others.</li>
+    <li><b>Payments:</b> &times; deletes a payment entered by mistake.</li>
+  </ul>
+
+  <h2>Account and the Danger Zone</h2>
+  <p>The Account tab has the buyer's details, login status, contact methods and recent activity. Actions that lock someone out sit in the red <b>Danger Zone</b> at the bottom. Each asks you to confirm; deleting a login is for admins.</p>
+  <ul>
+    <li><span class="ui">Reset and Send Link</span>: signs them out and emails a new setup link (lost phone, forgotten password).</li>
+    <li><span class="ui">Deactivate</span>: blocks sign-in. Nothing is deleted, and it can be reactivated.</li>
+  </ul>
+  <figure><img src="shots/staff-danger.jpg" alt=""><figcaption>The Danger Zone, as staff see it.</figcaption></figure>
+
+  <h2>Your Settings</h2>
+  <p>Open <span class="ui">Settings</span> to change your photo or password (you'll confirm it with your app's code), and to log out. Always log out on a shared computer.</p>
+</section>
+
+<!-- ───────────────────────── 8 Quick answers ───────────────────────── -->
+<section class="page">
+  <h1><span class="n">6</span>Quick Answers</h1>
+
+  <div class="qa"><div class="q">A buyer asks for a call to be replaced.</div>
+    <p>Get the day, time and caller number. Buyer's page &rarr; Calls &amp; Replacements &rarr; Choose Calls beside that day &rarr; search the number &rarr; tick &rarr; Replace. Reply in the chat.</p></div>
+  <div class="qa"><div class="q">The day I need isn't listed under Call Summaries.</div>
+    <p>Widen the date filter (e.g. Last 30 Days). If it still isn't there, the log hasn't been uploaded: upload it under Reports first.</p></div>
+  <div class="qa"><div class="q">I replaced the wrong call.</div>
+    <p>Press Put Back beside it under Replaced on These Days, then replace the right one.</p></div>
+  <div class="qa"><div class="q">The replace was refused.</div>
+    <p>The day has no calls in billing, or not enough left to replace. Press Read Calls on its Call Summary, or enter the day's calls in the Calls card.</p></div>
+  <div class="qa"><div class="q">What does "125 &minus; 2" mean?</div>
+    <p>125 calls that day, 2 of them replaced. The buyer pays for 123.</p></div>
+  <div class="qa"><div class="q">I uploaded a log with a mistake.</div>
+    <p>Delete it under Reports, then upload the corrected one. Their billing follows each change.</p></div>
+  <div class="qa"><div class="q">A buyer never got their setup link.</div>
+    <p>Buyer's page &rarr; Account &rarr; Danger Zone &rarr; Send Setup Link. Or copy the link shown and send it yourself.</p></div>
+  <div class="qa"><div class="q">A buyer lost their phone or password.</div>
+    <p>Account &rarr; Danger Zone &rarr; Reset and Send Link. They set up again from the new email.</p></div>
+
+  <h2>Where to Find Things</h2>
+  <table>
+    <thead><tr><th style="width:42%">To&hellip;</th><th>Go to</th></tr></thead>
+    <tbody>
+      <tr><td>Upload a call log or billing report</td><td>Reports</td></tr>
+      <tr><td>Add a buyer</td><td>New Customer</td></tr>
+      <tr><td>Set a nickname</td><td>Customers</td></tr>
+      <tr><td>Replace or put back a call</td><td>Buyer &rarr; Calls &amp; Replacements</td></tr>
+      <tr><td>Enter calls for a day without a log</td><td>Buyer &rarr; Calls &amp; Replacements &rarr; Calls</td></tr>
+      <tr><td>Change price or start date</td><td>Buyer &rarr; Billing &amp; Payments &rarr; Billing Terms</td></tr>
+      <tr><td>Record or delete a payment</td><td>Buyer &rarr; Billing &amp; Payments</td></tr>
+      <tr><td>Reset or deactivate a login</td><td>Buyer &rarr; Account &rarr; Danger Zone</td></tr>
+      <tr><td>Change your password</td><td>Settings</td></tr>
+    </tbody>
+  </table>
+</section>
+
+</body>
+</html>

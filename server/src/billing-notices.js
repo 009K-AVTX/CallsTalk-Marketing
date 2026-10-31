@@ -20,7 +20,7 @@ import { addDays, localDate, statement } from './billing.js';
 import { getValue, setValue } from './db.js';
 import { emailPaymentReceived, emailPaymentToTeam } from './email.js';
 import { financeReport } from './finance.js';
-import { clip, escapeHtml as escape, fitLines, formatClock, TELEGRAM_BUDGET } from './format.js';
+import { buyerName, clip, escapeHtml as escape, fitLines, formatClock, TELEGRAM_BUDGET } from './format.js';
 import { getAccount, getUser, listDays, listPayments } from './portal-db.js';
 import { rateLimit } from './rate-limit.js';
 import { HttpError } from './routes.js';
@@ -37,7 +37,7 @@ const TIME = /^([01]\d|2[0-3]):[0-5]\d$/;
 const cents = (v) => Math.round(Number(v || 0) * 100);
 const usd = (c) => `${c < 0 ? '-' : ''}$${(Math.abs(c) / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const calls = (k) => `${k.toLocaleString('en-US')} call${k === 1 ? '' : 's'}`;
-const nameOf = (u) => u.company || u.name || u.email;
+const nameOf = buyerName;
 
 export async function noticeSettings() {
   try {

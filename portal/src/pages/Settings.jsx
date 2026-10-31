@@ -132,7 +132,7 @@ function ContactsForm() {
 
 // Admins and staff (`team`) have no billing account, so they get their login and password only.
 export default function Settings({ statement, team }) {
-  const label = { admin: 'Admin', staff: 'Staff' }[team];
+  const label = { owner: 'Owner', admin: 'Admin', staff: 'Billing' }[team];
   const profile = useLoad(fetchProfile, []);
   const p = profile.data;
   const s = statement?.data;
@@ -140,7 +140,7 @@ export default function Settings({ statement, team }) {
 
   return (
     <>
-      <PageHead title="Settings" sub={team ? `Your ${team} login.` : 'Your login, your account and how to reach us.'} />
+      <PageHead title="Settings" sub={team ? `Your ${label.toLowerCase()} login.` : 'Your login, your account and how to reach us.'} />
       <ErrorNote error={profile.error} onRetry={profile.reload} />
       <div className="p-grid">
         <section className="p-card">
@@ -152,14 +152,14 @@ export default function Settings({ statement, team }) {
             <div><dt>Company</dt><dd>{(team ? p?.company : s?.customer) || '—'}</dd></div>
             <div><dt>Access</dt><dd>{label || 'Customer'}</dd></div>
           </dl>
-          <p className="p-admin__note">Signing in requires your password and a verification code from your authenticator app. If you lose access to the app, {team === 'admin' ? 'another admin' : team ? 'an admin' : 'our support team'} can reset your login.</p>
+          <p className="p-admin__note">Signing in requires your password and a verification code from your authenticator app. If you lose access to the app, {team === 'owner' ? 'another Owner' : team === 'admin' ? 'another admin' : team ? 'an admin' : 'our support team'} can reset your login.</p>
           <button type="button" className="btn btn--quiet btn--sm p-logout" onClick={logOut}><Icon name="logout" />Log Out</button>
         </section>
         {!team && (
           <section className="p-card">
             <header className="p-card__head"><div><h2>Your Account</h2><p>Set by our team. Please contact us if any changes are required.</p></div></header>
             <dl className="p-facts">
-              <div><dt>Price per Converted Call</dt><dd>{s ? money(s.price_per_call, s.currency) : '—'}</dd></div>
+              <div><dt>Price per Converted Call</dt><dd>{s ? (Number(s.price_per_call) ? money(s.price_per_call, s.currency) : 'Not set yet') : '—'}</dd></div>
               <div><dt>Currency</dt><dd>{s?.currency || '—'}</dd></div>
               <div><dt>Days Counted In</dt><dd>{s ? s.timezone.replace(/_/g, ' ') : '—'}</dd></div>
               <div><dt>Billing Since</dt><dd>{dayLabel(s?.billing_since || BILLING_FROM)}</dd></div>
@@ -168,7 +168,7 @@ export default function Settings({ statement, team }) {
         )}
         {team && <PasswordForm />}
       </div>
-      {team === 'admin' && <BillingNotices />}
+      {(team === 'admin' || team === 'owner') && <BillingNotices />}
       {!team && <TelegramConnect />}
       {!team && <ContactsForm />}
       {!team && <div className="p-grid">

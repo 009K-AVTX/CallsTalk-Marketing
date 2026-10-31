@@ -130,6 +130,15 @@
 .p-table--sheet thead th { position: sticky; top: 0; z-index: 1; letter-spacing: .02em; text-transform: none; font-size: .8rem; }
 .p-table--sheet tbody tr:nth-child(even) { background: rgba(255, 255, 255, .015); }
 
+/* Replaced calls: marked in a Call Summary, and chosen there by admins (SheetViewer pick) */
+.p-viewer__mark { width: 1%; white-space: nowrap; text-align: center; }
+.p-viewer__mark input { width: 16px; height: 16px; accent-color: var(--accent); cursor: pointer; }
+.p-viewer__sheet tr:has(.p-viewer__mark input) { cursor: pointer; }
+.p-table--sheet tr.is-replaced td:not(.p-viewer__mark) { color: var(--slate); }
+.p-table--sheet tbody tr.is-picked { background: rgba(214, 163, 255, .08); }
+.p-viewer__pick.p-form { display: grid; gap: 10px; margin-top: 14px; }
+.p-calls__log { display: block; font-size: .7rem; color: var(--slate); }
+
 /* Upload page (billing team) */
 .p-up .p-top__inner { justify-content: space-between; }
 .p-up__out { margin-left: auto; }
@@ -139,10 +148,19 @@
 .p-up__grid { display: grid; grid-template-columns: minmax(0, 420px) minmax(0, 1fr); gap: 20px; align-items: start; }
 .p-up__form { margin-bottom: 0; }
 .p-up__file { display: block; font-size: .78rem; color: var(--slate); }
+/* Uploaded: the title opens the report, as View does */
+.p-up__open.p-linkbtn { color: var(--white); text-decoration: none; text-align: left; overflow-wrap: anywhere; }
+.p-up__open.p-linkbtn:hover { color: var(--accent); text-decoration: underline; }
+.p-up__tools { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
 /* Upload: Call Summary or Billing Report */
 .p-up__kind { display: grid; gap: 6px; justify-items: start; }
 .p-up__label { font-size: .8rem; font-weight: 500; letter-spacing: .01em; }
 .p-up__kind .p-up__hint { font-size: .76rem; }
+/* Upload: a billing report sent as text, pasted in */
+.p-up__paste-open { justify-self: start; }
+.p-up__paste { display: grid; gap: 8px; }
+.p-form .p-up__paste textarea { resize: vertical; min-height: 150px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .82rem; line-height: 1.5; white-space: pre; }
+.p-up__paste-actions { display: flex; gap: 8px; }
 /* Upload: the report's days, to enter in the buyer's billing (admins) */
 .p-import { display: grid; gap: 10px; }
 .p-import__table { max-height: 260px; border: 1px solid var(--line); border-radius: 12px; }
@@ -154,8 +172,17 @@
 .p-import__table td:last-child { white-space: normal; }
 .p-import tr.is-same td, .p-import tr.is-skip td { color: var(--slate); }
 .p-import__why { display: block; font-size: .76rem; color: var(--slate); white-space: normal; }
-.p-form select, .p-form input:not([type="file"]), .p-search input { width: 100%; font: inherit; font-size: .9rem; padding: 10px 13px; border-radius: 11px; border: 1px solid #2c2632; background: #0a080c; color: var(--white); }
-.p-form input:focus, .p-form select:focus, .p-search input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(214, 163, 255, .18); }
+.p-import__why.is-warn { color: var(--warn); }
+/* With the balances and payments, the table scrolls sideways in a narrow form rather than squeezing its columns. */
+.p-import__table { max-height: 380px; }
+.p-import__table table { min-width: 660px; }
+.p-import__table td { white-space: normal; vertical-align: top; }
+.p-import__table th[scope="row"] { vertical-align: top; white-space: nowrap; }
+.p-import__start { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
+.p-import__start .p-import__why { flex: 1 1 260px; }
+.p-import__start b { color: var(--white); font-weight: 600; }
+.p-form select, .p-form input:not([type="file"]), .p-form textarea, .p-search input { width: 100%; font: inherit; font-size: .9rem; padding: 10px 13px; border-radius: 11px; border: 1px solid #2c2632; background: #0a080c; color: var(--white); }
+.p-form input:focus, .p-form select:focus, .p-form textarea:focus, .p-search input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(214, 163, 255, .18); }
 .p-form input:disabled { opacity: .55; }
 .p-form__row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .p-form input[type="date"] { color-scheme: dark; }
@@ -302,7 +329,7 @@ html { font-size: 15px; }
 .p-app .wallet__facts dt { font-size: .7rem; letter-spacing: .06em; text-transform: uppercase; }
 .p-app .wallet__facts dd { font-size: .92rem; }
 .p-app .wallet__pay { border-top-color: var(--line-soft); }
-.p-app .wallet__amount input, .p-form input, .p-form select, .p-form .c-select__btn, .p-search input { border-color: var(--line); background: rgba(0, 0, 0, .35); }
+.p-app .wallet__amount input, .p-form input, .p-form select, .p-form textarea, .p-form .c-select__btn, .p-search input { border-color: var(--line); background: rgba(0, 0, 0, .35); }
 .p-app .wallet__presets button { border-color: var(--line); font-size: .8rem; }
 .p-app .bill { border-radius: 16px; }
 .p-app .bill--today {
@@ -771,3 +798,186 @@ html { font-size: 15px; }
 .p-check.is-off { opacity: .6; }
 .p-check input:disabled { cursor: not-allowed; }
 .p-contacts__bot { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 16px 0 0; }
+/* Staff Customers: a nickname saved in its row. */
+.p-form.p-nick { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.p-form.p-nick input:not([type="file"]) { width: 140px; flex: none; }
+.p-nick__note { display: inline-flex; align-items: center; gap: 4px; margin: 0; font-size: .8rem; }
+
+/* Replaced Calls on a buyer's page (AdminUser.jsx): one date filter on the days of the calls, their Call Summaries,
+   then the calls replaced on those days, by day. Buyers ask a day or two later, so the dates are the calls' days. */
+.p-app .is-warn { color: var(--warn); }
+/* The dates' calls, in four figures: Calls, Replaced, Billable, Charges. */
+.p-rc__totals { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin: 0 0 16px; }
+.p-rc__totals.is-skeleton { min-height: 62px; border-radius: 12px; }
+.p-rc__totals > span { display: flex; flex-direction: column; gap: 2px; min-width: 0; padding: 10px 14px; border-radius: 12px; border: 1px solid var(--line); background: rgba(255, 255, 255, .015); }
+.p-rc__totals small { font-size: .74rem; letter-spacing: .04em; text-transform: uppercase; color: var(--slate); }
+.p-rc__totals b { font-size: 1.15rem; font-weight: 600; color: var(--white); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.p-rc__totals b.is-warn { color: var(--warn); }
+.p-rc__unbilled { grid-column: 1 / -1; font-size: .8rem; }
+@media (max-width: 560px) { .p-rc__totals { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+/* The same calls by toll-free number called. */
+.p-card:not(.p-card--flush) .p-tablewrap.p-rc__numbers { margin: -4px 0 16px; border: 1px solid var(--line); border-radius: 12px; }
+.p-rc__numbers .p-table th, .p-rc__numbers .p-table td { padding: 9px 14px; }
+.p-rc__numbers .p-table td.is-warn { color: var(--warn); }
+.p-rc__readall { margin-left: auto; }
+.p-rc__count { font-weight: 600; color: var(--white); }
+.p-rc__step { padding: 16px 0 18px; border-top: 1px solid var(--line-soft); }
+.p-rc__title { display: flex; align-items: center; gap: 10px; margin: 0 0 12px; font-size: .92rem; font-weight: 600; color: var(--white); }
+.p-rc__reports { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.p-rc__reports li { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 20px; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--line); background: rgba(255, 255, 255, .015); }
+.p-rc__when { display: flex; flex: 0 1 240px; flex-direction: column; gap: 2px; min-width: 0; }
+.p-rc__when b { font-weight: 600; color: var(--white); }
+.p-rc__when small { font-size: .78rem; color: var(--slate); }
+.p-rc__when small .is-warn, .p-rc__when small.is-warn { color: var(--warn); }
+.p-rc__what { display: flex; flex: 1 1 220px; flex-direction: column; gap: 2px; min-width: 0; }
+.p-rc__what > span { color: var(--on-dark); overflow-wrap: anywhere; }
+.p-rc__what small { font-size: .8rem; color: var(--slate); }
+.p-rc__what small.is-warn { color: var(--warn); }
+.p-rc__go { display: flex; flex-wrap: wrap; gap: 8px; margin-left: auto; }
+.p-rc__more { margin-top: 10px; font-size: .84rem; }
+.p-rc__none { margin: 0; padding: 14px; border-radius: 12px; border: 1px dashed var(--line); font-size: .86rem; color: var(--on-dark-soft); }
+.p-rc__none a { color: var(--accent); }
+.p-rows.is-skeleton.p-rc__loading { min-height: 64px; }
+.p-rc__history { display: grid; gap: 12px; padding-top: 16px; border-top: 1px solid var(--line-soft); }
+.p-rc__bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; }
+.p-rc__bar .p-rc__title { margin: 0; }
+.p-rc__search { flex: 0 1 280px; }
+.p-rc__hint { margin: 0; font-size: .82rem; }
+.p-rc__groups { display: grid; gap: 16px; }
+.p-rc__group h4 { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; margin: 0 0 8px; font-size: .84rem; font-weight: 600; color: var(--white); }
+.p-rc__group h4 small { font-size: .78rem; font-weight: 400; color: var(--slate); }
+.p-rc__group h4 .p-linkbtn { margin-left: auto; font-size: .78rem; font-weight: 500; }
+.p-rc__calls { margin: 0; padding: 0; list-style: none; overflow: hidden; border-radius: 12px; border: 1px solid var(--line); }
+.p-rc__calls li { display: grid; grid-template-columns: 6.5em minmax(0, 1fr) minmax(0, 16em) auto; grid-template-areas: "time call by undo"; align-items: center; gap: 4px 16px; padding: 10px 14px; }
+.p-rc__calls li + li { border-top: 1px solid var(--line-soft); }
+.p-rc__time { grid-area: time; font-size: .88rem; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--white); overflow-wrap: anywhere; }
+.p-rc__call { grid-area: call; display: flex; flex-direction: column; min-width: 0; }
+.p-rc__call b { font-weight: 500; font-variant-numeric: tabular-nums; color: var(--white); overflow-wrap: anywhere; }
+.p-rc__call small, .p-rc__by { font-size: .78rem; color: var(--slate); overflow-wrap: anywhere; }
+.p-rc__by { grid-area: by; line-height: 1.45; }
+.p-rc__undo { grid-area: undo; }
+
+/* Picking calls in a Call Summary (SheetViewer pick): find a call, see what is ticked, then replace. The viewer opens
+   inside a card on a buyer's page: its sheet keeps its own edges (not a card table's), and the dialog never grows wider
+   than the screen. While picking it keeps one height, so it does not jump as the search narrows the rows. */
+.p-viewer { grid-template-columns: minmax(0, 1fr); }
+.p-viewer__panel { min-width: 0; justify-self: center; }
+.p-card .p-tablewrap.p-viewer__sheet { margin: 0; }
+.p-viewer__panel.is-picking { height: calc(100vh - 48px); }
+.p-viewer__find { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; margin-bottom: 12px; }
+.p-search.p-viewer__search { flex: 1 1 260px; min-width: 0; max-width: 360px; }
+.p-viewer__search input { padding: 9px 12px; font-size: .86rem; }
+.p-viewer__count { margin: 0 0 0 auto; font-size: .82rem; font-variant-numeric: tabular-nums; color: var(--slate); }
+.p-viewer__chosen { display: grid; gap: 8px; }
+.p-viewer__chosen-head { display: flex; align-items: center; gap: 12px; font-size: .86rem; color: var(--white); }
+.p-viewer__chosen-head .p-linkbtn { font-size: .8rem; }
+.p-chips.p-viewer__chips { max-height: 76px; margin: 0; padding: 0; overflow-y: auto; list-style: none; }
+.p-viewer__send { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 12px; }
+.p-viewer__send label { flex: 1 1 260px; }
+
+@media (max-width: 640px) {
+  /* Lists that reach the card's edges: the card's padding is 16px here, not 22px. */
+  .p-admin__payments { margin: 0 -16px -16px; }
+  .p-admin__payments li { padding: 12px 16px; }
+  .p-search.p-rc__search { flex-basis: 100%; max-width: none; }
+  .p-rc__calls li { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "time undo" "call undo" "by by"; }
+  .p-viewer__panel.is-picking { height: 100%; }
+  .p-viewer__count { margin-left: 0; }
+  .p-search.p-viewer__search { max-width: none; }
+}
+
+/* A buyer's page in tabs (AdminUser.jsx): Calls & Replacements, Billing & Payments, Account. */
+.p-tabs { display: flex; gap: 4px; margin: 0 0 22px; overflow-x: auto; border-bottom: 1px solid var(--line); scrollbar-width: none; }
+.p-tabs::-webkit-scrollbar { display: none; }
+.p-tabs__tab { position: relative; display: inline-flex; flex: none; align-items: center; gap: 8px; padding: 10px 14px 12px; border: 0; background: none; color: var(--on-dark-soft); font: inherit; font-size: .9rem; font-weight: 500; white-space: nowrap; cursor: pointer; transition: color .2s; }
+.p-tabs__tab .p-icon { width: 16px; height: 16px; }
+.p-tabs__tab:hover { color: var(--white); }
+.p-tabs__tab.is-on { color: var(--white); }
+.p-tabs__tab.is-on .p-icon { color: var(--accent); }
+.p-tabs__tab.is-on::after { content: ''; position: absolute; left: 10px; right: 10px; bottom: -1px; height: 2px; border-radius: 2px; background: var(--accent); }
+.p-tabs__tab:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: 8px; }
+.p-tabs__short { display: none; }
+
+/* Danger Zone (as Vercel's): what locks a person out or removes them, in red at the foot of Account. */
+.p-danger-zone { border-color: rgba(255, 107, 129, .45); background: linear-gradient(180deg, rgba(255, 107, 129, .05), rgba(255, 107, 129, .015)); }
+.p-danger-zone .p-card__head h2 { color: var(--neg); }
+.p-danger-zone__list { margin: 0 -22px -22px; padding: 0; list-style: none; }
+.p-danger-zone__list li { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 20px; padding: 16px 22px; border-top: 1px solid rgba(255, 107, 129, .2); }
+.p-danger-zone__list li > span { display: flex; flex: 1 1 320px; flex-direction: column; gap: 3px; min-width: 0; }
+.p-danger-zone__list b { font-weight: 600; color: var(--white); }
+.p-danger-zone__list small { font-size: .82rem; color: var(--on-dark-soft); }
+.p-danger-zone .p-ok, .p-danger-zone .access-card__error, .p-danger-zone .p-linkbox { margin-top: 30px; }
+.p-app .btn.p-danger-btn { flex: none; border-color: rgba(255, 107, 129, .55); background: rgba(255, 107, 129, .06); color: var(--neg); }
+.p-app .btn.p-danger-btn:hover { border-color: var(--neg); background: rgba(255, 107, 129, .12); }
+.p-app .btn.p-danger-btn.is-solid { border-color: var(--neg); background: #e5484d; color: #fff; }
+.p-app .btn.p-danger-btn.is-solid:hover { background: #f2555a; }
+
+/* Date range picker (components/DateRange.jsx): a button with the range, opening presets and a month calendar. */
+.p-range { display: inline-flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 10px; border: 1px solid var(--line); background: rgba(0, 0, 0, .3); color: var(--white); font: inherit; font-size: .84rem; font-weight: 500; white-space: nowrap; cursor: pointer; transition: border-color .2s; }
+.p-range:hover, .p-range.is-open { border-color: rgba(214, 163, 255, .5); }
+.p-range:focus-visible { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(214, 163, 255, .18); }
+.p-range svg { flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.p-range__cal { width: 15px; height: 15px; color: var(--accent); }
+.p-range__chev { width: 13px; height: 13px; color: var(--on-dark-soft); transition: transform .2s; }
+.p-range.is-open .p-range__chev { transform: rotate(180deg); }
+.p-range__pop { position: fixed; z-index: 80; max-height: calc(100vh - 16px); overflow-y: auto; padding: 14px; border-radius: 16px; border: 1px solid var(--line); background: #110d16; box-shadow: 0 30px 80px -20px rgba(0, 0, 0, .95); animation: drawer-in .18s var(--ease); }
+.p-range__presets { position: relative; margin-bottom: 14px; }
+.p-range__preset { display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 9px 12px; border-radius: 10px; border: 1px solid var(--line); background: rgba(255, 255, 255, .03); color: var(--white); font: inherit; font-size: .86rem; font-weight: 500; cursor: pointer; }
+.p-range__preset:hover { background: rgba(255, 255, 255, .06); }
+.p-range__preset svg { fill: none; stroke: currentColor; stroke-width: 2; }
+.p-range__preset[aria-expanded="true"] .p-range__chev { transform: rotate(180deg); }
+.p-range__list { position: absolute; left: 0; right: 0; top: calc(100% + 4px); z-index: 2; overflow: hidden; padding: 4px; border-radius: 10px; border: 1px solid var(--line); background: #15101b; box-shadow: 0 20px 40px -16px rgba(0, 0, 0, .9); }
+.p-range__list button { display: block; width: 100%; padding: 8px 10px; border: 0; border-radius: 7px; background: none; color: var(--on-dark); font: inherit; font-size: .86rem; text-align: left; cursor: pointer; }
+.p-range__list button:hover { background: rgba(214, 163, 255, .08); }
+.p-range__list button.is-on { background: var(--accent); color: #120c18; }
+.p-range__hint { margin: 8px 0 0; font-size: .74rem; text-align: center; color: var(--slate); }
+.p-range__hint .p-linkbtn { font-size: inherit; }
+.p-range__foot { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line-soft); }
+.p-cal { user-select: none; }
+.p-cal__nav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; font-size: .88rem; font-weight: 600; color: var(--white); }
+.p-cal__nav button { display: grid; place-items: center; width: 28px; height: 28px; border: 0; border-radius: 8px; background: none; color: var(--on-dark-soft); cursor: pointer; }
+.p-cal__nav button:hover { background: rgba(255, 255, 255, .06); color: var(--white); }
+.p-cal__nav svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
+.p-cal__grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); row-gap: 2px; }
+.p-cal__dow { padding: 4px 0; font-size: .66rem; font-weight: 600; letter-spacing: .06em; text-align: center; text-transform: uppercase; color: var(--slate); }
+.p-cal__day { height: 34px; padding: 0; border: 0; border-radius: 999px; background: none; color: var(--on-dark); font: inherit; font-size: .84rem; font-variant-numeric: tabular-nums; cursor: pointer; transition: background-color .15s; }
+.p-cal__day:hover:not(:disabled) { background: rgba(255, 255, 255, .07); }
+.p-cal__day:disabled { color: #4b4452; cursor: default; }
+.p-cal__day.is-today { color: var(--accent); font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
+.p-cal__day.is-in { border-radius: 0; background: rgba(214, 163, 255, .12); color: var(--white); }
+.p-cal__day.is-from, .p-cal__day.is-to { background: var(--accent); color: #120c18; font-weight: 600; text-decoration: none; }
+.p-cal__day.is-from:not(.is-to) { border-radius: 999px 0 0 999px; }
+.p-cal__day.is-to:not(.is-from) { border-radius: 0 999px 999px 0; }
+.p-cal__day.is-from:hover, .p-cal__day.is-to:hover { background: var(--accent); }
+.p-cal__day:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+
+@media (max-width: 640px) {
+  /* Short tab names, so all three fit. */
+  .p-tabs__tab { flex: 1; justify-content: center; padding: 10px 8px 12px; }
+  .p-tabs__long { display: none; }
+  .p-tabs__short { display: inline; }
+  .p-danger-zone__list { margin: 0 -16px -16px; }
+  .p-danger-zone__list li { padding: 14px 16px; }
+  .p-danger-zone__list .btn { width: 100%; justify-content: center; }
+  .p-rc .p-card__head .p-range { width: 100%; }
+  .p-rc__go { width: 100%; margin-left: 0; }
+}
+
+/* Rates are the Owner's: where someone else would type one, they see it instead. */
+.p-rate-note { display: grid; gap: 3px; align-content: start; padding: 10px 14px; border-radius: 12px; border: 1px dashed var(--line); background: rgba(255, 255, 255, .015); }
+.p-rate-note span { font-size: .86rem; font-weight: 500; color: var(--on-dark-soft); }
+.p-rate-note b { color: var(--white); }
+.p-rate-note small { color: var(--slate); font-size: .8rem; }
+
+/* Owner Panel: a card per month, its totals in the header, the clients' table when opened. */
+.p-owner__month { margin-bottom: 16px; }
+.p-owner__month .p-card__head { align-items: center; }
+.p-owner__toggle { display: inline-flex; align-items: center; gap: 10px; padding: 0; border: 0; background: none; color: inherit; font: inherit; cursor: pointer; }
+.p-owner__chevron { width: 16px; height: 16px; transform: rotate(-90deg); transition: transform .2s; color: var(--slate); }
+.p-owner__chevron.is-open { transform: rotate(90deg); }
+.p-owner__totals { display: flex; flex-wrap: wrap; gap: 8px 22px; margin: 0; }
+.p-owner__totals dt { font-size: .72rem; letter-spacing: .06em; text-transform: uppercase; color: var(--slate); }
+.p-owner__totals dd { margin: 2px 0 0; font-weight: 600; color: var(--white); font-variant-numeric: tabular-nums; }
+.p-owner__totals dd small { color: var(--slate); font-weight: 500; }
+.p-owner__totals .is-neg { color: var(--neg); }
+.p-owner__totals .is-pos { color: var(--pos); }

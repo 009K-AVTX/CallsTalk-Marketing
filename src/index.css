@@ -746,6 +746,7 @@ h3 { font-size: 1.5rem; }
 .bill__head h3 { margin: 0; font-size: 1.02rem; letter-spacing: -.01em; color: var(--white); }
 .bill__head h3 span { font-weight: 500; color: var(--on-dark-soft); }
 .bill__note { caption-side: bottom; padding: 10px 20px 14px; text-align: left; font-size: .8rem; color: var(--slate); }
+.bill__from { display: block; margin-top: 2px; font-size: .72rem; font-weight: 400; color: var(--slate); }
 .bill__live { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 999px; font-size: .74rem; font-weight: 600; color: var(--pos); background: rgba(94, 224, 160, .12); }
 .bill__live i { width: 6px; height: 6px; border-radius: 50%; background: currentColor; animation: billing-pulse 2s infinite; }
 .bill__table { width: 100%; border-collapse: collapse; font-size: .95rem; font-variant-numeric: tabular-nums; }
@@ -759,6 +760,7 @@ h3 { font-size: 1.5rem; }
 .bill__table tfoot td.is-pos { color: var(--pos); }
 
 .billing__history { margin-bottom: 56px; }
+.billing__replaced { margin-bottom: 56px; }
 .billing__history-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 24px; margin-bottom: 16px; }
 .billing__history-head h2 { margin: 0; }
 .history { overflow-x: auto; border-radius: 16px; border: 1px solid #2c2632; background: #0e0b12; }

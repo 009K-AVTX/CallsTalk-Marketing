@@ -33,11 +33,16 @@ Every day from `from` up to and including today (today counted so far), **newest
   "days": [
     { "date": "2026-10-24", "is_today": true,
       "opening_balance": "-320.00", "calls": 64, "replacements": 0, "billable_calls": 64, "price_per_call": "35.00",
-      "charges": "2240.00", "payment_received": "2500.00", "balance": "-60.00" }
+      "charges": "2240.00", "payment_received": "2500.00", "balance": "-60.00", "from_call_log": true }
   ],
   "payments": [
     { "id": "…", "amount": "2500.00", "currency": "USD", "status": "completed",
       "method": "manual", "reference": "", "note": "Bank transfer", "date": "2026-10-24T14:20:00Z" }
+  ],
+  "replaced_calls": [
+    { "date": "2026-10-22", "called_at": "2026-10-22 14:37:25", "caller": "19736517174", "duration": "00:00:55",
+      "call_time": "2026-10-22 14:37:25", "number_called": "18779642010",
+      "reason": "Under 30 seconds", "replaced_at": "2026-10-23T09:12:00Z" }
   ]
 }
 ```
@@ -47,6 +52,8 @@ Rules the page relies on:
 - `balance` (per day) = `opening_balance − charges + payment_received`; the next day's `opening_balance` is the previous day's `balance`.
 - `charges` = `(calls − replacements) × price_per_call`. Each customer has their own price.
 - `replacements`: calls from that day that are replaced and **not charged**; shown as "125 − 2" (125 calls, 2 replaced, 123 charged). Our team often adds them after the day, and the corrected balance carries into every later day. `billable_calls` = `calls − replacements`.
+- `from_call_log`: the day's `calls` were counted from its Call Summaries (the call logs under Reports): every distinct call (time and caller) in them, replaced ones included. Each upload or deletion of a Call Summary counts its days again, so the balance follows the logs at once. `false`: the calls were entered by our team (a day with no Call Summary).
+- `replaced_calls`: the calls replaced on the returned days, latest day first, as their Call Summary shows them (`called_at`, `caller`, `duration`; `call_time` to the second and the toll-free `number_called`, `''` for calls replaced before these were kept), with the team's `reason` ('' when none). Buyers ask for a replacement in the portal chat; an admin chooses the call in that day's Call Summary, which adds one to the day's `replacements`. Who replaced it is not returned. A day's `replacements` can be more than its listed calls when a billing report gave them as a number ("125 − 2").
 - `amount_due` = `max(−balance, 0)`.
 - `payments.status`: `pending` | `completed` | `failed`. Only completed payments count towards the balance.
 - 403 for a login that is not a customer, 404 when their billing is not set up; the `detail` is shown on the page.

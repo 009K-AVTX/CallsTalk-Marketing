@@ -25,12 +25,18 @@ export const callsLabel = (day) => (day.replacements
   ? `${day.calls.toLocaleString('en-US')} − ${day.replacements.toLocaleString('en-US')}`
   : day.calls.toLocaleString('en-US'));
 
+// A call's time as its log gives it, without the day when the log writes that too ("2026-10-26 11:17:24" -> "11:17:24").
+export const callTime = (call) => {
+  const at = call.call_time || call.called_at; // to the second when the log was read with it
+  return at.startsWith(`${call.date} `) ? at.slice(call.date.length + 1) : at;
+};
+
 // The day's bill: the Telegram picture's four lines, plus the price and what the calls came to.
 export function Statement({ day, currency }) {
   const charged = billable(day);
   const rows = [
     ['Opening Balance', money(day.opening_balance, currency), tone(day.opening_balance)],
-    ['Total Calls', callsLabel(day), ''],
+    [<>Total Calls{day.from_call_log && <small className="bill__from">From your call log</small>}</>, callsLabel(day), '', 'Total Calls'],
     ['Price per Call', money(day.price_per_call, currency), ''],
     ['Call Charges', charged ? `-${money(day.charges, currency)}` : money(0, currency), charged ? 'is-neg' : ''],
     ['Payment Received', Number(day.payment_received) ? `+${money(day.payment_received, currency)}` : money(0, currency), Number(day.payment_received) ? 'is-pos' : ''],
@@ -47,8 +53,8 @@ export function Statement({ day, currency }) {
         )}
         <thead><tr><th scope="col">Metric</th><th scope="col">Amount</th></tr></thead>
         <tbody>
-          {rows.map(([label, value, cls]) => (
-            <tr key={label}><th scope="row">{label}</th><td className={cls}>{value}</td></tr>
+          {rows.map(([label, value, cls, key = label]) => (
+            <tr key={key}><th scope="row">{label}</th><td className={cls}>{value}</td></tr>
           ))}
         </tbody>
         <tfoot>
@@ -80,7 +86,7 @@ export function BalanceCard({ data }) {
             : 'Your balance is clear. Nothing to pay right now.'}
       </p>
       <dl className="acct__facts">
-        <div><dt>Price</dt><dd>{money(data.price_per_call, data.currency)} / call</dd></div>
+        <div><dt>Price</dt><dd>{Number(data.price_per_call) ? `${money(data.price_per_call, data.currency)} / call` : 'Not set yet'}</dd></div>
         <div><dt>Calls today</dt><dd>{today ? callsLabel(today) : '0'}</dd></div>
         <div><dt>Time zone</dt><dd>{zoneName(data.timezone)}</dd></div>
       </dl>
@@ -205,7 +211,7 @@ export function History({ days, currency }) {
               <tr key={d.date} className={d.is_today ? 'is-today' : ''}>
                 <th scope="row">{dayLabel(d.date)}{d.is_today && <span className="bill__live"><i aria-hidden="true" />Live</span>}</th>
                 <td className={tone(d.opening_balance)}>{money(d.opening_balance, currency)}</td>
-                <td title={d.replacements ? `${d.replacements} replaced, not charged` : undefined}>{callsLabel(d)}</td>
+                <td title={[d.from_call_log && 'From your call log', d.replacements && `${d.replacements} replaced, not charged`].filter(Boolean).join('. ') || undefined}>{callsLabel(d)}</td>
                 <td>{money(d.price_per_call, currency)}</td>
                 <td className={billable(d) ? 'is-neg' : ''}>{billable(d) ? `-${money(d.charges, currency)}` : money(0, currency)}</td>
                 <td className={Number(d.payment_received) ? 'is-pos' : ''}>{Number(d.payment_received) ? `+${money(d.payment_received, currency)}` : money(0, currency)}</td>
@@ -226,7 +232,7 @@ export function History({ days, currency }) {
           </tfoot>
         </table>
       </div>
-      <p className="billing__history-note">Statements for the last {HISTORY_DAYS} days. An entry such as “125 − 2” indicates 2 replaced calls, which are not charged. Your daily call logs are available as Call Summary reports under Reports.</p>
+      <p className="billing__history-note">Statements for the last {HISTORY_DAYS} days. An entry such as “125 − 2” indicates 2 replaced calls, which are not charged. Each day's calls are counted from your call log once its Call Summary is uploaded, and the balances update with them; the logs are under Reports. To have a call replaced, send us its time and caller number in the chat.</p>
     </section>
   );
 }
@@ -289,6 +295,24 @@ export function BillingSections({ data, onPaid }) {
       </section>
 
       <History days={data.days} currency={data.currency} />
+
+      {data.replaced_calls?.length > 0 && (
+        <section className="billing__payments billing__replaced" aria-labelledby="replaced-title">
+          <div className="billing__history-head">
+            <h2 id="replaced-title">Replaced Calls</h2>
+            <span className="billing__history-range">Last {HISTORY_DAYS} Days</span>
+          </div>
+          <ul>
+            {data.replaced_calls.map((c) => (
+              <li key={`${c.date} ${c.called_at} ${c.caller} ${c.call_time} ${c.number_called}`}>
+                <span>{dayLabel(c.date)} · {callTime(c)}<small>{[c.caller, c.number_called && `to ${c.number_called}`, c.duration, c.reason].filter(Boolean).join(' · ')}</small></span>
+                <span className="billing__status is-completed">Replaced</span>
+                <b>Not charged</b>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       <section className="billing__payments" aria-labelledby="payments-title">
         <div className="billing__history-head">

@@ -103,9 +103,11 @@ export async function verifyCode(tempToken, code, email) {
   signedInAs(data, email);
 }
 
-export const isAdmin = () => loadSession()?.role === 'admin';
-// Staff upload customer reports and nothing else; admins can too.
-export const canUploadReports = () => ['staff', 'admin'].includes(loadSession()?.role);
+// The Owner is an admin who also sets clients' rates and has the Owner Panel (the server checks it again).
+export const isOwner = () => loadSession()?.role === 'owner';
+export const isAdmin = () => ['admin', 'owner'].includes(loadSession()?.role);
+// Staff upload customer reports and work customers' pages (logins, billing, calls, payments); admins can too.
+export const canUploadReports = () => ['staff', 'admin', 'owner'].includes(loadSession()?.role);
 
 // The one-use setup link from the email: set a password and add the authenticator app.
 export const fetchInvite = (token) => call(`/accounts/invite/${encodeURIComponent(token)}`);

@@ -1,215 +1,158 @@
-// Daily calls read from a billing report, for an admin to enter in the buyer's billing along with the upload.
+// A billing report's days (billing-read.js), set against the buyer's billing, for an admin to enter along with the
+// upload: each day's calls and replacements, and its Payment Received.
 //
-// Two layouts are read:
-//  - the Excel template (Upload.jsx downloadTemplate): the "Daily Bills" sheet, or the first sheet with a Date and a
-//    Total Calls column, a row per day;
-//  - the team's own report: a "Financial Overview" box per day, on one sheet or several, titled with the day
-//    ("Oct 22, 2026 · Financial Overview") over Metric and Amount rows. Its Total No. is the day's calls, "125 - 2"
-//    being 125 calls with 2 replaced. It has no price, so each day keeps the one billing has.
-// Only each day's calls, replacements and price are read. The portal works out charges and balances itself, and
-// payments are never taken from a file: USDT deposits come in on their own and the team records the others, so
-// reading them here would count them twice.
+// Calls: each day is saved through the same call as the customer page's Calls (PUT /api/admin/users/:id/days/:date),
+// so the same checks apply, a day someone else changed meanwhile is refused, and each one is in the Audit Log. A day
+// billed from its Call Summaries keeps the call log's count; only its replacements can come from the report.
 //
-// Each day is saved through the same call as the customer page's Calls (PUT /api/admin/users/:id/days/:date), so the
-// same checks apply, a day someone else changed meanwhile is refused, and each one is in the Audit Log.
+// Payments: a day's Payment Received is recorded as the part of it the day does not already have (typed in by the
+// team, a USDT deposit, or this report uploaded before), so the same money is never counted twice
+// (POST /api/admin/users/:id/report-payments, server/src/portal-db.js setReportPayment).
+//
+// Opening and closing balances are not saved: the portal works them out (balance = opening + payment received -
+// (calls - replacements) x price). The report's are checked against it, and any difference is shown.
 
-import { isConflict, saveDay } from './admin.js';
+import { settle } from './billing-read.js';
 
-const HEADS = {
-  date: ['date'],
-  calls: ['total calls', 'calls'],
-  replacements: ['replacements', 'replaced'],
-  price: ['price per call', 'price'],
-};
-// A Financial Overview box's rows, by their Metric.
-const METRICS = { calls: ['total no', 'total number', ...HEADS.calls], replacements: HEADS.replacements, price: HEADS.price };
-const OVERVIEW = /^(.+?)\s*[·•|:–—-]\s*financial overview\b/i;
-const MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
-// "Price per Call ($)" -> "price per call"
-const norm = (v) => String(v ?? '').toLowerCase().replace(/\(.*?\)|[^a-z ]/g, '').replace(/\s+/g, ' ').trim();
+export { readBillingDays } from './billing-read.js';
 
-const iso = (y, m, d) => {
-  const t = new Date(Date.UTC(y, m - 1, d));
-  return t.getUTCFullYear() === y && t.getUTCMonth() === m - 1 && t.getUTCDate() === d ? t.toISOString().slice(0, 10) : null;
-};
+const cents = (v) => Math.round(Number(v || 0) * 100);
+const usd = (v) => `${v < 0 ? '-' : ''}$${Math.abs(Number(v)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+// A red balance typed without its minus sign, read as owed because only that adds up (billing-read.js settle).
+const FLIPPED = { opening: 'opening', closing: 'closing', both: 'both balances' };
 
-// A date cell (an Excel date number) or text: "2026-10-19", "10/19/2026" as Excel shows US dates, or "Oct 19, 2026".
-function dayOf(v, XLSX) {
-  if (typeof v === 'number') {
-    const d = XLSX.SSF.parse_date_code(v);
-    return d ? iso(d.y, d.m, d.d) : null;
-  }
-  const s = String(v ?? '').trim();
-  const ymd = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(s);
-  if (ymd) return iso(+ymd[1], +ymd[2], +ymd[3]);
-  const mdy = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(s);
-  if (mdy) return iso(+mdy[3], +mdy[1], +mdy[2]);
-  const named = /^([a-z]{3,9})\.?\s+(\d{1,2}),?\s+(\d{4})$/i.exec(s);
-  const month = named ? MONTHS.indexOf(named[1].slice(0, 3).toLowerCase()) + 1 : 0;
-  return month ? iso(+named[3], month, +named[2]) : null;
-}
-
-const num = (v) => (v === null || v === undefined || String(v).trim() === '' ? null : Number(String(v).replace(/[$,\s]/g, '')));
-
-// A day's calls as the reports write them: 125, or "125 - 2" for 125 calls with 2 replaced. `replacements` is null
-// when none are written in it.
-function callsOf(v) {
-  const m = /^(\d[\d,]*)\s*[-−–]\s*(\d[\d,]*)$/.exec(String(v ?? '').trim());
-  if (!m) return { calls: num(v), replacements: null };
-  return { calls: num(m[1]), replacements: num(m[2]) };
-}
-
-// A row's figures, as read -> { date, calls, replacements, price } for billing, or the reason it is skipped.
-// `price`: null when the cell is empty or 0, so the day keeps its price.
-function dayFrom({ day, calls, replacements, price }, XLSX) {
-  const date = dayOf(day, XLSX);
-  const counted = callsOf(calls);
-  const replaced = counted.replacements ?? num(replacements) ?? 0;
-  const priced = num(price);
-  if (!date) return { reason: `"${day ?? ''}" is not a date` };
-  if (counted.calls === null) return { reason: 'no calls entered' };
-  if (!Number.isInteger(counted.calls) || counted.calls < 0 || counted.calls > 1_000_000) return { reason: 'the calls are not a whole number' };
-  if (!Number.isInteger(replaced) || replaced < 0 || replaced > counted.calls) return { reason: 'the replacements are not a whole number up to the calls' };
-  if (priced !== null && (!Number.isFinite(priced) || priced < 0)) return { reason: 'the price is not a number' };
-  return { day: { date, calls: counted.calls, replacements: replaced, price: priced ? priced.toFixed(2) : null } };
-}
-
-// A sheet's cells as rows, and the row number Excel gives the first of them.
-function cellsOf(sheet, XLSX) {
-  const first = XLSX.utils.decode_range(sheet['!ref']).s.r + 1;
-  return { first, rows: XLSX.utils.sheet_to_json(sheet, { header: 1, raw: true, blankrows: true, defval: null }) };
-}
-
-// The template's "Daily Bills" sheet (or the first with its columns) -> { days, skipped }, or null.
-function readTable(book, file, XLSX) {
-  const names = [...book.SheetNames].sort((a, b) => (b === 'Daily Bills') - (a === 'Daily Bills'));
-  for (const name of names) {
-    const sheet = book.Sheets[name];
-    if (!sheet['!ref']) continue;
-    const { first, rows } = cellsOf(sheet, XLSX);
-    const at = rows.slice(0, 10).findIndex((r) => r.some((c) => norm(c) === 'date') && r.some((c) => HEADS.calls.includes(norm(c))));
-    if (at < 0) continue;
-    const col = Object.fromEntries(Object.entries(HEADS).map(([k, heads]) => [k, rows[at].findIndex((c) => heads.includes(norm(c)))]));
-
-    const days = [];
-    const skipped = [];
-    for (let i = at + 1; i < rows.length; i++) {
-      const cell = (k) => (col[k] < 0 ? null : rows[i][col[k]]);
-      if (cell('date') === null && cell('calls') === null) continue; // a blank row
-      const read = dayFrom({ day: cell('date'), calls: cell('calls'), replacements: cell('replacements'), price: cell('price') }, XLSX);
-      if (read.day) days.push(read.day);
-      else skipped.push({ file: file.name, row: first + i, reason: read.reason });
-    }
-    return { days, skipped };
-  }
-  return null;
-}
-
-// Every "Financial Overview" box on every sheet -> { days, skipped }, or null when there is none. A box runs from its
-// title down to the next title in the same columns (or 12 rows); each Metric is in the title's column or the two
-// beside it, and its Amount is the first filled cell to its right.
-function readOverviews(book, file, XLSX) {
-  const days = [];
-  const skipped = [];
-  for (const name of book.SheetNames) {
-    const sheet = book.Sheets[name];
-    if (!sheet['!ref']) continue;
-    const { first, rows } = cellsOf(sheet, XLSX);
-    const titles = [];
-    rows.forEach((r, i) => r.forEach((c, j) => {
-      const m = typeof c === 'string' && OVERVIEW.exec(c.trim());
-      if (m) titles.push({ i, j, day: m[1] });
-    }));
-    for (const { i, j, day } of titles) {
-      const next = titles.find((t) => t.i > i && Math.abs(t.j - j) <= 2);
-      const figures = {};
-      for (let k = i + 1; k < Math.min(next ? next.i : Infinity, i + 13, rows.length); k++) {
-        for (let c = j; c <= j + 2; c++) {
-          const metric = Object.keys(METRICS).find((key) => METRICS[key].includes(norm(rows[k][c])));
-          if (!metric || metric in figures) continue;
-          figures[metric] = rows[k].slice(c + 1).find((v) => v !== null && String(v).trim() !== '') ?? null;
-          break;
-        }
-      }
-      const read = dayFrom({ day, ...figures }, XLSX);
-      if (read.day) days.push(read.day);
-      else skipped.push({ file: file.name, row: first + i, reason: read.reason });
-    }
-  }
-  return days.length || skipped.length ? { days, skipped } : null;
-}
-
-// One file -> { days: [{ date, calls, replacements, price }], skipped: [{ file, row, reason }] }, or null when it is
-// in neither layout.
-async function readFile(file) {
-  const XLSX = await import('xlsx');
-  // CSV as plain text, so "2026-10-19" stays as written instead of becoming a date number in the browser's zone.
-  const book = XLSX.read(await file.arrayBuffer(), { raw: /\.csv$/i.test(file.name) });
-  return readTable(book, file, XLSX) ?? readOverviews(book, file, XLSX);
-}
-
-// Every chosen file -> { days, skipped } as above, oldest day first, or null when none is in the template's format.
-// A day listed twice with different figures is left out: which one is right is for the team to say.
-export async function readBillingDays(files) {
-  const read = (await Promise.all([...files].map((f) => readFile(f).catch(() => null)))).filter(Boolean);
-  if (!read.length) return null;
-  const byDate = new Map();
-  const skipped = read.flatMap((r) => r.skipped);
-  const twice = new Set();
-  for (const d of read.flatMap((r) => r.days)) {
-    const seen = byDate.get(d.date);
-    if (!seen) byDate.set(d.date, d);
-    else if (seen.calls !== d.calls || seen.replacements !== d.replacements || seen.price !== d.price) twice.add(d.date);
-  }
-  for (const date of twice) {
-    byDate.delete(date);
-    skipped.push({ date, reason: 'listed twice with different figures' });
-  }
-  return { days: [...byDate.values()].sort((a, b) => a.date.localeCompare(b.date)), skipped };
-}
-
-const localDate = (timeZone) => {
-  const p = new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date());
+const localDate = (timeZone, now = new Date()) => {
+  const p = new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(now);
   const get = (t) => p.find((x) => x.type === t).value;
   return `${get('year')}-${get('month')}-${get('day')}`;
 };
 
+// A day's calls -> { now, version, action, reason, save: { calls, replacements } }: `now` is what billing has
+// ({ calls, replacements, price }, or null when nothing is entered), `action` is new | change | same | skip.
+function callsPlan(d, s, { version, picked, today, start, rates }) {
+  if (d.calls === null) return { now: null, action: 'skip', reason: 'no calls in the report' };
+  if (d.date < start) return { now: null, action: 'skip', reason: 'before billing started' };
+  if (d.date > today) return { now: null, action: 'skip', reason: 'a future day' };
+  // Older days are not shown on the customer page either: entered without comparing (and without a version).
+  if (!s) return { now: null, action: 'new', reason: 'older than 30 days, not compared', save: { calls: d.calls, replacements: d.replacements } };
+  const why = [];
+  let calls = d.calls;
+  let { replacements } = d;
+  if (s.from_call_log && calls !== s.calls) {
+    why.push(`the call log has ${s.calls} calls, the report ${d.calls}: the call log's count stays`);
+    calls = s.calls;
+  }
+  if (replacements < picked) {
+    why.push(`${picked} call${picked === 1 ? ' was' : 's were'} replaced one by one and stay${picked === 1 ? 's' : ''} replaced`);
+    replacements = picked;
+  }
+  if (replacements > calls) replacements = calls;
+  const save = { calls, replacements };
+  if (version === undefined) {
+    const empty = !calls && !replacements;
+    return { now: null, version: 0, action: empty ? 'same' : 'new', reason: empty ? 'no calls' : why.join('; '), save };
+  }
+  const now = { calls: s.calls, replacements: s.replacements, price: s.price_per_call };
+  // Only the Owner sets rates: for anyone else the report's price is shown but never entered.
+  if (!rates && d.price !== null && Number(d.price) !== Number(now.price)) why.push(`the report's rate of ${usd(Number(d.price))} is not entered: only the Owner sets rates`);
+  const same = now.calls === calls && now.replacements === replacements && (!rates || d.price === null || Number(d.price) === Number(now.price));
+  return { now, version, action: same ? 'same' : 'change', reason: why.join('; '), save };
+}
+
+// A day's Payment Received -> { action, amount, was, reason } or null when the report has none. `amount`: what the
+// report's payment for the day will be, after the day's other payments; action is new | change | same | check | skip
+// (check: a day older than the customer page shows, set against its payments when saved).
+function paymentPlan(d, s, { own, today, start }) {
+  if (d.payment === null) return null;
+  if (d.date < start) return { action: 'skip', reason: 'before billing started' };
+  if (d.date > today) return { action: 'skip', reason: 'a future day' };
+  if (!s) return d.payment || own ? { action: 'check', amount: d.payment, reason: 'set against that day\'s other payments when saved' } : { action: 'same', amount: 0 };
+  const others = cents(s.payment_received) - cents(own);
+  const want = Math.max(0, cents(d.payment) - others);
+  const reason = others > cents(d.payment) ? `${usd(others / 100)} is recorded that day, more than the report shows`
+    : others && want ? `${usd(others / 100)} of it is already recorded` : others ? 'already recorded' : '';
+  if (want === cents(own)) return { action: 'same', amount: want / 100, reason };
+  return { action: own ? 'change' : 'new', amount: want / 100, was: Number(own || 0), reason };
+}
+
 // What entering `days` would do to the buyer's billing. `billing`: fetchBilling (admin.js) for that buyer.
-// -> each day with { now, version, action, reason }: `now` is what billing has for it ({ calls, replacements, price },
-// or null when nothing is entered), `action` is new | change | same | skip, and `version` goes back with the save.
-export function planBillingDays(days, { account, statement, day_versions: versions = {} }) {
-  const today = localDate(account.timezone);
-  const shown = new Map(statement.days.map((d) => [d.date, d])); // the last 30 days, as on the customer page
+// `rates`: whether the report's prices are entered too (the Owner only; the server refuses anyone else's).
+// -> each day as read, with the calls' { now, version, action, reason, save }, `pay` (paymentPlan) and `checks`: what
+// does not match (the report's balance, or its opening balance against the portal's).
+export function planBillingDays(days, billing, now = new Date(), { rates = true } = {}) {
+  const { account, statement, day_versions: versions = {}, replaced_calls: replaced = [], report_payments: reported = {} } = billing;
+  const today = localDate(account.timezone, now);
+  const shown = new Map(statement.days.map((d) => [d.date, d])); // the last 31 days, as on the customer page
+  const picked = replaced.reduce((m, c) => m.set(c.date, (m.get(c.date) || 0) + 1), new Map());
   return days.map((d) => {
-    if (d.date < account.start_date) return { ...d, now: null, action: 'skip', reason: 'before billing started' };
-    if (d.date > today) return { ...d, now: null, action: 'skip', reason: 'a future day' };
-    // Older days are not shown on the customer page either: entered without comparing (and without a version).
-    if (!shown.has(d.date)) return { ...d, now: null, action: 'new', reason: 'older than 30 days, not compared' };
-    if (versions[d.date] === undefined) {
-      const empty = !d.calls && !d.replacements;
-      return { ...d, now: null, version: 0, action: empty ? 'same' : 'new', ...(empty && { reason: 'no calls' }) };
-    }
     const s = shown.get(d.date);
-    const now = { calls: s.calls, replacements: s.replacements, price: s.price_per_call };
-    const same = now.calls === d.calls && now.replacements === d.replacements && (d.price === null || Number(d.price) === Number(now.price));
-    return { ...d, now, version: versions[d.date], action: same ? 'same' : 'change' };
+    const price = Number(d.price ?? s?.price_per_call ?? account.price_per_call);
+    const day = settle({ ...d, ...d.read }, price);
+    const checks = [...(d.notes || [])];
+    if (day.adds_up === false) checks.push(`balance does not add up at ${usd(price)} a call`);
+    else if (day.flipped) checks.push(`${FLIPPED[day.flipped]} read as owed`);
+    if (s && day.opening !== null && cents(day.opening) !== cents(s.opening_balance)) checks.push(`billing opens at ${usd(Number(s.opening_balance))}`);
+    return {
+      ...day,
+      rates,
+      ...callsPlan(day, s, { version: versions[d.date], picked: picked.get(d.date) || 0, today, start: account.start_date, rates }),
+      pay: paymentPlan(day, s, { own: reported[d.date], today, start: account.start_date }),
+      checks,
+    };
   });
 }
 
 export const toEnter = (plan) => plan.filter((d) => d.action === 'new' || d.action === 'change');
+export const toPay = (plan) => plan.filter((d) => ['new', 'change', 'check'].includes(d.pay?.action));
 
-// Saves the new and changed days, one at a time. -> { saved, failed: ["Oct 19, 2026: why", …] }. `label`: a day's date
-// as shown. One day failing leaves the others.
-export async function enterBillingDays(customerId, plan, label) {
+// The report's first day with an opening balance (and a price, when `priced`), preferring one with calls or a payment:
+// the template's empty days before it ("0" all along) need no billing.
+function openingDay(days, priced) {
+  const set = days.filter((x) => x.opening !== null && (!priced || x.price || x.implied_price));
+  return set.find((x) => x.calls || x.payment) || set[0] || null;
+}
+
+// Billing terms suggested by a report for a buyer who has none: from its first day with an opening balance and a price.
+// -> { start_date, opening_balance, price_per_call } or null.
+export function termsFrom(days) {
+  const d = openingDay(days, true);
+  return d ? { start_date: d.date, opening_balance: d.opening.toFixed(2), price_per_call: Number(d.price || d.implied_price).toFixed(2) } : null;
+}
+
+// A report whose days start before the buyer's billing does (billing started the day their login was made, say): the
+// earlier start it suggests, on its first day with the report's opening balance, so its calls and payments can be
+// entered. -> { start_date, opening_balance } (the price stays the account's) or null.
+export function earlierStart(days, account) {
+  const before = account ? days.filter((x) => x.date < account.start_date) : [];
+  const d = before.some((x) => x.calls || x.payment) && openingDay(before, false);
+  return d ? { start_date: d.date, opening_balance: d.opening.toFixed(2) } : null;
+}
+
+// Saves the ticked parts of the plan: the new and changed days' calls first, then the days' payments, one at a time.
+// -> { saved, paid, received, failed: ["Oct 19, 2026: why", …] }: days saved, payments saved and what they came to
+// (only what each day did not have already). `label`: a day's date as shown. One day failing leaves the others.
+export async function enterBillingDays(customerId, plan, label, { calls = true, payments = false } = {}) {
+  const { isConflict, saveDay, saveReportPayment } = await import('./admin.js');
   let saved = 0;
+  let paid = 0;
+  let received = 0;
   const failed = [];
-  for (const d of toEnter(plan)) {
+  for (const d of calls ? toEnter(plan) : []) {
     try {
-      await saveDay(customerId, d.date, d.calls, d.price, d.replacements, d.version);
+      await saveDay(customerId, d.date, d.save.calls, d.rates === false ? undefined : d.price, d.save.replacements, d.version);
       saved++;
     } catch (err) {
       failed.push(`${label(d.date)}: ${isConflict(err) ? 'someone changed it meanwhile, so it was left as it is' : err.message}`);
     }
   }
-  return { saved, failed };
+  for (const d of payments ? toPay(plan) : []) {
+    try {
+      const { report_payment: saved = {} } = await saveReportPayment(customerId, d.date, d.payment);
+      paid++;
+      received += Math.max(0, Number(saved.amount ?? d.pay.amount ?? 0) - Number(saved.before ?? d.pay.was ?? 0));
+    } catch (err) {
+      failed.push(`${label(d.date)} payment: ${err.message}`);
+    }
+  }
+  return { saved, paid, received, failed };
 }

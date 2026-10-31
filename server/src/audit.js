@@ -19,8 +19,9 @@
 import { Router } from 'express';
 import { validTimeZone } from './billing.js';
 import { UUID } from './db.js';
+import { buyerName } from './format.js';
 import {
-  addAuditEntry, auditActions, auditSummary, getAccount, getDay, getPayment, getReportInfo, getUser, listAudit, paymentStatuses,
+  addAuditEntry, auditActions, auditSummary, getAccount, getDay, getPayment, getReplacedCall, getReportInfo, getUser, listAudit, paymentStatuses,
 } from './portal-db.js';
 import { reportLimits } from './rate-limit.js';
 import { HttpError } from './routes.js';
@@ -40,13 +41,14 @@ function clean(body) {
   return out;
 }
 
-const label = (u) => u?.company || u?.name || u?.email || '';
+const label = buyerName;
+const dayChange = ({ date, before, after }) => `${date}: ${before ?? 'none'} to ${after ?? 'none'} call${after === 1 ? '' : 's'}`;
 const pick = (o, keys) => o && Object.fromEntries(keys.filter((k) => o[k] !== undefined).map((k) => [k, o[k]]));
 
 // The login a change is about, loaded before the change so a deleted login still has a name in the log.
 const subject = async (m) => {
   const user = UUID.test(m.user) ? await getUser(m.user) : null;
-  return user && { id: user.id, label: label(user), email: user.email, before: pick(user, ['name', 'company', 'role', 'status']) };
+  return user && { id: user.id, label: label(user), email: user.email, before: pick(user, ['name', 'company', 'nickname', 'role', 'status']) };
 };
 
 // method, path (under /api), action, and what to read before the change happens.
@@ -54,6 +56,7 @@ const subject = async (m) => {
 const ROUTES = [
   ['POST', /^\/admin\/users$/, 'login.create'],
   ['PATCH', /^\/admin\/users\/(?<user>[^/]+)$/, 'login.update', subject],
+  ['PATCH', /^\/admin\/users\/(?<user>[^/]+)\/nickname$/, 'login.update', subject],
   ['POST', /^\/admin\/users\/(?<user>[^/]+)\/invite$/, 'login.link', subject],
   ['DELETE', /^\/admin\/users\/(?<user>[^/]+)$/, 'login.delete', subject],
   ['PUT', /^\/admin\/users\/(?<user>[^/]+)\/billing$/, 'billing.terms', async (m) => {
@@ -70,7 +73,14 @@ const ROUTES = [
     const day = s && /^\d{4}-\d{2}-\d{2}$/.test(m.day) ? await getDay(s.id, m.day) : null;
     return s && { ...s, before: day ? { date: m.day, ...pick(day, ['calls', 'replacements', 'price_per_call']) } : { date: m.day } };
   }],
+  ['POST', /^\/admin\/users\/(?<user>[^/]+)\/replaced-calls$/, 'calls.replace', subject],
+  ['DELETE', /^\/admin\/users\/(?<user>[^/]+)\/replaced-calls\/(?<call>[^/]+)$/, 'calls.unreplace', async (m) => {
+    const s = await subject(m);
+    const c = s && UUID.test(m.call) ? await getReplacedCall(s.id, m.call) : null;
+    return s && { ...s, before: c ? pick(c, ['date', 'called_at', 'caller', 'duration', 'reason']) : null };
+  }],
   ['POST', /^\/admin\/users\/(?<user>[^/]+)\/payments$/, 'payment.create', subject],
+  ['POST', /^\/admin\/users\/(?<user>[^/]+)\/report-payments$/, 'payment.report', subject],
   ['DELETE', /^\/admin\/users\/(?<user>[^/]+)\/payments\/(?<payment>[^/]+)$/, 'payment.delete', async (m) => {
     const s = await subject(m);
     const p = s && UUID.test(m.payment) ? await getPayment(s.id, m.payment) : null;
@@ -79,6 +89,10 @@ const ROUTES = [
   ['POST', /^\/staff\/reports$/, 'report.upload', async (m, body) => {
     const user = UUID.test(body?.customer) ? await getUser(body.customer) : null;
     return user && { id: user.id, label: label(user), email: user.email };
+  }],
+  ['PUT', /^\/staff\/reports\/(?<report>[^/]+)\/calls$/, 'report.calls', async (m) => {
+    const r = UUID.test(m.report) ? await getReportInfo(m.report) : null;
+    return r && { id: r.user_id, label: r.customer, before: pick(r, ['title', 'calls']) };
   }],
   ['DELETE', /^\/staff\/reports\/(?<report>[^/]+)$/, 'report.delete', async (m) => {
     const r = UUID.test(m.report) ? await getReportInfo(m.report) : null;
@@ -168,7 +182,23 @@ export async function auditTrail(req, res, next) {
       if (action === 'login.create' && reply?.user) about = { id: reply.user.id, label: label(reply.user), email: reply.user.email };
       else if (action === 'login.link' && reply) details.emailed = reply.emailed;
       else if (action === 'report.upload' && reply?.id) details.report_id = reply.id;
+      // A Call Summary's calls are logged as how many there were, and the days of billing they changed, one line each
+      // ("Oct 28, 2026: 60 to 73 calls").
+      if (action.startsWith('report.')) {
+        if (Array.isArray(body?.calls)) details.calls = body.calls.length;
+        if (reply?.billing_days?.length) details.billing_days = reply.billing_days.map(dayChange);
+      }
       else if (action === 'report.notify' && reply) Object.assign(details, { emailed: reply.emailed, telegram_sent: reply.telegram?.sent });
+      // The report's Payment Received (amount), and what was recorded from it: the part no other payment that day covers.
+      else if (action === 'payment.report' && reply?.report_payment) Object.assign(details, { recorded: reply.report_payment.amount, was: reply.report_payment.before });
+      else if (action === 'calls.replace') {
+        // Each call as one line ("2026-10-22 14:37:25 · 19736517174"), and its day when they share one.
+        const calls = Array.isArray(body?.calls) ? body.calls : [];
+        details.calls = calls.slice(0, 100).map((c) => [c?.called_at, c?.caller].filter(Boolean).join(' · '));
+        const days = [...new Set(calls.map((c) => c?.date))];
+        if (days.length === 1 && DAY.test(days[0])) details.date = days[0];
+        if (reply?.replaced !== undefined) details.replaced = reply.replaced;
+      }
       else if (!about && /^\/(accounts|billing)\//.test(path)) about = { id: user.id, label: label(user), email: user.email };
       if (about?.email && about.email !== about.label) details.target_email = about.email;
 

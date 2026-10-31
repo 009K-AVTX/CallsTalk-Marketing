@@ -1,20 +1,30 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { LogoMark } from '../../../src/components/Logo.jsx';
-import { isAdmin } from '../../../src/lib/portal.js';
-import { fetchBilling } from '../admin.js';
+import { isAdmin, isOwner } from '../../../src/lib/portal.js';
+import { fetchBilling, saveTerms } from '../admin.js';
 import { Avatar } from '../avatar.jsx';
-import { enterBillingDays, planBillingDays, readBillingDays, toEnter } from '../billing-import.js';
-import { readCallSummary } from '../call-summary.js';
+import { earlierStart, enterBillingDays, planBillingDays, readBillingDays, termsFrom, toEnter, toPay } from '../billing-import.js';
+import { namedIn, textBook } from '../billing-read.js';
+import { callsIn, readCallSummary } from '../call-summary.js';
 import Icon from '../components/Icons.jsx';
 import { ErrorNote } from '../components/Shell.jsx';
-import { addDays, dayLabel, money, today } from '../format.js';
+import SheetViewer, { downloadReport } from '../components/SheetViewer.jsx';
+import { addDays, buyerName, dayLabel, money, today } from '../format.js';
 import {
   canNotify, deleteReport, KINDS, listAll, listCustomers, localKeyHint, MAX_MB, notifyReports, staffSession, staffSignIn, staffSignOut, staffSignInKind, uploadReport,
 } from '../reports.js';
 import { fileSize, period } from './Reports.jsx';
 import Select from '../../../src/components/Select.jsx';
 
-const ACCEPT = '.xlsx,.xls,.csv';
+const ACCEPT = '.xlsx,.xls,.csv,.txt';
+
+// A report sent as text (the "Account Summary" message), as an Excel file with a line a row: uploaded, viewed and
+// read like any other (billing-read.js textBook).
+async function textFile(text, name) {
+  const XLSX = await import('xlsx');
+  const data = XLSX.write(textBook(text, XLSX), { type: 'array', bookType: 'xlsx' });
+  return new File([data], name, { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+}
 
 // A blank billing report in the format customers know from the old Telegram bill. The sums are formulas:
 // Call Charges = (Total Calls - Replacements) x Price, Balance = Opening - Charges + Payment, and each day
@@ -85,40 +95,120 @@ function Gate({ onIn }) {
 }
 
 // "117 - 4 at $35.00": calls less replacements, and the price when there is one.
-const callsText = ({ calls, replacements, price }) => `${calls}${replacements ? ` - ${replacements}` : ''}${price ? ` at ${money(price)}` : ''}`;
-const ACTION = { new: ['New', 'is-wait'], change: ['Changes', 'is-warn'], same: ['Same', ''], skip: ['Skipped', 'is-off'] };
+const callsText = ({ calls, replacements, price }) => (calls === null ? '-' : `${calls}${replacements ? ` - ${replacements}` : ''}${price ? ` at ${money(price)}` : ''}`);
+// ["Opens -$420.00", "Paid $1,000.00", "Closes $90.00"]: the balances a report shows for a day.
+const balances = ({ opening, payment, closing }) => [opening !== null && `Opens ${money(opening)}`, payment !== null && `Paid ${money(payment)}`, closing !== null && `Closes ${money(closing)}`]
+  .filter(Boolean);
+const ACTION = { new: ['New', 'is-wait'], change: ['Changes', 'is-warn'], same: ['Same', ''], skip: ['Skipped', 'is-off'], check: ['On Save', 'is-wait'] };
+const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
 
-// Admins: the days read from the chosen report, set against what the buyer's billing has, and the choice to enter
-// them (billing-import.js). Nothing is saved unless it is ticked, and only once the report has uploaded.
-function CallsFromFile({ read, billing, plan, enter, onEnter }) {
+// The days a report has calls or payments on that cannot be entered (before billing starts, or ahead of today):
+// "Oct 28, 2026 (before billing started)".
+const leftOut = (days) => days.map((d) => `${dayLabel(d.date)} (${(d.pay?.action === 'skip' && d.pay.reason) || d.reason})`).join(', ');
+
+// Admins: the days read from the chosen report (calls, and the payments received), set against what the buyer's
+// billing has, and the choice to enter them (billing-import.js). Saved only once the report has uploaded, and only
+// what is ticked. `named`: buyers the report names when the chosen one is not among them. `onStart`: sets billing
+// terms from the report, for a buyer who has none or whose billing starts after the report's first day.
+function CallsFromFile({ read, billing, plan, enter, onEnter, pay, onPay, named, buyer, onStart }) {
+  const [starting, setStarting] = useState(false);
+  const [startError, setStartError] = useState('');
   const todo = plan ? toEnter(plan) : [];
+  const paying = plan ? toPay(plan) : [];
   const changed = todo.filter((d) => d.action === 'change').length;
   const unread = read.skipped;
+  const account = billing?.data?.account;
+  const noTerms = billing?.data && !account;
+  const suggested = noTerms ? termsFrom(read.days) : null;
+  const earlier = account ? earlierStart(read.days, account) : null;
+  const skippedCalls = plan ? plan.filter((d) => d.action === 'skip' && d.calls) : [];
+  const skippedPay = plan ? plan.filter((d) => d.pay?.action === 'skip' && d.payment) : [];
   let note;
   if (billing?.error) note = `The customer's billing could not be loaded: ${billing.error}`;
-  else if (billing?.data && !billing.data.account) note = 'This customer has no billing terms yet. Set them on their page first.';
+  else if (noTerms) note = 'This customer has no billing terms yet. Set them on their page first.';
   else if (!plan) note = 'Checking the customer\'s billing…';
+  else if (!todo.length && skippedCalls.length) note = `Nothing can be entered: ${leftOut(skippedCalls)}.`;
   else if (!todo.length) note = 'Nothing to change: the billing already has these figures.';
-  else note = `${todo.length} day${todo.length === 1 ? '' : 's'} to enter${changed ? `, ${changed} of them changing what is there` : ''}. Saved after the report uploads; each one is in the Audit Log.`;
+  else note = `${plural(todo.length, 'day')} to enter${changed ? `, ${changed} of them changing what is there` : ''}. Saved after the report uploads; each one is in the Audit Log.`;
+  let payNote;
+  if (!plan) payNote = noTerms ? 'Payments are recorded once billing terms are set.' : 'Checking the customer\'s payments…';
+  else if (!plan.some((d) => d.pay)) payNote = 'The report shows no payments received.';
+  else if (!paying.length && skippedPay.length) payNote = `Nothing can be recorded: ${leftOut(skippedPay)}.`;
+  else if (!paying.length) payNote = 'Nothing to record: the payments in the report are already in billing.';
+  else {
+    const sum = paying.reduce((t, d) => t + Number(d.pay.amount || 0), 0);
+    payNote = `${money(sum)} over ${plural(paying.length, 'day')}. Only what a day does not already have (typed in, or a deposit) is recorded, so nothing is counted twice.`;
+  }
+  const start = async (terms) => {
+    setStarting(true);
+    setStartError('');
+    try {
+      await onStart(terms);
+    } catch (err) {
+      setStartError(err.message);
+    } finally {
+      setStarting(false);
+    }
+  };
 
   return (
     <div className="p-import">
+      {named?.length > 0 && (
+        <small className="p-import__why is-warn">This report names {named.join(', ')}, not {buyer}. Check the customer before entering anything.</small>
+      )}
+      {suggested && (
+        <div className="p-import__start">
+          <small className="p-import__why">
+            The report starts on <b>{dayLabel(suggested.start_date)}</b> with an opening balance of <b>{money(suggested.opening_balance)}</b> at <b>{money(suggested.price_per_call)}</b> a call.
+            {!isOwner() && ' The rate is not entered: the Owner sets it, and these calls are charged at it once set.'}
+          </small>
+          <button type="button" className="btn btn--quiet btn--sm" disabled={starting} onClick={() => start(suggested)}>{starting ? 'Saving…' : 'Start Billing From the Report'}</button>
+          {startError && <small className="p-import__why is-warn">{startError}</small>}
+        </div>
+      )}
+      {earlier && (
+        <div className="p-import__start">
+          <small className="p-import__why is-warn">
+            {buyer}'s billing starts on <b>{dayLabel(account.start_date)}</b>, so the report's days before it are left out.
+            Start billing on <b>{dayLabel(earlier.start_date)}</b> with the report's opening balance of <b>{money(earlier.opening_balance)}</b> (now {money(account.opening_balance)} on {dayLabel(account.start_date)}) to enter them.
+          </small>
+          <button type="button" className="btn btn--quiet btn--sm" disabled={starting} onClick={() => start(earlier)}>{starting ? 'Saving…' : `Start Billing on ${dayLabel(earlier.start_date)}`}</button>
+          {startError && <small className="p-import__why is-warn">{startError}</small>}
+        </div>
+      )}
       <label className={`p-check${todo.length ? '' : ' is-off'}`}>
         <input type="checkbox" checked={enter && todo.length > 0} onChange={(e) => onEnter(e.target.checked)} disabled={!todo.length} />
         <span><b>Enter these calls in the customer's billing</b><small>{note}</small></span>
       </label>
+      <label className={`p-check${paying.length ? '' : ' is-off'}`}>
+        <input type="checkbox" checked={pay && paying.length > 0} onChange={(e) => onPay(e.target.checked)} disabled={!paying.length} />
+        <span><b>Record the payments received</b><small>{payNote}</small></span>
+      </label>
       {plan && (
         <div className="p-tablewrap p-tablewrap--inset p-import__table">
           <table className="p-table p-table--sheet">
-            <thead><tr><th scope="col">Day</th><th scope="col">In the File</th><th scope="col">In Billing Now</th></tr></thead>
+            <thead><tr><th scope="col">Day</th><th scope="col">In the File</th><th scope="col">In Billing Now</th><th scope="col">Payment</th></tr></thead>
             <tbody>
               {plan.map((d) => (
                 <tr key={d.date} className={`is-${d.action}`}>
                   <th scope="row">{dayLabel(d.date)}</th>
-                  <td>{callsText(d)}</td>
+                  <td>
+                    {callsText(d)}
+                    {balances(d).map((b) => <small key={b} className="p-import__why">{b}</small>)}
+                    {d.checks.map((c) => <small key={c} className="p-import__why is-warn">{c}</small>)}
+                  </td>
                   <td>
                     {d.now ? callsText(d.now) : '-'} <span className={`p-pill ${ACTION[d.action][1]}`}>{ACTION[d.action][0]}</span>
                     {d.reason && <small className="p-import__why">{d.reason}</small>}
+                  </td>
+                  <td>
+                    {d.pay ? (
+                      <>
+                        {money(d.pay.amount ?? 0)} <span className={`p-pill ${ACTION[d.pay.action][1]}`}>{ACTION[d.pay.action][0]}</span>
+                        {d.pay.action === 'change' && <small className="p-import__why">was {money(d.pay.was)}</small>}
+                        {d.pay.reason && <small className="p-import__why">{d.pay.reason}</small>}
+                      </>
+                    ) : '-'}
                   </td>
                 </tr>
               ))}
@@ -137,8 +227,8 @@ function CallsFromFile({ read, billing, plan, enter, onEnter }) {
 
 // What each kind of report is for, under the choice.
 const KIND_NOTES = {
-  calls: 'The day\'s call log. The customer can view and download it in their portal, and is told about it.',
-  billing: 'For our team only: the customer does not see it. An admin can enter its calls in the customer\'s billing.',
+  calls: 'The day\'s call log. Its calls are the customer\'s calls in billing for those days. The customer can view and download it in their portal, and is told about it.',
+  billing: 'For our team only: the customer does not see it. Its calls and payments received can be entered in the customer\'s billing.',
 };
 
 function UploadForm({ customers, onDone }) {
@@ -157,13 +247,19 @@ function UploadForm({ customers, onDone }) {
   // Whether the chosen customer has connected Telegram in their Settings (only they can turn it on).
   const chosen = customers.find((c) => c.id === form.customer);
   const telegramReady = Boolean(chosen?.telegram);
+  // On our server customers are picked by nickname ("Q10", in order, Q2 before Q10); those without one come last,
+  // by their login. Demo and local: the login is typed.
+  const picking = customers.some((c) => c.id !== c.login);
+  const byNickname = useMemo(() => [...customers].sort((a, b) => (!a.nickname - !b.nickname)
+    || (a.nickname || '').localeCompare(b.nickname || '', 'en', { numeric: true, sensitivity: 'base' })), [customers]);
 
-  // The chosen files, read both ways. A billing report's days (Excel template or Financial Overview format) set its
-  // period, and admins can enter them in the buyer's billing with the upload; only admins change billing. A Call
-  // Summary's calls, when it lists them as the dialer exports them, set its period and count; any other layout is
+  // The chosen files, read both ways. A billing report's days (in any of the team's layouts, billing-read.js) set its
+  // period, and the team (admins and staff, on our server) can enter their calls and payments received in the buyer's
+  // billing with the upload. A
+  // Call Summary's calls, when it lists them as the dialer exports them, set its period and count; any other layout is
   // uploaded as it is. The type follows what the files turn out to be. Upload waits until the files have been read
   // (the first time, the spreadsheet reader itself has to load).
-  const canEnterCalls = canNotify && isAdmin();
+  const canEnterCalls = canNotify;
   const [read, setRead] = useState(null); // billing days: { days, skipped } or null
   const [log, setLog] = useState(null); // calls: { calls, from, to, unread } or null
   const [reading, setReading] = useState(false);
@@ -190,6 +286,8 @@ function UploadForm({ customers, onDone }) {
     const [from, to] = kind === 'calls' ? [log?.from, log?.to] : [read?.days[0]?.date, read?.days.at(-1)?.date];
     if (from) setForm((f) => ({ ...f, periodFrom: from, periodTo: to }));
   }, [kind, read, log]);
+  const [enterPayments, setEnterPayments] = useState(false);
+  const [termsSet, setTermsSet] = useState(0); // billing terms started from the report: the billing is loaded again
   useEffect(() => {
     let gone = false;
     setBilling(null);
@@ -197,15 +295,39 @@ function UploadForm({ customers, onDone }) {
       fetchBilling(chosen.id).then((data) => !gone && setBilling({ data }), (err) => !gone && setBilling({ error: err.message }));
     }
     return () => { gone = true; };
-  }, [canEnterCalls, kind, chosen?.id, read]);
-  const plan = useMemo(() => (kind === 'billing' && read && billing?.data?.account ? planBillingDays(read.days, billing.data) : null), [kind, read, billing]);
-  useEffect(() => setEnterCalls(false), [plan]); // a new file or buyer: ticked again only after a look at the days
+  }, [canEnterCalls, kind, chosen?.id, read, termsSet]);
+  const plan = useMemo(() => (kind === 'billing' && read && billing?.data?.account ? planBillingDays(read.days, billing.data, new Date(), { rates: isOwner() }) : null), [kind, read, billing]);
+  // Buyers the report names ("VGK", "P30-Balance Data") when the chosen one is not among them.
+  const named = useMemo(() => {
+    if (!read || !chosen?.nickname) return [];
+    const found = namedIn(read.titles, customers.map((c) => c.nickname).filter((n) => n && n.length > 1));
+    return found.some((n) => n.toUpperCase() === chosen.nickname.toUpperCase()) ? [] : found;
+  }, [read, chosen?.nickname, customers]);
+  // A new file or buyer: what can be entered is ticked, with the days shown above the Upload button; nothing is when
+  // the report names another buyer.
+  useEffect(() => {
+    setEnterCalls(Boolean(plan) && !named.length && toEnter(plan).length > 0);
+    setEnterPayments(Boolean(plan) && !named.length && toPay(plan).length > 0);
+  }, [plan, named]);
+  // Only the Owner gives a client their rate: anyone else starts billing without it, and the Owner sets it.
+  const startBilling = async ({ price_per_call: rate, ...terms }) => {
+    await saveTerms(chosen.id, isOwner() && rate !== undefined ? { ...terms, price_per_call: rate } : terms);
+    setTermsSet((n) => n + 1);
+  };
 
-  const pick = (list) => {
-    const ok = [...list].filter((f) => /\.(xlsx|xls|csv)$/i.test(f.name));
-    if (ok.length < list.length) setMessage('Only Excel (.xlsx, .xls) and .csv files can be uploaded.');
+  // A .txt file is uploaded as Excel (textFile).
+  const pick = async (list) => {
+    const ok = [...list].filter((f) => /\.(xlsx|xls|csv|txt)$/i.test(f.name));
+    if (ok.length < list.length) setMessage('Only Excel (.xlsx, .xls), .csv and .txt files can be uploaded.');
     else setMessage('');
-    setFiles(ok);
+    setFiles(await Promise.all(ok.map(async (f) => (/\.txt$/i.test(f.name) ? textFile(await f.text(), f.name.replace(/\.txt$/i, '.xlsx')) : f))));
+  };
+  // A billing report sent as text, pasted in.
+  const [pasting, setPasting] = useState(null);
+  const takePasted = async () => {
+    setFiles([await textFile(pasting, `Billing report, pasted ${today()}.xlsx`)]);
+    setPasting(null);
+    if (input.current) input.current.value = '';
   };
 
   const submit = async (e) => {
@@ -221,12 +343,20 @@ function UploadForm({ customers, onDone }) {
       // single Call Summary without one is "Call Summary, 72 calls" when its calls could be counted.
       const counted = kind === 'calls' && log && !log.unread.length ? `Call Summary, ${log.calls} call${log.calls === 1 ? '' : 's'}` : '';
       const single = files.length === 1 && (form.title.trim() || counted);
-      for (const file of files) uploaded.push(await uploadReport({ ...form, kind, title: single || '', file }));
-      const who = customers.find((c) => c.id === form.customer)?.login || form.customer.trim().toLowerCase();
-      // Only what went wrong is added to the message.
+      // A Call Summary's calls go with it, read as its viewer reads them: they set the customer's calls in billing.
+      for (const file of files) {
+        const calls = kind === 'calls' ? await callsIn(await file.arrayBuffer()) : null;
+        uploaded.push(await uploadReport({ ...form, kind, title: single || '', file, calls }));
+      }
+      const who = chosen ? buyerName(chosen) : form.customer.trim().toLowerCase();
+      // Added to the message: what went into billing, and what went wrong.
       let notes = '';
-      if (kind === 'billing' && enterCalls && plan && toEnter(plan).length) {
-        const { failed } = await enterBillingDays(form.customer, plan, dayLabel);
+      const calls = enterCalls && plan && toEnter(plan).length > 0;
+      const payments = enterPayments && plan && toPay(plan).length > 0;
+      if (kind === 'billing' && (calls || payments)) {
+        const { saved, paid, received, failed } = await enterBillingDays(form.customer, plan, dayLabel, { calls, payments });
+        const done = [saved && `${plural(saved, 'day')} of calls entered`, paid && `${money(received)} recorded as received`].filter(Boolean);
+        if (done.length) notes += ` In billing: ${done.join(', ')}.`;
         if (failed.length) notes += ` Not entered in billing: ${failed.join('; ')}.`;
       }
       const telegram = byTelegram && telegramReady;
@@ -253,7 +383,7 @@ function UploadForm({ customers, onDone }) {
   return (
     <form className="p-card p-form p-up__form" onSubmit={submit}>
       <header className="p-card__head">
-        <div><h2>Upload a Report</h2><p>Excel or CSV, up to {MAX_MB} MB each.</p></div>
+        <div><h2>Upload a Report</h2><p>Excel, CSV or text, up to {MAX_MB} MB each.</p></div>
         {kind === 'billing' && <button type="button" className="btn btn--quiet btn--sm" onClick={downloadTemplate}><Icon name="download" />Excel Template</button>}
       </header>
       <div className="p-up__kind">
@@ -265,11 +395,11 @@ function UploadForm({ customers, onDone }) {
         </div>
         <small className="p-up__hint">{KIND_NOTES[kind]}</small>
       </div>
-      <label>Customer Login ID
-        {customers.some((c) => c.id !== c.login) ? (
+      <label>{picking ? 'Customer' : 'Customer Login ID'}
+        {picking ? (
           <Select required value={form.customer} onChange={set('customer')}>
             <option value="">Choose a customer</option>
-            {customers.map((c) => <option key={c.id} value={c.id}>{c.name} ({c.login}){c.telegram ? ' · Telegram' : ''}</option>)}
+            {byNickname.map((c) => <option key={c.id} value={c.id}>{c.nickname ? `${c.nickname} · ${c.name}` : `${c.name} (${c.login})`}{c.telegram ? ' · Telegram' : ''}</option>)}
           </Select>
         ) : (
           <>
@@ -301,8 +431,23 @@ function UploadForm({ customers, onDone }) {
           <span><b>Drop Excel files here</b> or click to choose</span>
         )}
       </label>
+      {kind === 'billing' && (pasting === null ? (
+        <button type="button" className="btn btn--quiet btn--sm p-up__paste-open" onClick={() => setPasting('')}>Paste a Report Sent as Text</button>
+      ) : (
+        <div className="p-up__paste">
+          <label><span>Report Text <i className="p-optional">a line a row, as sent</i></span>
+            <textarea rows={8} value={pasting} onChange={(e) => setPasting(e.target.value)} spellCheck={false}
+              placeholder={'Date              : 19-10-2026\nOld Due           : $ 2,350 /-\nTotal Number      : 70-1\nPayment Received  : $ 2,000 /-\nTotal Due         : $ 3,800 /-'} />
+          </label>
+          <div className="p-up__paste-actions">
+            <button type="button" className="btn btn--light btn--sm" disabled={!pasting.trim()} onClick={takePasted}>Use This Text</button>
+            <button type="button" className="btn btn--quiet btn--sm" onClick={() => setPasting(null)}>Cancel</button>
+          </div>
+        </div>
+      ))}
       {kind === 'billing' && canEnterCalls && chosen && read?.days.length > 0 && (
-        <CallsFromFile read={read} billing={billing} plan={plan} enter={enterCalls} onEnter={setEnterCalls} />
+        <CallsFromFile read={read} billing={billing} plan={plan} enter={enterCalls} onEnter={setEnterCalls} pay={enterPayments} onPay={setEnterPayments}
+          named={named} buyer={buyerName(chosen)} onStart={startBilling} />
       )}
       {kind === 'calls' && canNotify && (
         <>
@@ -329,13 +474,16 @@ function UploadForm({ customers, onDone }) {
   );
 }
 
-// Customer reports: upload, list and remove. Shown inside the admin and staff portal (Reports in the top bar),
-// and on the standalone /upload page (demo and local key sign-in). `onSignedOut` runs when the session ends.
+// Customer reports: upload, list, view and remove. Shown inside the admin and staff portal (Reports in the top bar),
+// and on the standalone /upload page (demo and local key sign-in). Either kind opens as a table in the viewer, as a
+// buyer sees their Call Summaries. `onSignedOut` runs when the session ends.
 export function ReportManager({ onSignedOut }) {
   const [reports, setReports] = useState(null);
   const [customers, setCustomers] = useState([]);
   const [error, setError] = useState('');
   const [filter, setFilter] = useState('');
+  const [open, setOpen] = useState(null);
+  const close = useCallback(() => setOpen(null), []);
 
   const load = useCallback(async () => {
     try {
@@ -352,8 +500,8 @@ export function ReportManager({ onSignedOut }) {
   useEffect(() => { load(); }, [load]);
 
   const remove = async (r) => {
-    const seen = r.kind === 'calls' ? ' The customer will no longer be able to see it.' : '';
-    if (!window.confirm(`Delete "${r.title}" for ${r.customer}?${seen}`)) return;
+    const seen = r.kind === 'calls' ? ' The customer will no longer be able to see it, and its calls come off their billing.' : '';
+    if (!window.confirm(`Delete "${r.title}" for ${r.customer_name || r.customer}?${seen}`)) return;
     try {
       await deleteReport(r.id);
       load();
@@ -362,7 +510,8 @@ export function ReportManager({ onSignedOut }) {
     }
   };
 
-  const shown = (reports || []).filter((r) => !filter || r.customer.includes(filter.trim().toLowerCase()) || r.title.toLowerCase().includes(filter.trim().toLowerCase()));
+  const q = filter.trim().toLowerCase();
+  const shown = (reports || []).filter((r) => !q || [r.customer, r.customer_name, r.title].some((v) => (v || '').toLowerCase().includes(q)));
 
   return (
     <>
@@ -377,20 +526,29 @@ export function ReportManager({ onSignedOut }) {
           </header>
           <div className="p-tablewrap">
             <table className="p-table">
-              <thead><tr><th scope="col">Customer</th><th scope="col">Report</th><th scope="col">Period</th><th scope="col">Added</th><th scope="col"><span className="sr-only">Delete</span></th></tr></thead>
+              <thead><tr><th scope="col">Customer</th><th scope="col">Report</th><th scope="col">Period</th><th scope="col">Added</th><th scope="col"><span className="sr-only">View, download or delete</span></th></tr></thead>
               <tbody>
                 {shown.map((r) => (
                   <tr key={r.id}>
                     <th scope="row">
                       <span className="p-person">
                         <Avatar userId={r.user_id} version={customers.find((c) => c.id === r.user_id)?.avatar_version} name={r.customer} size="sm" />
-                        {r.customer}
+                        {r.customer_name || r.customer}
                       </span>
                     </th>
-                    <td>{r.title}<small className="p-up__file">{KINDS[r.kind] || KINDS.billing} · {r.filename} · {fileSize(r.size)}</small></td>
+                    <td>
+                      <button type="button" className="p-linkbtn p-up__open" onClick={() => setOpen(r)}>{r.title}</button>
+                      <small className="p-up__file">{KINDS[r.kind] || KINDS.billing} · {r.filename} · {fileSize(r.size)}</small>
+                    </td>
                     <td>{period(r)}</td>
                     <td>{new Date(r.uploaded_at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}</td>
-                    <td><button type="button" className="p-iconbtn" aria-label={`Delete ${r.title}`} onClick={() => remove(r)}><Icon name="close" /></button></td>
+                    <td>
+                      <span className="p-up__tools">
+                        <button type="button" className="btn btn--quiet btn--sm" onClick={() => setOpen(r)}>View</button>
+                        <button type="button" className="p-iconbtn" aria-label={`Download ${r.filename}`} onClick={() => downloadReport(r).catch((e) => setError(e.message))}><Icon name="download" /></button>
+                        <button type="button" className="p-iconbtn" aria-label={`Delete ${r.title}`} onClick={() => remove(r)}><Icon name="close" /></button>
+                      </span>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -399,6 +557,7 @@ export function ReportManager({ onSignedOut }) {
           </div>
         </section>
       </div>
+      {open && <SheetViewer report={open} onClose={close} />}
     </>
   );
 }

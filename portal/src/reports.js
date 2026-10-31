@@ -104,18 +104,25 @@ export async function listAll() {
   }
 }
 
+// One customer's Call Summaries, newest first (our server only): for picking the calls they asked to have replaced.
+export const listCallSummariesOf = async (customerId) => (await api(`/staff/reports?customer=${encodeURIComponent(customerId)}&kind=calls`)).results;
+
 // Customers the billing team can upload for. Demo and local: anyone who already has a report.
 export async function listCustomers() {
   if (MODE === 'api') return (await api('/staff/customers')).results;
   return [...new Set((await listAll()).map((r) => r.customer))].map((c) => ({ id: c, name: c, login: c }));
 }
 
-// `kind`: 'billing' or 'calls'.
-export async function uploadReport({ customer, kind, title, note, periodFrom, periodTo, file }) {
+// A customer's nickname ("Q10"; '' for none). `version`: as listCustomers gave it, so a newer change is not overwritten.
+export const saveNickname = (id, nickname, version) => api(`/admin/users/${id}/nickname`, 'PATCH', { nickname, version });
+
+// `kind`: 'billing' or 'calls'. `calls`: a Call Summary's calls (call-summary.js callsIn); on our server they set the
+// customer's calls in billing for those days.
+export async function uploadReport({ customer, kind, title, note, periodFrom, periodTo, file, calls }) {
   if (file.size > MAX_MB * 1024 * 1024) throw new Error(`Files must be ${MAX_MB} MB or smaller.`);
   const content = await toBase64(file);
   const body = { customer, kind, title, note, period_from: periodFrom, period_to: periodTo, filename: file.name, content_base64: content };
-  if (MODE === 'api') return api('/staff/reports', 'POST', body);
+  if (MODE === 'api') return api('/staff/reports', 'POST', { ...body, ...(kind === 'calls' && calls && { calls }) });
   if (MODE === 'demo') return send('/api/reports', { method: 'POST', headers: staffHeaders(), body });
   await listAll();
   const report = {
@@ -140,6 +147,9 @@ export async function notifyReports(customer, reportIds, { email = true, telegra
   if (MODE !== 'api') return { emailed: false, reason: 'email is not available in this demo', telegram: { sent: false, reason: 'Telegram is not available in this demo' } };
   return api('/staff/reports/notify', 'POST', { customer, reports: reportIds, email, telegram });
 }
+
+// A Call Summary uploaded before calls were read: its calls, read now, bill its days (our server only).
+export const setReportCalls = (id, calls) => api(`/staff/reports/${encodeURIComponent(id)}/calls`, 'PUT', { calls });
 
 export async function deleteReport(id) {
   if (MODE === 'api') return api(`/staff/reports/${encodeURIComponent(id)}`, 'DELETE');

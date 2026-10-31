@@ -16,14 +16,14 @@ import { config } from './config.js';
 import { requireUser } from './accounts.js';
 import { hashToken, newToken } from './auth-crypto.js';
 import { recordAudit } from './audit.js';
-import { escapeHtml as escape, fitLines, TELEGRAM_BUDGET } from './format.js';
+import { buyerName, escapeHtml as escape, fitLines, TELEGRAM_BUDGET } from './format.js';
 import {
   createTelegramCode, deleteCustomerTelegram, deleteTelegramChat, getCustomerTelegram, getUser, saveCustomerTelegram, useTelegramCode,
 } from './portal-db.js';
 import { rateLimit } from './rate-limit.js';
 import { botUsername, sendTo } from './telegram.js';
 
-const label = (u) => u?.company || u?.name || u?.email || '';
+const label = buyerName;
 
 async function bot() {
   try {
