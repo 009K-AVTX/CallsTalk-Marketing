@@ -59,15 +59,43 @@ export function Statement({ day, currency }) {
   );
 }
 
-export function Wallet({ data, onPaid }) {
+// "−$1,505.00": the large balance uses a true minus sign, as on the billing mockup.
+const bigMoney = (v, currency) => money(v, currency).replace(/^-/, '−');
+// "America/New_York" -> "New York".
+const zoneName = (tz) => tz.split('/').pop().replace(/_/g, ' ');
+
+// The account at a glance: what is owed (or held in credit), the price, today's calls and the time zone the days are
+// counted in.
+export function BalanceCard({ data }) {
+  const owes = Number(data.balance) < 0;
+  const credit = Number(data.balance) > 0;
+  const today = data.days.find((d) => d.is_today);
+  return (
+    <section className="acct acct--balance" aria-labelledby="balance-title">
+      <p className="acct__label" id="balance-title">{owes ? 'Balance due' : 'Balance'}</p>
+      <p className={`acct__amount ${tone(data.balance)}`}>{bigMoney(data.balance, data.currency)}</p>
+      <p className="acct__note">
+        {owes ? `Pay ${money(data.amount_due, data.currency)} to clear your balance.`
+          : credit ? `${money(data.balance, data.currency)} in credit. Nothing to pay right now.`
+            : 'Your balance is clear. Nothing to pay right now.'}
+      </p>
+      <dl className="acct__facts">
+        <div><dt>Price</dt><dd>{money(data.price_per_call, data.currency)} / call</dd></div>
+        <div><dt>Calls today</dt><dd>{today ? callsLabel(today) : '0'}</dd></div>
+        <div><dt>Time zone</dt><dd>{zoneName(data.timezone)}</dd></div>
+      </dl>
+    </section>
+  );
+}
+
+// Paying: an amount (the full balance, a preset or typed), then the customer's own USDT (TRC-20) address to send it to.
+export function PayCard({ data, onPaid }) {
   const due = Number(data.amount_due);
   const [amount, setAmount] = useState(due > 0 ? data.amount_due : '');
   const [status, setStatus] = useState('idle'); // idle | sending | error
   const [error, setError] = useState('');
-  const owes = Number(data.balance) < 0;
-  const valid = Number(amount) >= 1;
-
   const [details, setDetails] = useState(null); // where to send it, once Pay is pressed
+  const valid = Number(amount) >= 1;
 
   const pay = async (e) => {
     e.preventDefault();
@@ -85,42 +113,27 @@ export function Wallet({ data, onPaid }) {
   };
 
   return (
-    <section className="wallet" aria-labelledby="wallet-title">
-      <div className="wallet__top">
-        <p className="wallet__label" id="wallet-title"><WalletIcon />Wallet Balance</p>
-        <span className={`wallet__state ${owes ? 'is-due' : 'is-ok'}`}>{owes ? 'Payment Due' : 'In Credit'}</span>
-      </div>
-      <p className={`wallet__balance ${tone(data.balance)}`}>{money(data.balance, data.currency)}</p>
-      <p className="wallet__note">
-        {owes
-          ? <>A payment of <b>{money(data.amount_due, data.currency)}</b> will settle your outstanding balance. Each billable call is charged at {money(data.price_per_call, data.currency)}.</>
-          : <>No payment is due at this time. Each billable call is charged at {money(data.price_per_call, data.currency)} against this balance.</>}
-      </p>
-      <dl className="wallet__facts">
-        <div><dt>Your Price</dt><dd>{money(data.price_per_call, data.currency)} / call</dd></div>
-        <div><dt>Days Counted In</dt><dd>{data.timezone.replace(/_/g, ' ')}</dd></div>
-      </dl>
-
+    <section className="acct acct--pay" aria-labelledby="pay-title">
+      <h2 className="acct__title" id="pay-title">Make a payment</h2>
       {details ? <PayDetails details={details} currency={data.currency} onBack={() => setDetails(null)} /> : (
-      <form className="wallet__pay" onSubmit={pay}>
-        <label htmlFor="pay-amount">Make a Payment</label>
-        <div className="wallet__amount">
-          <span aria-hidden="true">$</span>
-          <input id="pay-amount" type="number" inputMode="decimal" min="1" step="0.01" placeholder="0.00" value={amount} onChange={(e) => setAmount(e.target.value)} />
-        </div>
-        <div className="wallet__presets">
-          {due > 0 && <button type="button" className={Number(amount) === due ? 'is-on' : ''} onClick={() => setAmount(data.amount_due)}>Full Balance</button>}
-          {PRESETS.map((p) => (
-            <button key={p} type="button" className={Number(amount) === p ? 'is-on' : ''} onClick={() => setAmount(String(p))}>${p.toLocaleString('en-US')}</button>
-          ))}
-        </div>
-        <p className="wallet__method"><span aria-hidden="true">₮</span>USDT on the TRON network (TRC-20)</p>
-        {status === 'error' && <p className="access-card__error" role="alert">{error}</p>}
-        <button type="submit" className="btn btn--light" disabled={!valid || status === 'sending'}>
-          {status === 'sending' ? 'Preparing Your Deposit Address…' : valid ? `Pay ${money(amount, data.currency)}` : 'Pay Now'}
-        </button>
-        <p className="wallet__secure">Your funds will be credited to your account once the transaction has been confirmed on the blockchain.</p>
-      </form>
+        <form className="acct__form" onSubmit={pay}>
+          <label className="sr-only" htmlFor="pay-amount">Amount to pay in US dollars</label>
+          <div className="wallet__amount">
+            <span aria-hidden="true">$</span>
+            <input id="pay-amount" type="number" inputMode="decimal" min="1" step="0.01" placeholder="0.00" value={amount} onChange={(e) => setAmount(e.target.value)} />
+          </div>
+          <div className="wallet__presets">
+            {due > 0 && <button type="button" className={Number(amount) === due ? 'is-on' : ''} onClick={() => setAmount(data.amount_due)}>Full balance</button>}
+            {PRESETS.map((p) => (
+              <button key={p} type="button" className={Number(amount) === p ? 'is-on' : ''} onClick={() => setAmount(String(p))}>${p.toLocaleString('en-US')}</button>
+            ))}
+          </div>
+          {status === 'error' && <p className="access-card__error" role="alert">{error}</p>}
+          <button type="submit" className="btn btn--light acct__pay" disabled={!valid || status === 'sending'}>
+            {status === 'sending' ? 'Preparing your deposit address…' : valid ? `Pay ${money(amount, data.currency)}` : 'Pay'}
+          </button>
+          <p className="acct__fine">Paid in USDT (TRC-20). Credited once confirmed on the blockchain.</p>
+        </form>
       )}
     </section>
   );
@@ -218,14 +231,6 @@ export function History({ days, currency }) {
   );
 }
 
-function WalletIcon() {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M4 7.5A2.5 2.5 0 0 1 6.5 5H18v3" /><rect x="4" y="8" width="16" height="11" rx="2.5" /><circle cx="16" cy="13.5" r="1.2" />
-    </svg>
-  );
-}
-
 // The live statement, refreshed every 30 seconds while the tab is visible.
 // `onSignedOut` runs when the session has ended (the caller sends them to log in).
 export function useStatement(onSignedOut) {
@@ -262,18 +267,18 @@ export function useStatement(onSignedOut) {
   return { data, error, loading, load };
 }
 
-// Wallet and today, the last three days, and the last five days of bills and payments.
+// The balance and Make a payment side by side, then the last three days, and the last five days of bills and
+// payments (today is in Billing History, marked Live).
 export function BillingSections({ data, onPaid }) {
   if (!data) {
-    return <div className="billing__top" aria-hidden="true"><div className="wallet is-skeleton" /><div className="bill is-skeleton" /></div>;
+    return <div className="billing__top" aria-hidden="true"><div className="acct is-skeleton" /><div className="acct is-skeleton" /></div>;
   }
-  const today = data.days.find((d) => d.is_today);
   const past = data.days.filter((d) => !d.is_today).slice(0, 3);
   return (
     <>
       <div className="billing__top">
-        <Wallet data={data} onPaid={onPaid} />
-        {today && <Statement day={today} currency={data.currency} />}
+        <BalanceCard data={data} />
+        <PayCard data={data} onPaid={onPaid} />
       </div>
 
       <section className="billing__days" aria-labelledby="days-title">
